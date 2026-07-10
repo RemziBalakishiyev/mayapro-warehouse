@@ -25,10 +25,8 @@ builder.Services.AddCors(options => options.AddPolicy(FrontendCors, policy => po
     .AllowAnyHeader()
     .AllowAnyMethod()));
 
-// --- JWT bearer authentication (scheme is wired; real token issuance comes in the Identity stage) ---
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer();
-builder.Services.AddAuthorization();
+// --- JWT bearer authentication, role policies and ICurrentUser ---
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // --- Global exception handling ---
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

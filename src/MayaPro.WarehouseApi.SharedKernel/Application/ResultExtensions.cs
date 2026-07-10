@@ -1,11 +1,11 @@
-using MayaPro.WarehouseApi.SharedKernel.Application;
+using Microsoft.AspNetCore.Http;
 
-namespace MayaPro.WarehouseApi.Api.Extensions;
+namespace MayaPro.WarehouseApi.SharedKernel.Application;
 
 /// <summary>
-/// Uniform <see cref="Result"/> → HTTP translation. Success returns 200/201; failure maps the error
-/// code to a status (404 / 409 / 400) and always returns the same body shape: <c>{ code, message }</c>,
-/// which the frontend api-client reads directly for toasts.
+/// Uniform <see cref="Result"/> → HTTP translation, shared by every module's endpoints. Success returns
+/// 200/201; failure maps the error code to a status (404 / 409 / 400) and always returns the same body
+/// shape: <c>{ code, message }</c>, which the frontend api-client reads directly for toasts.
 /// </summary>
 public static class ResultExtensions
 {
