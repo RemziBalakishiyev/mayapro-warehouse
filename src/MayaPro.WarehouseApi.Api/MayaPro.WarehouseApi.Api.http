@@ -1,0 +1,6 @@
+@MayaPro.WarehouseApi.Api_HostAddress = http://localhost:5208
+
+GET {{MayaPro.WarehouseApi.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
