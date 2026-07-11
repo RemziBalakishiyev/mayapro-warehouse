@@ -16,6 +16,8 @@
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Products\MayaPro.WarehouseApi.Modules.Products.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Customers\MayaPro.WarehouseApi.Modules.Customers.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Sales\MayaPro.WarehouseApi.Modules.Sales.csproj" />
+    <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Suppliers\MayaPro.WarehouseApi.Modules.Suppliers.csproj" />
+    <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Expenses\MayaPro.WarehouseApi.Modules.Expenses.csproj" />
   </ItemGroup>
 
 </Project>

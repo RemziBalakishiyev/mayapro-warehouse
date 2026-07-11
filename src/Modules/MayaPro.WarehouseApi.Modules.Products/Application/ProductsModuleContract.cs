@@ -28,4 +28,41 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
 
         return Result.Success(new ProductStockSnapshot(product.Name, product.RealCostPerUnit));
     }
+
+    public async Task<Result<ProductSnapshot>> GetSnapshotAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default)
+    {
+        Product? product = await db.Products
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+
+        return product is null
+            ? Result.Failure<ProductSnapshot>(ProductErrors.NotFound)
+            : Result.Success(new ProductSnapshot(product.Id, product.Name, product.RealCostPerUnit));
+    }
+
+    public async Task<Result> AddExpenseToProductAsync(
+        Guid productId,
+        ProductCostBucket bucket,
+        decimal amount,
+        CancellationToken cancellationToken = default)
+    {
+        Product? product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null)
+            return Result.Failure(ProductErrors.NotFound);
+
+        product.AddExpense(ToKind(bucket), amount);
+        return Result.Success();
+    }
+
+    private static ProductExpenseKind ToKind(ProductCostBucket bucket) => bucket switch
+    {
+        ProductCostBucket.Yol => ProductExpenseKind.Yol,
+        ProductCostBucket.Fehle => ProductExpenseKind.Fehle,
+        ProductCostBucket.Yer => ProductExpenseKind.Yer,
+        ProductCostBucket.Paket => ProductExpenseKind.Paket,
+        ProductCostBucket.Diger => ProductExpenseKind.Diger,
+        _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket, "Naməlum xərc növü")
+    };
 }
