@@ -1,5 +1,8 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.Products.Application;
 using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
+using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
@@ -26,14 +29,20 @@ public sealed class ProductsModule : IModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        // Scoped options so each scope binds the shared connection from IDbConnectionFactory.
         services.AddDbContext<ProductsDbContext>((sp, options) =>
         {
+            var connection = sp.GetRequiredService<IDbConnectionFactory>().GetConnection();
             options.UseSqlServer(
-                configuration.GetConnectionString("Default"),
+                connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ProductsDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
-        });
+        }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IProductsDbContext>(sp => sp.GetRequiredService<ProductsDbContext>());
+        services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<ProductsDbContext>());
+
+        // Cross-module contract: stock decrement for the sales chain.
+        services.AddScoped<IProductsModule, ProductsModuleContract>();
 
         services.AddScoped<ProductSeeder>();
 

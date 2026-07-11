@@ -9,6 +9,9 @@ public interface ICurrentUser
     /// <summary>The user id (JWT <c>sub</c> claim), or <c>null</c> for anonymous requests.</summary>
     Guid? UserId { get; }
 
+    /// <summary>The user's full name (JWT <c>name</c> claim), or <c>null</c> for anonymous requests.</summary>
+    string? Name { get; }
+
     /// <summary>The role name (JWT <c>role</c> claim), or <c>null</c> for anonymous requests.</summary>
     string? Role { get; }
 

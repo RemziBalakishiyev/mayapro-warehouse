@@ -21,6 +21,8 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
         }
     }
 
+    public string? Name => Principal?.FindFirstValue("name");
+
     public string? Role => Principal?.FindFirstValue("role");
 
     public bool IsAuthenticated => Principal?.Identity?.IsAuthenticated ?? false;

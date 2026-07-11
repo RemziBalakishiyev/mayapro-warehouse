@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Api.Extensions;
 using MayaPro.WarehouseApi.Api.Middleware;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -61,6 +62,10 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, jwtScheme);
     options.AddSecurityRequirement(new OpenApiSecurityRequirement { [jwtScheme] = Array.Empty<string>() });
 });
+
+// --- Cross-module transaction infrastructure: one shared connection + unit of work per scope ---
+builder.Services.AddScoped<IDbConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // --- Cross-module contracts: temporary activity logger (writes to Serilog until the Activity module ships) ---
 builder.Services.AddScoped<IActivityLogger, LoggingActivityLogger>();
