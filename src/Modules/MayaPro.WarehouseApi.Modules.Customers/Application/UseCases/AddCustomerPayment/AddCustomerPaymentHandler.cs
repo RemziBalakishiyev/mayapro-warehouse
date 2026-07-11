@@ -38,14 +38,14 @@ public sealed class AddCustomerPaymentHandler(
         var payment = CustomerPayment.Create(customer.Id, command.Amount, command.Note, currentUser.UserId);
         db.CustomerPayments.Add(payment);
 
-        await tx.SaveChangesAsync(ct);
-
+        // Log before the save so the activity is flushed in the same transaction.
         await activityLogger.LogAsync(
             "Ödəniş qəbul etdi",
             $"{customer.Name} — {command.Amount:0.00} AZN",
             currentUser.UserId,
             ct);
 
+        await tx.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
         return Result.Success(payment.ToDto());

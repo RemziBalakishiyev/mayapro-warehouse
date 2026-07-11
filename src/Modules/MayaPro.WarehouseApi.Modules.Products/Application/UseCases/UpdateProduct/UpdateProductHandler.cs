@@ -11,6 +11,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.UpdateProdu
 /// <summary>Edits an existing product, recomputing its real cost, and records an activity entry.</summary>
 public sealed class UpdateProductHandler(
     IProductsDbContext db,
+    IUnitOfWork unitOfWork,
     IValidator<UpdateProductCommand> validator,
     IActivityLogger activityLogger,
     ICurrentUser currentUser)
@@ -54,13 +55,17 @@ public sealed class UpdateProductHandler(
             command.Box,
             expenses);
 
-        await db.SaveChangesAsync(ct);
+        // Transaction so the edit and its activity log commit together.
+        await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         await activityLogger.LogAsync(
             "Mal redaktə etdi",
             product.Name,
             currentUser.UserId,
             ct);
+
+        await tx.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         return Result.Success(product.ToDto());
     }

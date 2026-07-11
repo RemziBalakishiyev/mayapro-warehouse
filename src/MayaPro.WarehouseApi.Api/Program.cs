@@ -1,7 +1,6 @@
 using MayaPro.WarehouseApi.Api.Extensions;
 using MayaPro.WarehouseApi.Api.Middleware;
 using MayaPro.WarehouseApi.SharedKernel.Application;
-using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
@@ -67,8 +66,7 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddScoped<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// --- Cross-module contracts: temporary activity logger (writes to Serilog until the Activity module ships) ---
-builder.Services.AddScoped<IActivityLogger, LoggingActivityLogger>();
+// The IActivityLogger implementation is supplied by the Activity module (DbActivityLogger).
 
 // --- Modules: discover and register every IModule ---
 builder.Services.AddModules(builder.Configuration);

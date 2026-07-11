@@ -1,5 +1,7 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.Expenses.Application;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.Abstractions;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpense;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenses;
 using MayaPro.WarehouseApi.Modules.Expenses.Endpoints;
@@ -34,6 +36,9 @@ public sealed class ExpensesModule : IModule
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IExpensesDbContext>(sp => sp.GetRequiredService<ExpensesDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<ExpensesDbContext>());
+
+        // Cross-module contract: day total for day-end.
+        services.AddScoped<IExpensesModule, ExpensesModuleContract>();
 
         services.AddScoped<IValidator<CreateExpenseCommand>, CreateExpenseValidator>();
 

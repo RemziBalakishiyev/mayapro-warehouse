@@ -14,6 +14,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock
 /// </summary>
 public sealed class AdjustStockHandler(
     IProductsDbContext db,
+    IUnitOfWork unitOfWork,
     IValidator<AdjustStockCommand> validator,
     IActivityLogger activityLogger,
     ICurrentUser currentUser)
@@ -29,7 +30,9 @@ public sealed class AdjustStockHandler(
             return Result.Failure<ProductDto>(ProductErrors.NotFound);
 
         product.AdjustStock(command.Delta);
-        await db.SaveChangesAsync(ct);
+
+        // Transaction so the stock change and its activity log commit together.
+        await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         string suffix = string.IsNullOrWhiteSpace(command.Note) ? string.Empty : $" ({command.Note})";
         string sign = command.Delta > 0 ? "+" : string.Empty;
@@ -38,6 +41,9 @@ public sealed class AdjustStockHandler(
             $"{product.Name} {sign}{command.Delta}{suffix}",
             currentUser.UserId,
             ct);
+
+        await tx.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         return Result.Success(product.ToDto());
     }

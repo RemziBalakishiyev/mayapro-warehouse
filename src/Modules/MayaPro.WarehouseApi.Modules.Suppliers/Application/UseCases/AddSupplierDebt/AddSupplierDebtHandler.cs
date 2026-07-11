@@ -33,14 +33,14 @@ public sealed class AddSupplierDebtHandler(
 
         supplier.IncreaseDebt(command.Amount);
 
-        await tx.SaveChangesAsync(ct);
-
+        // Log before the save so the activity is flushed in the same transaction.
         await activityLogger.LogAsync(
             "Təchizatçı borcu artdı",
             $"{supplier.Name} — {command.Amount:0.00} AZN",
             currentUser.UserId,
             ct);
 
+        await tx.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
         return Result.Success(supplier.ToDto());

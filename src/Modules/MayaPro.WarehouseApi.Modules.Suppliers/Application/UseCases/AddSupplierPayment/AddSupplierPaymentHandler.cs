@@ -38,14 +38,14 @@ public sealed class AddSupplierPaymentHandler(
         var payment = SupplierPayment.Create(supplier.Id, command.Amount, command.Note, currentUser.UserId);
         db.SupplierPayments.Add(payment);
 
-        await tx.SaveChangesAsync(ct);
-
+        // Log before the save so the activity is flushed in the same transaction.
         await activityLogger.LogAsync(
             "Təchizatçıya ödəniş etdi",
             $"{supplier.Name} — {command.Amount:0.00} AZN",
             currentUser.UserId,
             ct);
 
+        await tx.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
         return Result.Success(payment.ToDto());

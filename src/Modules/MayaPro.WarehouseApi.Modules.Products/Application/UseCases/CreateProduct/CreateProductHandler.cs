@@ -13,6 +13,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProdu
 /// </summary>
 public sealed class CreateProductHandler(
     IProductsDbContext db,
+    IUnitOfWork unitOfWork,
     IValidator<CreateProductCommand> validator,
     IActivityLogger activityLogger,
     ICurrentUser currentUser)
@@ -52,14 +53,19 @@ public sealed class CreateProductHandler(
             command.Box,
             expenses);
 
+        // Transaction so the product insert and its activity log commit together.
+        await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
+
         db.Products.Add(product);
-        await db.SaveChangesAsync(ct);
 
         await activityLogger.LogAsync(
             "Mal əlavə etdi",
             $"{product.Name} — {product.Quantity} ədəd",
             currentUser.UserId,
             ct);
+
+        await tx.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         return Result.Success(product.ToDto());
     }

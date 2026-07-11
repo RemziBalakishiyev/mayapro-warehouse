@@ -60,8 +60,11 @@ public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
         var options = new DbContextOptionsBuilder<AuthDbContext>()
             // Match the module's migration-history location, or the host's startup migration
             // would not see these migrations as applied and would try to recreate the tables.
-            .UseSqlServer(TestConnectionString, sql =>
-                sql.MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema))
+            .UseSqlServer(TestConnectionString, sql => sql
+                .MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema)
+                // Dropping + recreating the database and running every module's migrations is a cold-start
+                // operation that can exceed the default 30s command timeout on a busy local SQL Server.
+                .CommandTimeout(120))
             .Options;
 
         await using var db = new AuthDbContext(options);

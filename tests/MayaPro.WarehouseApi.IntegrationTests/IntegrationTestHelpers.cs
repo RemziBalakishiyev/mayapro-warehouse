@@ -117,5 +117,17 @@ internal static class IntegrationTestHelpers
 
     internal sealed record SupplierPaymentDto(Guid Id, Guid SupplierId, decimal Amount);
 
+    internal sealed record ClosingDto(
+        decimal OpeningCash,
+        decimal CashSales,
+        decimal CardSales,
+        decimal CreditSales,
+        decimal Expenses,
+        decimal ExpectedCash,
+        decimal ActualCash,
+        decimal Difference);
+
+    internal sealed record ActivityDto(Guid Id, Guid? EmployeeId, string Action, string Detail);
+
     internal sealed record ErrorDto(string Code, string Message);
 }

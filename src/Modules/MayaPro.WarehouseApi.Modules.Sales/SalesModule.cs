@@ -1,5 +1,7 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.Sales.Application;
 using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSales;
 using MayaPro.WarehouseApi.Modules.Sales.Endpoints;
@@ -34,6 +36,9 @@ public sealed class SalesModule : IModule
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<ISalesDbContext>(sp => sp.GetRequiredService<SalesDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<SalesDbContext>());
+
+        // Cross-module contract: day totals for day-end.
+        services.AddScoped<ISalesModule, SalesModuleContract>();
 
         services.AddScoped<IValidator<CreateSaleCommand>, CreateSaleValidator>();
 
