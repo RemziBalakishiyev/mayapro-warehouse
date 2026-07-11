@@ -1,4 +1,5 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.DayEnd.Application;
 using MayaPro.WarehouseApi.Modules.DayEnd.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.DayEnd.Application.UseCases.CloseDay;
 using MayaPro.WarehouseApi.Modules.DayEnd.Application.UseCases.GetClosings;
@@ -6,6 +7,7 @@ using MayaPro.WarehouseApi.Modules.DayEnd.Application.UseCases.GetTodayClosing;
 using MayaPro.WarehouseApi.Modules.DayEnd.Endpoints;
 using MayaPro.WarehouseApi.Modules.DayEnd.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +37,9 @@ public sealed class DayEndModule : IModule
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IDayEndDbContext>(sp => sp.GetRequiredService<DayEndDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<DayEndDbContext>());
+
+        // Cross-module contract: the last closing anchors "expected cash" on the reports dashboard.
+        services.AddScoped<IDayEndModule, DayEndModuleContract>();
 
         services.AddScoped<IValidator<CloseDayCommand>, CloseDayValidator>();
 

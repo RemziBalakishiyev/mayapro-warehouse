@@ -18,12 +18,12 @@ public sealed class StoreSettings : Entity
     public const int DefaultMinStockValue = 10;
 
     /// <summary>
-    /// Default WhatsApp debt-reminder template. Placeholders — {ad} (customer), {borc} (amount),
-    /// {mağaza} (store) — are substituted on the client before sending.
+    /// Default WhatsApp debt-reminder template. The frontend recognises a single placeholder — {debt} —
+    /// which it substitutes with the customer's outstanding balance before sending. Kept identical to the
+    /// frontend's own default so switching the mock off changes nothing.
     /// </summary>
     public const string DefaultWhatsappTemplate =
-        "Salam {ad}! {mağaza} mağazasına {borc} AZN borcunuz qalıb. " +
-        "Zəhmət olmasa ödənişi unutmayın. Təşəkkür edirik.";
+        "Salam, sizdə {debt} AZN qalıq borc görünür. Zəhmət olmasa ödənişi tamamlayın.";
 
     // EF Core constructor.
     private StoreSettings() { }

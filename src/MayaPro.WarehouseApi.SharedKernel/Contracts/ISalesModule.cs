@@ -14,10 +14,19 @@ public interface ISalesModule
         DateOnly? from,
         DateOnly? to,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the last sale date per product (only products that have ever sold). Used by the read-only
+    /// Reports module to flag "frozen" stock — items that have not moved in 30/60/90 days.
+    /// </summary>
+    Task<IReadOnlyList<ProductLastSale>> GetLastSaleDatesAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>A day's net sales split by payment type.</summary>
 public sealed record SalesDayTotals(decimal Cash, decimal Card, decimal Nisye);
+
+/// <summary>The most recent sale date for a product.</summary>
+public sealed record ProductLastSale(Guid ProductId, DateOnly LastSale);
 
 /// <summary>A single sale as seen by reports: date, net amount, profit, payment code and product line.</summary>
 public sealed record SalesReportRow(

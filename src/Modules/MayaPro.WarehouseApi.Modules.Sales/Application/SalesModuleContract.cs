@@ -50,4 +50,17 @@ internal sealed class SalesModuleContract(ISalesDbContext db) : ISalesModule
                 s.Quantity))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<ProductLastSale>> GetLastSaleDatesAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await db.Sales
+            .AsNoTracking()
+            .GroupBy(s => s.ProductId)
+            .Select(g => new { ProductId = g.Key, Last = g.Max(s => s.Date) })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new ProductLastSale(r.ProductId, DateOnly.FromDateTime(r.Last)))
+            .ToList();
+    }
 }

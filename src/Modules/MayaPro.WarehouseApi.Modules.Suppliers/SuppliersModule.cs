@@ -1,4 +1,5 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierDebt;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierPayment;
@@ -8,6 +9,7 @@ using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSuppliers;
 using MayaPro.WarehouseApi.Modules.Suppliers.Endpoints;
 using MayaPro.WarehouseApi.Modules.Suppliers.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +40,9 @@ public sealed class SuppliersModule : IModule
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<ISuppliersDbContext>(sp => sp.GetRequiredService<SuppliersDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<SuppliersDbContext>());
+
+        // Cross-module contract: our total debt for the reports dashboard.
+        services.AddScoped<ISuppliersModule, SuppliersModuleContract>();
 
         services.AddScoped<SupplierSeeder>();
 

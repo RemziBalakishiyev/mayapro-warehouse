@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetDashboard;
 using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetSummary;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,7 +20,10 @@ internal static class ReportsEndpoints
             .WithName("GetDashboard");
 
         group.MapGet("/summary", async (string? period, GetSummaryHandler handler, CancellationToken ct) =>
-                Results.Ok(await handler.Handle(period, Today(), ct)))
+            {
+                var result = await handler.Handle(period, Today(), ct);
+                return result.ToHttpResult();
+            })
             .WithName("GetSummary");
     }
 

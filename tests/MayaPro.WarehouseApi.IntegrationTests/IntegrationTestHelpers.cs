@@ -147,12 +147,23 @@ internal static class IntegrationTestHelpers
         decimal TodayProfit,
         decimal TodayExpenses,
         int TodaySalesCount,
-        decimal TotalCustomerDebt);
+        decimal TotalCustomerDebt,
+        decimal TotalSupplierDebt,
+        decimal ExpectedCash,
+        FrozenProductsDto FrozenProducts,
+        List<TopProductDto> TopProducts,
+        List<LowStockProductDto> LowStock);
+
+    internal sealed record FrozenProductsDto(int Days30, int Days60, int Days90);
+
+    internal sealed record TopProductDto(Guid ProductId, string Name, int QuantitySold, decimal Revenue);
+
+    internal sealed record LowStockProductDto(Guid ProductId, string Name, int Quantity, int MinStock);
 
     internal sealed record SummaryDto(
         string Period,
-        DateOnly From,
-        DateOnly To,
+        DateOnly? From,
+        DateOnly? To,
         decimal SalesTotal,
         decimal Profit,
         decimal Expenses,

@@ -1,10 +1,12 @@
+using System.Net;
 using System.Net.Http.Json;
 
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
 /// <summary>
 /// End-to-end tests for the read-only Reports module: the dashboard and the period summary are computed
-/// server-side from the other modules (sales, expenses, products, customers) — Reports owns no tables.
+/// server-side from the other modules (sales, expenses, products, customers, suppliers, day-end) —
+/// Reports owns no tables.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class ReportsApiTests : IAsyncLifetime
@@ -18,7 +20,7 @@ public sealed class ReportsApiTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task Dashboard_Reflects_Todays_Sales_Expenses_And_Stock()
+    public async Task Dashboard_Reflects_Trading_Stock_Debts_And_Frozen_Groups()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
 
@@ -36,6 +38,26 @@ public sealed class ReportsApiTests : IAsyncLifetime
         Assert.True(d.TodaySalesCount >= 1);
         Assert.True(d.StockRetailValue > 0m);
         Assert.True(d.StockCostValue > 0m);
+
+        // Extended fields.
+        Assert.True(d.TotalSupplierDebt >= 0m);   // "my debts" (ISuppliersModule.GetTotalDebtAsync)
+
+        // Frozen buckets are cumulative: 30-day count ≥ 60-day ≥ 90-day. Seeded, never-sold in-stock
+        // products count as frozen in every bucket, so the 90-day group is non-empty.
+        Assert.NotNull(d.FrozenProducts);
+        Assert.True(d.FrozenProducts.Days30 >= d.FrozenProducts.Days60);
+        Assert.True(d.FrozenProducts.Days60 >= d.FrozenProducts.Days90);
+        Assert.True(d.FrozenProducts.Days90 >= 1);
+
+        // Top products: at least one sold, each with a positive quantity, capped at five.
+        Assert.NotNull(d.TopProducts);
+        Assert.NotEmpty(d.TopProducts);
+        Assert.True(d.TopProducts.Count <= 5);
+        Assert.All(d.TopProducts, t => Assert.True(t.QuantitySold > 0));
+
+        // Low-stock list is consistent with the count.
+        Assert.NotNull(d.LowStock);
+        Assert.Equal(d.LowStockCount, d.LowStock.Count);
     }
 
     [Fact]
@@ -59,19 +81,38 @@ public sealed class ReportsApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Summary_Week_Spans_Seven_Days_And_Unknown_Period_Falls_Back_To_Today()
+    public async Task Summary_Week_Spans_Seven_Days_And_All_Is_Unbounded()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var product = await client.CreateProductAsync("RPT-ALL", quantity: 5, salePrice: 10m);
+        await SellAsync(client, product.Id, quantity: 1, "Nağd");
 
         var week = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
             "/api/reports/summary?period=week"))!;
         Assert.Equal("week", week.Period);
-        Assert.Equal(week.To.AddDays(-6), week.From);     // inclusive 7-day window
+        Assert.NotNull(week.From);
+        Assert.NotNull(week.To);
+        Assert.Equal(week.To!.Value.AddDays(-6), week.From!.Value); // inclusive 7-day window
 
-        var unknown = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
-            "/api/reports/summary?period=nonsense"))!;
-        Assert.Equal("today", unknown.Period);            // safe fallback
-        Assert.Equal(unknown.From, unknown.To);
+        var all = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=all"))!;
+        Assert.Equal("all", all.Period);
+        Assert.Null(all.From);            // unbounded — whole history
+        Assert.Null(all.To);
+        Assert.True(all.SalesTotal >= 10m);
+    }
+
+    [Fact]
+    public async Task Summary_Unknown_Period_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/summary?period=nonsense");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidPeriod", error.Code);
     }
 
     private static Task SellAsync(HttpClient client, Guid productId, int quantity, string paymentType) =>

@@ -29,7 +29,11 @@ public sealed class SettingsApiTests : IAsyncLifetime
         Assert.Equal("AZN", defaults.Currency);
         Assert.Equal(10, defaults.DefaultMinStock);
         Assert.Equal("az", defaults.Language);
-        Assert.False(string.IsNullOrWhiteSpace(defaults.WhatsappTemplate));
+        // Must match the frontend's own default template exactly (single {debt} placeholder).
+        Assert.Equal(
+            "Salam, sizdə {debt} AZN qalıq borc görünür. Zəhmət olmasa ödənişi tamamlayın.",
+            defaults.WhatsappTemplate);
+        Assert.Contains("{debt}", defaults.WhatsappTemplate);
 
         // Owner updates the settings.
         HttpResponseMessage put = await client.PutAsJsonAsync("/api/settings", new

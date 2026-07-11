@@ -1,11 +1,12 @@
 using MayaPro.WarehouseApi.Modules.Reports.Application.Contracts;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetSummary;
 
 /// <summary>
 /// Builds a trading summary over a period from the Sales and Expenses read contracts. Net profit is the
-/// sales profit less the period's expenses.
+/// sales profit less the period's expenses. An unrecognised period is rejected (400) rather than coerced.
 /// </summary>
 public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expenses)
 {
@@ -14,9 +15,10 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
     private const string CardCode = "Kart";
     private const string CreditCode = "Nisyə";
 
-    public async Task<SummaryDto> Handle(string? period, DateOnly today, CancellationToken ct)
+    public async Task<Result<SummaryDto>> Handle(string? period, DateOnly today, CancellationToken ct)
     {
-        ReportPeriod window = ReportPeriod.Resolve(period, today);
+        if (!ReportPeriod.TryResolve(period, today, out ReportPeriod window))
+            return Result.Failure<SummaryDto>(ReportErrors.InvalidPeriod);
 
         IReadOnlyList<SalesReportRow> salesRows = await sales.GetSalesAsync(window.From, window.To, ct);
         IReadOnlyList<ExpenseReportRow> expenseRows = await expenses.GetExpensesAsync(window.From, window.To, ct);
@@ -25,7 +27,7 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
         decimal profit = salesRows.Sum(s => s.Profit);
         decimal expensesTotal = expenseRows.Sum(e => e.Amount);
 
-        return new SummaryDto(
+        return Result.Success(new SummaryDto(
             Period: window.Code,
             From: window.From,
             To: window.To,
@@ -36,6 +38,6 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
             NetProfit: profit - expensesTotal,
             CashSales: salesRows.Where(s => s.PaymentType == CashCode).Sum(s => s.TotalAmount),
             CardSales: salesRows.Where(s => s.PaymentType == CardCode).Sum(s => s.TotalAmount),
-            CreditSales: salesRows.Where(s => s.PaymentType == CreditCode).Sum(s => s.TotalAmount));
+            CreditSales: salesRows.Where(s => s.PaymentType == CreditCode).Sum(s => s.TotalAmount)));
     }
 }
