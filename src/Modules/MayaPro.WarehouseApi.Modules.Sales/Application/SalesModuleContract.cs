@@ -1,17 +1,21 @@
 using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Sales.Domain;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Sales.Application;
 
-/// <summary>The Sales module's implementation of <see cref="ISalesModule"/>: day totals for day-end.</summary>
-internal sealed class SalesModuleContract(ISalesDbContext db) : ISalesModule
+/// <summary>
+/// The Sales module's implementation of <see cref="ISalesModule"/>: day totals for day-end and rows for
+/// reports. All day boundaries are the business time zone's (via <see cref="IDateProvider"/>), so a sale
+/// just after Baku midnight belongs to the Baku day even though it is still "yesterday" in UTC.
+/// </summary>
+internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider dateProvider) : ISalesModule
 {
     public async Task<SalesDayTotals> GetDayTotalsAsync(DateOnly date, CancellationToken cancellationToken = default)
     {
-        DateTime start = date.ToDateTime(TimeOnly.MinValue);
-        DateTime end = start.AddDays(1);
+        (DateTime start, DateTime end) = dateProvider.LocalDayRangeUtc(date);
 
         var byType = await db.Sales
             .AsNoTracking()
@@ -33,15 +37,15 @@ internal sealed class SalesModuleContract(ISalesDbContext db) : ISalesModule
         IQueryable<Sale> query = db.Sales.AsNoTracking();
 
         if (from is { } f)
-            query = query.Where(s => s.Date >= f.ToDateTime(TimeOnly.MinValue));
+            query = query.Where(s => s.Date >= dateProvider.LocalDayRangeUtc(f).StartUtc);
         if (to is { } t)
-            query = query.Where(s => s.Date < t.AddDays(1).ToDateTime(TimeOnly.MinValue));
+            query = query.Where(s => s.Date < dateProvider.LocalDayRangeUtc(t).EndUtc);
 
         List<Sale> sales = await query.OrderBy(s => s.Date).ToListAsync(cancellationToken);
 
         return sales
             .Select(s => new SalesReportRow(
-                DateOnly.FromDateTime(s.Date),
+                dateProvider.ToLocalDate(s.Date),
                 s.TotalAmount,
                 s.Profit,
                 s.PaymentType.ToCode(),
@@ -60,7 +64,43 @@ internal sealed class SalesModuleContract(ISalesDbContext db) : ISalesModule
             .ToListAsync(cancellationToken);
 
         return rows
-            .Select(r => new ProductLastSale(r.ProductId, DateOnly.FromDateTime(r.Last)))
+            .Select(r => new ProductLastSale(r.ProductId, dateProvider.ToLocalDate(r.Last)))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<RecentSaleInfo>> GetRecentSalesAsync(
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        List<Sale> sales = await db.Sales
+            .AsNoTracking()
+            .OrderByDescending(s => s.Date)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return sales
+            .Select(s => new RecentSaleInfo(
+                s.Id,
+                dateProvider.ToLocalDate(s.Date),
+                s.ProductName,
+                s.Quantity,
+                s.TotalAmount,
+                s.PaymentType.ToCode()))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<CustomerLastPurchase>> GetLastCreditSaleDatesByCustomerAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await db.Sales
+            .AsNoTracking()
+            .Where(s => s.CustomerId != null)
+            .GroupBy(s => s.CustomerId!.Value)
+            .Select(g => new { CustomerId = g.Key, Last = g.Max(s => s.Date) })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new CustomerLastPurchase(r.CustomerId, r.Last))
             .ToList();
     }
 }

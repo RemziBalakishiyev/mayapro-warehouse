@@ -58,6 +58,20 @@ public sealed class ReportsApiTests : IAsyncLifetime
         // Low-stock list is consistent with the count.
         Assert.NotNull(d.LowStock);
         Assert.Equal(d.LowStockCount, d.LowStock.Count);
+
+        // Frozen products now carry detail rows; the seeded never-sold items appear with null idle days.
+        Assert.NotEmpty(d.FrozenProducts.Items);
+        Assert.Contains(d.FrozenProducts.Items, i => i.DaysSinceLastSale == null && i.FrozenValue > 0m);
+
+        // Trend series are fixed-length and end today; today's point reflects this test's sale.
+        Assert.Equal(14, d.DailySeries.Count);
+        Assert.Equal(6, d.MonthlySeries.Count);
+        Assert.True(d.DailySeries[^1].Sales >= 30m);
+
+        // Recent activity feeds are present and reflect the sale just made.
+        Assert.NotEmpty(d.RecentSales);
+        Assert.Contains(d.RecentSales, r => r.PaymentType == "Nağd");
+        Assert.NotNull(d.RecentPayments);
     }
 
     [Fact]

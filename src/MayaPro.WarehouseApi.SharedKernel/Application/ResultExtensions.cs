@@ -37,7 +37,8 @@ public static class ResultExtensions
         if (code.EndsWith("NotFound", StringComparison.Ordinal))
             return StatusCodes.Status404NotFound;
         if (code.EndsWith("Conflict", StringComparison.Ordinal) ||
-            code.EndsWith("AlreadyExists", StringComparison.Ordinal))
+            code.EndsWith("AlreadyExists", StringComparison.Ordinal) ||
+            code.EndsWith("AlreadyClosed", StringComparison.Ordinal))
             return StatusCodes.Status409Conflict;
 
         return StatusCodes.Status400BadRequest;

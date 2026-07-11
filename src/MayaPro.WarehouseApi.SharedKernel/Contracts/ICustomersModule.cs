@@ -20,4 +20,15 @@ public interface ICustomersModule
     /// receivables figure on the dashboard.
     /// </summary>
     Task<decimal> GetTotalDebtAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the <paramref name="take"/> most recent customer payments, each with the customer's name,
+    /// for the dashboard's activity feed.
+    /// </summary>
+    Task<IReadOnlyList<RecentPaymentInfo>> GetRecentPaymentsAsync(
+        int take,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>A recent customer payment for the dashboard feed. Date is the business-zone (local) date.</summary>
+public sealed record RecentPaymentInfo(Guid Id, DateOnly Date, string CustomerName, decimal Amount);

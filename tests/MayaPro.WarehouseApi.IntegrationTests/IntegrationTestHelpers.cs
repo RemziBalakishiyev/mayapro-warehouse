@@ -152,13 +152,27 @@ internal static class IntegrationTestHelpers
         decimal ExpectedCash,
         FrozenProductsDto FrozenProducts,
         List<TopProductDto> TopProducts,
-        List<LowStockProductDto> LowStock);
+        List<LowStockProductDto> LowStock,
+        List<DailyPointDto> DailySeries,
+        List<MonthlyPointDto> MonthlySeries,
+        List<RecentSaleDto> RecentSales,
+        List<RecentPaymentDto> RecentPayments);
 
-    internal sealed record FrozenProductsDto(int Days30, int Days60, int Days90);
+    internal sealed record FrozenProductsDto(int Days30, int Days60, int Days90, List<FrozenProductDto> Items);
+
+    internal sealed record FrozenProductDto(Guid Id, string Name, int Quantity, decimal FrozenValue, int? DaysSinceLastSale);
 
     internal sealed record TopProductDto(Guid ProductId, string Name, int QuantitySold, decimal Revenue);
 
     internal sealed record LowStockProductDto(Guid ProductId, string Name, int Quantity, int MinStock);
+
+    internal sealed record DailyPointDto(DateOnly Date, decimal Sales, decimal Profit);
+
+    internal sealed record MonthlyPointDto(string Month, decimal Profit);
+
+    internal sealed record RecentSaleDto(Guid Id, DateOnly Date, string ProductName, int Quantity, decimal TotalAmount, string PaymentType);
+
+    internal sealed record RecentPaymentDto(Guid Id, DateOnly Date, string CustomerName, decimal Amount);
 
     internal sealed record SummaryDto(
         string Period,

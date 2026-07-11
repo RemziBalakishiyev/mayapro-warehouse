@@ -53,7 +53,8 @@ public sealed class DayEndApiTests : IAsyncLifetime
         HttpResponseMessage second = await client.PostAsJsonAsync(
             "/api/closings", new { openingCash = 100m, actualCash = 90m, note = (string?)null });
 
-        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+        // Re-closing the same day is a conflict (409), not a plain bad request.
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         var error = (await second.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
         Assert.Equal("DayEnd.AlreadyClosed", error.Code);
     }

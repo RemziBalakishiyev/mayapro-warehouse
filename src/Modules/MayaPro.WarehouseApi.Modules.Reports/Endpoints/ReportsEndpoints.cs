@@ -16,17 +16,14 @@ internal static class ReportsEndpoints
             .RequireAuthorization(); // viewing is open to every authenticated role
 
         group.MapGet("/dashboard", async (GetDashboardHandler handler, CancellationToken ct) =>
-                Results.Ok(await handler.Handle(Today(), ct)))
+                Results.Ok(await handler.Handle(ct)))
             .WithName("GetDashboard");
 
         group.MapGet("/summary", async (string? period, GetSummaryHandler handler, CancellationToken ct) =>
             {
-                var result = await handler.Handle(period, Today(), ct);
+                var result = await handler.Handle(period, ct);
                 return result.ToHttpResult();
             })
             .WithName("GetSummary");
     }
-
-    // "Today" is resolved on the server so the report window never depends on the client's clock.
-    private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
 }

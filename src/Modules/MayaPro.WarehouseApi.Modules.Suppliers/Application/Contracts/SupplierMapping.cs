@@ -5,9 +5,12 @@ namespace MayaPro.WarehouseApi.Modules.Suppliers.Application.Contracts;
 /// <summary>Maps Suppliers entities to their wire DTOs.</summary>
 public static class SupplierMapping
 {
-    public static SupplierDto ToDto(this Supplier supplier) =>
+    public static SupplierDto ToDto(
+        this Supplier supplier,
+        decimal paidAmount = 0m,
+        DateTime? lastPaymentDate = null) =>
         new(supplier.Id, supplier.Name, supplier.ContactName, supplier.Phone, supplier.Note,
-            supplier.Debt, supplier.CreatedAt, supplier.UpdatedAt);
+            supplier.Debt, paidAmount, lastPaymentDate, supplier.CreatedAt, supplier.UpdatedAt);
 
     public static SupplierPaymentDto ToDto(this SupplierPayment payment) =>
         new(payment.Id, payment.SupplierId, payment.Amount, payment.Note,

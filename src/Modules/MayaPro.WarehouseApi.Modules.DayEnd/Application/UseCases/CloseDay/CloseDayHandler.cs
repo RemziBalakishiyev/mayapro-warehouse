@@ -20,7 +20,8 @@ public sealed class CloseDayHandler(
     IExpensesModule expenses,
     IValidator<CloseDayCommand> validator,
     IActivityLogger activityLogger,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IDateProvider dateProvider)
 {
     public async Task<Result<ClosingDto>> Handle(CloseDayCommand command, CancellationToken ct)
     {
@@ -28,7 +29,7 @@ public sealed class CloseDayHandler(
         if (!validation.IsValid)
             return Result.Failure<ClosingDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
-        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+        DateOnly date = dateProvider.Today;
 
         // Friendly pre-check; the unique index below is the real guard against a concurrent second close.
         if (await db.Closings.AnyAsync(c => c.Date == date, ct))

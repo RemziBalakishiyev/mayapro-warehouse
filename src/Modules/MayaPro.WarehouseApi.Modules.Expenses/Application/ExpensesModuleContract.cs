@@ -1,17 +1,20 @@
 using MayaPro.WarehouseApi.Modules.Expenses.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Expenses.Domain;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Expenses.Application;
 
-/// <summary>The Expenses module's implementation of <see cref="IExpensesModule"/>: day total and report rows.</summary>
-internal sealed class ExpensesModuleContract(IExpensesDbContext db) : IExpensesModule
+/// <summary>
+/// The Expenses module's implementation of <see cref="IExpensesModule"/>: day total and report rows.
+/// Day boundaries are the business time zone's (via <see cref="IDateProvider"/>).
+/// </summary>
+internal sealed class ExpensesModuleContract(IExpensesDbContext db, IDateProvider dateProvider) : IExpensesModule
 {
     public async Task<decimal> GetDayTotalAsync(DateOnly date, CancellationToken cancellationToken = default)
     {
-        DateTime start = date.ToDateTime(TimeOnly.MinValue);
-        DateTime end = start.AddDays(1);
+        (DateTime start, DateTime end) = dateProvider.LocalDayRangeUtc(date);
 
         return await db.Expenses
             .AsNoTracking()
@@ -27,14 +30,14 @@ internal sealed class ExpensesModuleContract(IExpensesDbContext db) : IExpensesM
         IQueryable<Expense> query = db.Expenses.AsNoTracking();
 
         if (from is { } f)
-            query = query.Where(e => e.Date >= f.ToDateTime(TimeOnly.MinValue));
+            query = query.Where(e => e.Date >= dateProvider.LocalDayRangeUtc(f).StartUtc);
         if (to is { } t)
-            query = query.Where(e => e.Date < t.AddDays(1).ToDateTime(TimeOnly.MinValue));
+            query = query.Where(e => e.Date < dateProvider.LocalDayRangeUtc(t).EndUtc);
 
         List<Expense> expenses = await query.OrderBy(e => e.Date).ToListAsync(cancellationToken);
 
         return expenses
-            .Select(e => new ExpenseReportRow(DateOnly.FromDateTime(e.Date), e.Category.ToCode(), e.Amount))
+            .Select(e => new ExpenseReportRow(dateProvider.ToLocalDate(e.Date), e.Category.ToCode(), e.Amount))
             .ToList();
     }
 }

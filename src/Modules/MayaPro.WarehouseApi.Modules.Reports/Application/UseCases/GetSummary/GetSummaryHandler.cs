@@ -8,11 +8,11 @@ namespace MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetSummary;
 /// Builds a trading summary over a period from the Sales and Expenses read contracts. Net profit is the
 /// sales profit less the period's expenses. An unrecognised period is rejected (400) rather than coerced.
 /// </summary>
-public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expenses)
+public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expenses, IDateProvider dateProvider)
 {
-    public async Task<Result<SummaryDto>> Handle(string? period, DateOnly today, CancellationToken ct)
+    public async Task<Result<SummaryDto>> Handle(string? period, CancellationToken ct)
     {
-        if (!ReportPeriod.TryResolve(period, today, out ReportPeriod window))
+        if (!ReportPeriod.TryResolve(period, dateProvider.Today, out ReportPeriod window))
             return Result.Failure<SummaryDto>(ReportErrors.InvalidPeriod);
 
         IReadOnlyList<SalesReportRow> salesRows = await sales.GetSalesAsync(window.From, window.To, ct);

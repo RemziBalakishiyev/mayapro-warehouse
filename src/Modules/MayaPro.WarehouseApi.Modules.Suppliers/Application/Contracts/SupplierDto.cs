@@ -1,6 +1,9 @@
 namespace MayaPro.WarehouseApi.Modules.Suppliers.Application.Contracts;
 
-/// <summary>A supplier as returned by the API.</summary>
+/// <summary>
+/// A supplier as returned by the API. <see cref="PaidAmount"/> (total payments we made) and
+/// <see cref="LastPaymentDate"/> are computed server-side.
+/// </summary>
 public sealed record SupplierDto(
     Guid Id,
     string Name,
@@ -8,5 +11,7 @@ public sealed record SupplierDto(
     string? Phone,
     string? Note,
     decimal Debt,
+    decimal PaidAmount,
+    DateTime? LastPaymentDate,
     DateTime CreatedAt,
     DateTime UpdatedAt);

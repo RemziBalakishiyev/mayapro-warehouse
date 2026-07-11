@@ -62,6 +62,11 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityRequirement(new OpenApiSecurityRequirement { [jwtScheme] = Array.Empty<string>() });
 });
 
+// --- Business clock: all "today" reasoning uses the configured time zone (Asia/Baku) ---
+builder.Services.AddSingleton<IDateProvider>(_ => new AppDateProvider(
+    AppDateProvider.ResolveTimeZone(builder.Configuration["App:TimeZone"]),
+    () => DateTime.UtcNow));
+
 // --- Cross-module transaction infrastructure: one shared connection + unit of work per scope ---
 builder.Services.AddScoped<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
