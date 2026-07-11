@@ -24,4 +24,30 @@ internal sealed class SalesModuleContract(ISalesDbContext db) : ISalesModule
 
         return new SalesDayTotals(Total(PaymentType.Nagd), Total(PaymentType.Kart), Total(PaymentType.Nisye));
     }
+
+    public async Task<IReadOnlyList<SalesReportRow>> GetSalesAsync(
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<Sale> query = db.Sales.AsNoTracking();
+
+        if (from is { } f)
+            query = query.Where(s => s.Date >= f.ToDateTime(TimeOnly.MinValue));
+        if (to is { } t)
+            query = query.Where(s => s.Date < t.AddDays(1).ToDateTime(TimeOnly.MinValue));
+
+        List<Sale> sales = await query.OrderBy(s => s.Date).ToListAsync(cancellationToken);
+
+        return sales
+            .Select(s => new SalesReportRow(
+                DateOnly.FromDateTime(s.Date),
+                s.TotalAmount,
+                s.Profit,
+                s.PaymentType.ToCode(),
+                s.ProductId,
+                s.ProductName,
+                s.Quantity))
+            .ToList();
+    }
 }

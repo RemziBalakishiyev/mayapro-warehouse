@@ -14,4 +14,10 @@ public interface ICustomersModule
     /// inside its own unit of work.
     /// </summary>
     Task<Result> IncreaseDebtAsync(Guid customerId, decimal amount, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sums the outstanding debt across all customers. Used by the read-only Reports module for the
+    /// receivables figure on the dashboard.
+    /// </summary>
+    Task<decimal> GetTotalDebtAsync(CancellationToken cancellationToken = default);
 }

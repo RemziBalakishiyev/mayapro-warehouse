@@ -21,4 +21,7 @@ internal sealed class CustomersModuleContract(ICustomersDbContext db) : ICustome
         customer.IncreaseDebt(amount);
         return Result.Success();
     }
+
+    public async Task<decimal> GetTotalDebtAsync(CancellationToken cancellationToken = default) =>
+        await db.Customers.AsNoTracking().SumAsync(c => c.Debt, cancellationToken);
 }

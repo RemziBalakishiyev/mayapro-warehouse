@@ -22,6 +22,12 @@ public interface IProductsModule
     Task<Result<ProductSnapshot>> GetSnapshotAsync(Guid productId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads every product's current snapshot. Used by the read-only Reports module to compute stock
+    /// value and low-stock counts without touching the products tables.
+    /// </summary>
+    Task<IReadOnlyList<ProductSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a batch expense to a product's cost bucket, which recomputes its real cost. Used by the
     /// Expenses module when an expense is attached to a product. The change is made on the shared context
     /// but <b>not</b> saved — the caller commits it inside its own unit of work.
@@ -36,8 +42,18 @@ public interface IProductsModule
 /// <summary>Snapshot of a product at sale time: its name and current real cost per unit.</summary>
 public sealed record ProductStockSnapshot(string ProductName, decimal RealCostPerUnit);
 
-/// <summary>A read-only product snapshot: id, name and current real cost per unit.</summary>
-public sealed record ProductSnapshot(Guid Id, string Name, decimal RealCostPerUnit);
+/// <summary>
+/// A read-only product snapshot. Carries enough for the Reports module to value stock and flag low
+/// stock: identity, category, on-hand quantity, its reorder threshold, real cost and sale price.
+/// </summary>
+public sealed record ProductSnapshot(
+    Guid Id,
+    string Name,
+    string Category,
+    int Quantity,
+    int MinStock,
+    decimal RealCostPerUnit,
+    decimal SalePrice);
 
 /// <summary>
 /// The buckets an expense can contribute to a product's real cost. A provider-neutral mirror of the

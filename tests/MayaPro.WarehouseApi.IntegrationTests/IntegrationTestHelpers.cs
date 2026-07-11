@@ -129,5 +129,38 @@ internal static class IntegrationTestHelpers
 
     internal sealed record ActivityDto(Guid Id, Guid? EmployeeId, string Action, string Detail);
 
+    internal sealed record SettingsDto(
+        string StoreName,
+        string? OwnerName,
+        string WhatsappTemplate,
+        string Currency,
+        int DefaultMinStock,
+        string Language);
+
+    internal sealed record DashboardDto(
+        int ProductCount,
+        int LowStockCount,
+        int OutOfStockCount,
+        decimal StockCostValue,
+        decimal StockRetailValue,
+        decimal TodaySales,
+        decimal TodayProfit,
+        decimal TodayExpenses,
+        int TodaySalesCount,
+        decimal TotalCustomerDebt);
+
+    internal sealed record SummaryDto(
+        string Period,
+        DateOnly From,
+        DateOnly To,
+        decimal SalesTotal,
+        decimal Profit,
+        decimal Expenses,
+        int SalesCount,
+        decimal NetProfit,
+        decimal CashSales,
+        decimal CardSales,
+        decimal CreditSales);
+
     internal sealed record ErrorDto(string Code, string Message);
 }

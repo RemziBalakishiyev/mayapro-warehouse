@@ -20,6 +20,8 @@
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Expenses\MayaPro.WarehouseApi.Modules.Expenses.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Activity\MayaPro.WarehouseApi.Modules.Activity.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.DayEnd\MayaPro.WarehouseApi.Modules.DayEnd.csproj" />
+    <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Reports\MayaPro.WarehouseApi.Modules.Reports.csproj" />
+    <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Settings\MayaPro.WarehouseApi.Modules.Settings.csproj" />
   </ItemGroup>
 
 </Project>

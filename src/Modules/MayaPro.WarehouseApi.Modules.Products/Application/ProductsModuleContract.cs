@@ -39,8 +39,26 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
 
         return product is null
             ? Result.Failure<ProductSnapshot>(ProductErrors.NotFound)
-            : Result.Success(new ProductSnapshot(product.Id, product.Name, product.RealCostPerUnit));
+            : Result.Success(ToSnapshot(product));
     }
+
+    public async Task<IReadOnlyList<ProductSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
+    {
+        List<Product> products = await db.Products
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return products.Select(ToSnapshot).ToList();
+    }
+
+    private static ProductSnapshot ToSnapshot(Product product) => new(
+        product.Id,
+        product.Name,
+        product.Category,
+        product.Quantity,
+        product.MinStock,
+        product.RealCostPerUnit,
+        product.SalePrice);
 
     public async Task<Result> AddExpenseToProductAsync(
         Guid productId,
