@@ -15,7 +15,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.ProductName).IsRequired().HasMaxLength(200);
         builder.Property(s => s.SoldByName).HasMaxLength(200);
 
-        // Persist the payment type by name (Nagd/Kart/Nisye) for a readable, reorder-safe column.
+        // Persist the payment type by name (Cash/Card/Credit) for a readable, reorder-safe column.
         builder.Property(s => s.PaymentType)
             .IsRequired()
             .HasConversion<string>()

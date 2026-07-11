@@ -13,10 +13,10 @@ namespace MayaPro.WarehouseApi.Api.Extensions;
 /// </summary>
 public static class AuthenticationExtensions
 {
-    /// <summary>Sahibkar only — day-end, settings, employees management.</summary>
+    /// <summary>Owner only — day-end, settings, employees management.</summary>
     public const string OwnerOnly = "OwnerOnly";
 
-    /// <summary>Sahibkar or Menecer — products, expenses.</summary>
+    /// <summary>Owner or Manager — products, expenses.</summary>
     public const string OwnerOrManager = "OwnerOrManager";
 
     public static IServiceCollection AddJwtAuthentication(
@@ -49,9 +49,9 @@ public static class AuthenticationExtensions
             });
 
         services.AddAuthorizationBuilder()
-            .AddPolicy(OwnerOnly, policy => policy.RequireRole(nameof(Roles.Sahibkar)))
+            .AddPolicy(OwnerOnly, policy => policy.RequireRole(nameof(Roles.Owner)))
             .AddPolicy(OwnerOrManager, policy =>
-                policy.RequireRole(nameof(Roles.Sahibkar), nameof(Roles.Menecer)));
+                policy.RequireRole(nameof(Roles.Owner), nameof(Roles.Manager)));
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
@@ -62,8 +62,8 @@ public static class AuthenticationExtensions
     // Local mirror of the role names used in JWT role claims — avoids a host → module type dependency.
     private enum Roles
     {
-        Sahibkar,
-        Menecer,
-        Satici
+        Owner,
+        Manager,
+        Seller
     }
 }

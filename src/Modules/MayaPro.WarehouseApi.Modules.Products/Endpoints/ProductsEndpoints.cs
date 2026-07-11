@@ -12,7 +12,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Endpoints;
 
 internal static class ProductsEndpoints
 {
-    // Matches the host's role policy: only Sahibkar or Menecer may add/edit stock items.
+    // Matches the host's role policy: only Owner or Manager may add/edit stock items.
     private const string OwnerOrManager = "OwnerOrManager";
 
     public static void MapProductsEndpoints(this IEndpointRouteBuilder endpoints)

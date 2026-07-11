@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
 
 /// <summary>
-/// Issues HS256-signed JWTs. Role is emitted as the enum name (Sahibkar/Menecer/Satici) so server-side
+/// Issues HS256-signed JWTs. Role is emitted as the enum name (Owner/Manager/Seller) so server-side
 /// role policies match directly; the frontend-facing role code lives only in DTOs.
 /// </summary>
 public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService

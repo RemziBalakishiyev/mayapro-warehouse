@@ -17,8 +17,6 @@ public sealed class GetDashboardHandler(
     ISuppliersModule suppliers,
     IDayEndModule dayEnd)
 {
-    // The wire payment code (frontend contract) for cash — Reports references SharedKernel only.
-    private const string CashCode = "Nağd";
     private const int TopProductsCount = 5;
 
     public async Task<DashboardDto> Handle(DateOnly today, CancellationToken ct)
@@ -37,7 +35,7 @@ public sealed class GetDashboardHandler(
         DateOnly? sinceInclusive = lastClosing is null ? null : lastClosing.Date.AddDays(1);
         decimal openingCash = lastClosing?.ActualCash ?? 0m;
         decimal cashSince = allSales
-            .Where(s => s.PaymentType == CashCode && (sinceInclusive is null || s.Date >= sinceInclusive))
+            .Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash && (sinceInclusive is null || s.Date >= sinceInclusive))
             .Sum(s => s.TotalAmount);
         decimal expensesSince = (await expenses.GetExpensesAsync(sinceInclusive, today, ct)).Sum(e => e.Amount);
         decimal expectedCash = openingCash + cashSince - expensesSince;

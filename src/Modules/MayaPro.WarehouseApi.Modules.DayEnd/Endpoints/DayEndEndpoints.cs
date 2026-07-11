@@ -10,7 +10,7 @@ namespace MayaPro.WarehouseApi.Modules.DayEnd.Endpoints;
 
 internal static class DayEndEndpoints
 {
-    // Matches the host's role policy: only Sahibkar may close the day.
+    // Matches the host's role policy: only Owner may close the day.
     private const string OwnerOnly = "OwnerOnly";
 
     public static void MapDayEndEndpoints(this IEndpointRouteBuilder endpoints)

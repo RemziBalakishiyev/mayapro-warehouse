@@ -1,3 +1,5 @@
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
+
 namespace MayaPro.WarehouseApi.Modules.Auth.Domain;
 
 /// <summary>
@@ -6,26 +8,27 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Domain;
 /// </summary>
 public enum UserRole
 {
-    Sahibkar = 1,
-    Menecer = 2,
-    Satici = 3
+    Owner = 1,
+    Manager = 2,
+    Seller = 3
 }
 
 /// <summary>
 /// Maps <see cref="UserRole"/> to the frontend role codes (<c>"sahib" | "menecer" | "satici"</c>),
-/// which are the API contract for the <c>role</c> field in DTOs.
+/// which are the API contract for the <c>role</c> field in DTOs. The code values live in
+/// <see cref="WireFormat"/> (single source of truth).
 /// </summary>
 public static class RoleCode
 {
-    public const string Sahib = "sahib";
-    public const string Menecer = "menecer";
-    public const string Satici = "satici";
+    public const string Owner = WireFormat.Roles.Owner;
+    public const string Manager = WireFormat.Roles.Manager;
+    public const string Seller = WireFormat.Roles.Seller;
 
     public static string ToCode(this UserRole role) => role switch
     {
-        UserRole.Sahibkar => Sahib,
-        UserRole.Menecer => Menecer,
-        UserRole.Satici => Satici,
+        UserRole.Owner => Owner,
+        UserRole.Manager => Manager,
+        UserRole.Seller => Seller,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Naməlum rol")
     };
 }

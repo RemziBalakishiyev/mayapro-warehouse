@@ -22,7 +22,7 @@ public sealed class LoginHandlerTests
         Assert.True(result.IsSuccess);
         Assert.False(string.IsNullOrWhiteSpace(result.Value.Token));
         Assert.Equal(OwnerPhone, result.Value.User.Phone);
-        Assert.Equal(RoleCode.Sahib, result.Value.User.Role);
+        Assert.Equal(RoleCode.Owner, result.Value.User.Role);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class LoginHandlerTests
 
         var db = new AuthDbContext(options);
         string hash = Hasher.Hash(CorrectPassword);
-        db.Users.Add(User.Create("Rəşad Məmmədov", OwnerPhone, null, hash, UserRole.Sahibkar, isActive));
+        db.Users.Add(User.Create("Rəşad Məmmədov", OwnerPhone, null, hash, UserRole.Owner, isActive));
         await db.SaveChangesAsync();
         return db;
     }

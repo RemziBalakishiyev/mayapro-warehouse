@@ -104,7 +104,7 @@ public sealed class Sale : Entity
             profit,
             paymentType,
             // Only credit sales carry a customer, matching the frontend rule.
-            paymentType == PaymentType.Nisye ? customerId : null,
+            paymentType == PaymentType.Credit ? customerId : null,
             soldByUserId,
             soldByName,
             DateTime.UtcNow);

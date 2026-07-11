@@ -7,18 +7,18 @@ namespace MayaPro.WarehouseApi.Modules.Products.Domain;
 /// </summary>
 public enum ProductExpenseKind
 {
-    /// <summary>Yol — freight / transport.</summary>
-    Yol = 1,
+    /// <summary>Freight / transport (wire key <c>yol</c>).</summary>
+    Transport = 1,
 
-    /// <summary>Fəhlə — labour / loading.</summary>
-    Fehle = 2,
+    /// <summary>Labour / loading (wire key <c>fehle</c>).</summary>
+    Labor = 2,
 
-    /// <summary>Anbar/Yer — storage / place.</summary>
-    Yer = 3,
+    /// <summary>Storage / place (wire key <c>yer</c>).</summary>
+    Storage = 3,
 
-    /// <summary>Paket/Qutu — packaging.</summary>
-    Paket = 4,
+    /// <summary>Packaging (wire key <c>paket</c>).</summary>
+    Packaging = 4,
 
-    /// <summary>Digər — other.</summary>
-    Diger = 5
+    /// <summary>Other (wire key <c>diger</c>).</summary>
+    Other = 5
 }

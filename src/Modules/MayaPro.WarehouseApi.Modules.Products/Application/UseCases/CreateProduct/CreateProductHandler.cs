@@ -25,11 +25,11 @@ public sealed class CreateProductHandler(
             return Result.Failure<ProductDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
         var expenses = new ProductExpenses(
-            command.Expenses.Yol,
-            command.Expenses.Fehle,
-            command.Expenses.Yer,
-            command.Expenses.Paket,
-            command.Expenses.Diger);
+            command.Expenses.Transport,
+            command.Expenses.Labor,
+            command.Expenses.Storage,
+            command.Expenses.Packaging,
+            command.Expenses.Other);
 
         var product = Product.Create(
             command.Name,

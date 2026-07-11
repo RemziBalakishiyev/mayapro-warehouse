@@ -63,7 +63,7 @@ public sealed class ProductTests
         Product product = CreateProduct(purchasePrice: 10, quantity: 100, expenses: ProductExpenses.Empty());
         decimal before = product.RealCostPerUnit; // 10.00
 
-        product.AddExpense(ProductExpenseKind.Yol, 100); // +100/100 = +1.00
+        product.AddExpense(ProductExpenseKind.Transport, 100); // +100/100 = +1.00
 
         Assert.Equal(10m, before);
         Assert.Equal(11m, product.RealCostPerUnit);

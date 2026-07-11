@@ -29,11 +29,11 @@ public static class ProductMapping
             product.Shelf,
             product.Box,
             new ExpenseBreakdownDto(
-                product.Expenses.Yol,
-                product.Expenses.Fehle,
-                product.Expenses.Yer,
-                product.Expenses.Paket,
-                product.Expenses.Diger),
+                product.Expenses.Transport,
+                product.Expenses.Labor,
+                product.Expenses.Storage,
+                product.Expenses.Packaging,
+                product.Expenses.Other),
             product.RealCostPerUnit,
             product.CreatedAt,
             product.UpdatedAt);

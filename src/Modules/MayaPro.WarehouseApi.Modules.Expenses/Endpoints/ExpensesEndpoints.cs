@@ -9,7 +9,7 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Endpoints;
 
 internal static class ExpensesEndpoints
 {
-    // Matches the host's role policy: only Sahibkar or Menecer may record expenses.
+    // Matches the host's role policy: only Owner or Manager may record expenses.
     private const string OwnerOrManager = "OwnerOrManager";
 
     public static void MapExpensesEndpoints(this IEndpointRouteBuilder endpoints)

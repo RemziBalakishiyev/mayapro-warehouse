@@ -29,7 +29,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(200);
 
-        // Persist the role by name (Sahibkar/Menecer/Satici) for a readable, reorder-safe column.
+        // Persist the role by name (Owner/Manager/Seller) for a readable, reorder-safe column.
         builder.Property(u => u.Role)
             .IsRequired()
             .HasConversion<string>()

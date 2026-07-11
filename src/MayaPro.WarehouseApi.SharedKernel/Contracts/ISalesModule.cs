@@ -23,7 +23,7 @@ public interface ISalesModule
 }
 
 /// <summary>A day's net sales split by payment type.</summary>
-public sealed record SalesDayTotals(decimal Cash, decimal Card, decimal Nisye);
+public sealed record SalesDayTotals(decimal Cash, decimal Card, decimal Credit);
 
 /// <summary>The most recent sale date for a product.</summary>
 public sealed record ProductLastSale(Guid ProductId, DateOnly LastSale);

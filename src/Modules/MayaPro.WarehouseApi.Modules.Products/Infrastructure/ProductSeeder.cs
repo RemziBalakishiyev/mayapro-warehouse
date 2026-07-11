@@ -41,7 +41,7 @@ public sealed class ProductSeeder(ProductsDbContext db)
                 warehouse,
                 shelf,
                 box,
-                new ProductExpenses(raw.Yol, raw.Fehle, raw.Yer, raw.Paket, raw.Diger));
+                new ProductExpenses(raw.Transport, raw.Labor, raw.Storage, raw.Packaging, raw.Other));
 
             // Bring stock down from the initial batch to what is currently on hand (sales to date).
             if (raw.Quantity != raw.InitialQuantity)
@@ -77,11 +77,11 @@ public sealed class ProductSeeder(ProductsDbContext db)
         int MinStock,
         string SupplierId,
         string Location,
-        decimal Yol,
-        decimal Fehle,
-        decimal Yer,
-        decimal Paket,
-        decimal Diger);
+        decimal Transport,
+        decimal Labor,
+        decimal Storage,
+        decimal Packaging,
+        decimal Other);
 
     private static readonly RawProduct[] RawProducts =
     [

@@ -62,9 +62,9 @@ public sealed record ProductSnapshot(
 /// </summary>
 public enum ProductCostBucket
 {
-    Yol = 1,
-    Fehle = 2,
-    Yer = 3,
-    Paket = 4,
-    Diger = 5
+    Transport = 1,
+    Labor = 2,
+    Storage = 3,
+    Packaging = 4,
+    Other = 5
 }

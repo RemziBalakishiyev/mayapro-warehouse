@@ -10,11 +10,6 @@ namespace MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetSummary;
 /// </summary>
 public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expenses)
 {
-    // The wire payment codes (frontend contract) — Reports references SharedKernel only, not the Sales domain.
-    private const string CashCode = "Nağd";
-    private const string CardCode = "Kart";
-    private const string CreditCode = "Nisyə";
-
     public async Task<Result<SummaryDto>> Handle(string? period, DateOnly today, CancellationToken ct)
     {
         if (!ReportPeriod.TryResolve(period, today, out ReportPeriod window))
@@ -36,8 +31,8 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
             Expenses: expensesTotal,
             SalesCount: salesRows.Count,
             NetProfit: profit - expensesTotal,
-            CashSales: salesRows.Where(s => s.PaymentType == CashCode).Sum(s => s.TotalAmount),
-            CardSales: salesRows.Where(s => s.PaymentType == CardCode).Sum(s => s.TotalAmount),
-            CreditSales: salesRows.Where(s => s.PaymentType == CreditCode).Sum(s => s.TotalAmount)));
+            CashSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash).Sum(s => s.TotalAmount),
+            CardSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Card).Sum(s => s.TotalAmount),
+            CreditSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Credit).Sum(s => s.TotalAmount)));
     }
 }

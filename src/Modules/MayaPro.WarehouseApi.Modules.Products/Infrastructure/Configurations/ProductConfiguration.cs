@@ -26,14 +26,14 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Shelf).HasMaxLength(100);
         builder.Property(p => p.Box).HasMaxLength(100);
 
-        // Batch expenses live inline as Expenses_Yol, Expenses_Fehle... (no separate table).
+        // Batch expenses live inline as Expenses_Transport, Expenses_Labor... (no separate table).
         builder.OwnsOne(p => p.Expenses, expenses =>
         {
-            expenses.Property(e => e.Yol).HasColumnName("Expenses_Yol");
-            expenses.Property(e => e.Fehle).HasColumnName("Expenses_Fehle");
-            expenses.Property(e => e.Yer).HasColumnName("Expenses_Yer");
-            expenses.Property(e => e.Paket).HasColumnName("Expenses_Paket");
-            expenses.Property(e => e.Diger).HasColumnName("Expenses_Diger");
+            expenses.Property(e => e.Transport).HasColumnName("Expenses_Transport");
+            expenses.Property(e => e.Labor).HasColumnName("Expenses_Labor");
+            expenses.Property(e => e.Storage).HasColumnName("Expenses_Storage");
+            expenses.Property(e => e.Packaging).HasColumnName("Expenses_Packaging");
+            expenses.Property(e => e.Other).HasColumnName("Expenses_Other");
         });
         builder.Navigation(p => p.Expenses).IsRequired();
 

@@ -42,7 +42,7 @@ public sealed class CloseDayHandler(
             command.OpeningCash,
             totals.Cash,
             totals.Card,
-            totals.Nisye,
+            totals.Credit,
             expenseTotal,
             command.ActualCash,
             currentUser.UserId,

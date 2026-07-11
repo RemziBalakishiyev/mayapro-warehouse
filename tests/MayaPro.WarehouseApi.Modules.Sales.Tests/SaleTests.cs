@@ -16,7 +16,7 @@ public sealed class SaleTests
             unitPrice: 20m,
             discount: 5m,
             costPerUnit: 12m,
-            paymentType: PaymentType.Nagd,
+            paymentType: PaymentType.Cash,
             customerId: null,
             soldByUserId: Guid.NewGuid(),
             soldByName: "Satıcı");
@@ -36,7 +36,7 @@ public sealed class SaleTests
             unitPrice: 10m,
             discount: 0m,
             costPerUnit: 5m,
-            paymentType: PaymentType.Nagd,
+            paymentType: PaymentType.Cash,
             customerId: Guid.NewGuid(), // provided, but a cash sale keeps no customer
             soldByUserId: null,
             soldByName: "Satıcı");

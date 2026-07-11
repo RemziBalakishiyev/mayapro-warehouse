@@ -25,7 +25,7 @@ public sealed class CreateSaleValidator : AbstractValidator<CreateSaleCommand>
             .WithMessage("Ödəniş növü yanlışdır");
 
         RuleFor(x => x.CustomerId)
-            .NotNull().When(x => x.PaymentType == PaymentTypeCode.Nisye)
+            .NotNull().When(x => x.PaymentType == PaymentTypeCode.Credit)
             .WithMessage("Nisyə satış üçün müştəri seçilməlidir");
     }
 }

@@ -22,7 +22,7 @@ internal sealed class SalesModuleContract(ISalesDbContext db) : ISalesModule
 
         decimal Total(PaymentType type) => byType.FirstOrDefault(x => x.Type == type)?.Total ?? 0m;
 
-        return new SalesDayTotals(Total(PaymentType.Nagd), Total(PaymentType.Kart), Total(PaymentType.Nisye));
+        return new SalesDayTotals(Total(PaymentType.Cash), Total(PaymentType.Card), Total(PaymentType.Credit));
     }
 
     public async Task<IReadOnlyList<SalesReportRow>> GetSalesAsync(

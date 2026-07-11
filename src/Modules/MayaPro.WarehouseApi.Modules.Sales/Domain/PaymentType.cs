@@ -1,31 +1,33 @@
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
+
 namespace MayaPro.WarehouseApi.Modules.Sales.Domain;
 
 /// <summary>
-/// How a sale was paid. Persisted by name (Nagd/Kart/Nisye); the wire contract uses the frontend codes
+/// How a sale was paid. Persisted by name (Cash/Card/Credit); the wire contract uses the frontend codes
 /// (<c>"Nağd" | "Kart" | "Nisyə"</c>) — see <see cref="PaymentTypeCode"/>.
 /// </summary>
 public enum PaymentType
 {
-    Nagd = 1,
-    Kart = 2,
-    Nisye = 3
+    Cash = 1,
+    Card = 2,
+    Credit = 3
 }
 
 /// <summary>
 /// Maps <see cref="PaymentType"/> to/from the frontend payment codes, which are the API contract for the
-/// <c>paymentType</c> field.
+/// <c>paymentType</c> field. The code values live in <see cref="WireFormat"/> (single source of truth).
 /// </summary>
 public static class PaymentTypeCode
 {
-    public const string Nagd = "Nağd";
-    public const string Kart = "Kart";
-    public const string Nisye = "Nisyə";
+    public const string Cash = WireFormat.PaymentTypes.Cash;
+    public const string Card = WireFormat.PaymentTypes.Card;
+    public const string Credit = WireFormat.PaymentTypes.Credit;
 
     public static string ToCode(this PaymentType type) => type switch
     {
-        PaymentType.Nagd => Nagd,
-        PaymentType.Kart => Kart,
-        PaymentType.Nisye => Nisye,
+        PaymentType.Cash => Cash,
+        PaymentType.Card => Card,
+        PaymentType.Credit => Credit,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Naməlum ödəniş növü")
     };
 
@@ -33,14 +35,14 @@ public static class PaymentTypeCode
     {
         switch (code)
         {
-            case Nagd:
-                type = PaymentType.Nagd;
+            case Cash:
+                type = PaymentType.Cash;
                 return true;
-            case Kart:
-                type = PaymentType.Kart;
+            case Card:
+                type = PaymentType.Card;
                 return true;
-            case Nisye:
-                type = PaymentType.Nisye;
+            case Credit:
+                type = PaymentType.Credit;
                 return true;
             default:
                 type = default;

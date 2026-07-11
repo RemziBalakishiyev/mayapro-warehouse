@@ -10,12 +10,12 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Tests;
 public sealed class ExpenseCategoryTests
 {
     [Theory]
-    [InlineData(ExpenseCategory.Yol, "Yol")]
-    [InlineData(ExpenseCategory.Fehle, "Fəhlə")]
-    [InlineData(ExpenseCategory.AnbarYer, "Anbar/Yer")]
-    [InlineData(ExpenseCategory.PaketQutu, "Paket/Qutu")]
-    [InlineData(ExpenseCategory.Magaza, "Mağaza")]
-    [InlineData(ExpenseCategory.Diger, "Digər")]
+    [InlineData(ExpenseCategory.Transport, "Yol")]
+    [InlineData(ExpenseCategory.Labor, "Fəhlə")]
+    [InlineData(ExpenseCategory.Storage, "Anbar/Yer")]
+    [InlineData(ExpenseCategory.Packaging, "Paket/Qutu")]
+    [InlineData(ExpenseCategory.Store, "Mağaza")]
+    [InlineData(ExpenseCategory.Other, "Digər")]
     public void ToCode_And_TryParse_Round_Trip(ExpenseCategory category, string code)
     {
         Assert.Equal(code, category.ToCode());
@@ -31,12 +31,12 @@ public sealed class ExpenseCategoryTests
     }
 
     [Theory]
-    [InlineData(ExpenseCategory.Yol, ProductCostBucket.Yol)]
-    [InlineData(ExpenseCategory.Fehle, ProductCostBucket.Fehle)]
-    [InlineData(ExpenseCategory.AnbarYer, ProductCostBucket.Yer)]
-    [InlineData(ExpenseCategory.PaketQutu, ProductCostBucket.Paket)]
-    [InlineData(ExpenseCategory.Magaza, ProductCostBucket.Diger)] // no store bucket → Digər
-    [InlineData(ExpenseCategory.Diger, ProductCostBucket.Diger)]
+    [InlineData(ExpenseCategory.Transport, ProductCostBucket.Transport)]
+    [InlineData(ExpenseCategory.Labor, ProductCostBucket.Labor)]
+    [InlineData(ExpenseCategory.Storage, ProductCostBucket.Storage)]
+    [InlineData(ExpenseCategory.Packaging, ProductCostBucket.Packaging)]
+    [InlineData(ExpenseCategory.Store, ProductCostBucket.Other)] // no store bucket → Digər
+    [InlineData(ExpenseCategory.Other, ProductCostBucket.Other)]
     public void ToCostBucket_Maps_Category_To_Product_Bucket(ExpenseCategory category, ProductCostBucket bucket)
     {
         Assert.Equal(bucket, category.ToCostBucket());

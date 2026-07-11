@@ -12,7 +12,7 @@ namespace MayaPro.WarehouseApi.Modules.Suppliers.Endpoints;
 
 internal static class SuppliersEndpoints
 {
-    // Matches the host's role policy: only Sahibkar or Menecer may write supplier data.
+    // Matches the host's role policy: only Owner or Manager may write supplier data.
     private const string OwnerOrManager = "OwnerOrManager";
 
     public static void MapSuppliersEndpoints(this IEndpointRouteBuilder endpoints)

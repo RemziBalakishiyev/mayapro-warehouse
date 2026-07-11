@@ -27,11 +27,11 @@ public sealed class UpdateProductHandler(
             return Result.Failure<ProductDto>(ProductErrors.NotFound);
 
         var expenses = new ProductExpenses(
-            command.Expenses.Yol,
-            command.Expenses.Fehle,
-            command.Expenses.Yer,
-            command.Expenses.Paket,
-            command.Expenses.Diger);
+            command.Expenses.Transport,
+            command.Expenses.Labor,
+            command.Expenses.Storage,
+            command.Expenses.Packaging,
+            command.Expenses.Other);
 
         product.Update(
             command.Name,

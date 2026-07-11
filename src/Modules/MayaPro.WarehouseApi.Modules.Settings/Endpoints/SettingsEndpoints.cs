@@ -9,7 +9,7 @@ namespace MayaPro.WarehouseApi.Modules.Settings.Endpoints;
 
 internal static class SettingsEndpoints
 {
-    // Matches the host's role policy: only Sahibkar may change settings.
+    // Matches the host's role policy: only Owner may change settings.
     private const string OwnerOnly = "OwnerOnly";
 
     public static void MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)

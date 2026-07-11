@@ -76,11 +76,11 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
 
     private static ProductExpenseKind ToKind(ProductCostBucket bucket) => bucket switch
     {
-        ProductCostBucket.Yol => ProductExpenseKind.Yol,
-        ProductCostBucket.Fehle => ProductExpenseKind.Fehle,
-        ProductCostBucket.Yer => ProductExpenseKind.Yer,
-        ProductCostBucket.Paket => ProductExpenseKind.Paket,
-        ProductCostBucket.Diger => ProductExpenseKind.Diger,
+        ProductCostBucket.Transport => ProductExpenseKind.Transport,
+        ProductCostBucket.Labor => ProductExpenseKind.Labor,
+        ProductCostBucket.Storage => ProductExpenseKind.Storage,
+        ProductCostBucket.Packaging => ProductExpenseKind.Packaging,
+        ProductCostBucket.Other => ProductExpenseKind.Other,
         _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket, "Naməlum xərc növü")
     };
 }

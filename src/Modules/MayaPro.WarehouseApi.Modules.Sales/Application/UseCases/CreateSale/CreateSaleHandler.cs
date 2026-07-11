@@ -43,7 +43,7 @@ public sealed class CreateSaleHandler(
             return Result.Failure<SaleDto>(stock.Error);
 
         // ④ Credit sale → increase the customer's debt by the net (post-discount) amount.
-        if (paymentType == PaymentType.Nisye)
+        if (paymentType == PaymentType.Credit)
         {
             Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
             if (debt.IsFailure)
