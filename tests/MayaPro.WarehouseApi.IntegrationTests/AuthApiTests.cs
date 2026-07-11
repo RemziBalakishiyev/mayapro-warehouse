@@ -8,7 +8,8 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 /// End-to-end tests over the real host + SQL Server test database. Verifies the module mechanism
 /// (health), the login → token → /me flow, and that protected endpoints reject anonymous callers.
 /// </summary>
-public sealed class AuthApiTests : IClassFixture<WarehouseApiFactory>, IAsyncLifetime
+[Collection(ApiCollection.Name)]
+public sealed class AuthApiTests : IAsyncLifetime
 {
     private const string OwnerPhone = "0501112233";
     private const string DemoPassword = "demo123";

@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MayaPro.WarehouseApi.SharedKernel\MayaPro.WarehouseApi.SharedKernel.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Auth\MayaPro.WarehouseApi.Modules.Auth.csproj" />
+    <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Products\MayaPro.WarehouseApi.Modules.Products.csproj" />
   </ItemGroup>
 
 </Project>
