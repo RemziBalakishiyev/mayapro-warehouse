@@ -20,9 +20,7 @@ public sealed class Product : Entity
     private Product(
         string name,
         string category,
-        string size,
-        string color,
-        string model,
+        IReadOnlyList<ProductAttribute> attributes,
         string barcode,
         string image,
         string note,
@@ -41,9 +39,7 @@ public sealed class Product : Entity
     {
         Name = name;
         Category = category;
-        Size = size;
-        Color = color;
-        Model = model;
+        Attributes = attributes;
         Barcode = barcode;
         Image = image;
         Note = note;
@@ -65,13 +61,17 @@ public sealed class Product : Entity
 
     public string Name { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Free-text category name. A string snapshot (not a foreign key to <see cref="Category"/>) so an
+    /// existing product is never broken when the managed category list is renamed or trimmed.
+    /// </summary>
     public string Category { get; private set; } = string.Empty;
 
-    public string Size { get; private set; } = string.Empty;
-
-    public string Color { get; private set; } = string.Empty;
-
-    public string Model { get; private set; } = string.Empty;
+    /// <summary>
+    /// Dynamic attributes (name/value pairs), replacing the old fixed Size/Color/Model columns. Persisted
+    /// as a JSON array on this row via a value converter.
+    /// </summary>
+    public IReadOnlyList<ProductAttribute> Attributes { get; private set; } = new List<ProductAttribute>();
 
     public string Barcode { get; private set; } = string.Empty;
 
@@ -114,9 +114,7 @@ public sealed class Product : Entity
     public static Product Create(
         string name,
         string category,
-        string size,
-        string color,
-        string model,
+        IReadOnlyList<ProductAttribute> attributes,
         string barcode,
         string image,
         string note,
@@ -132,7 +130,7 @@ public sealed class Product : Entity
         string shelf,
         string box,
         ProductExpenses expenses) =>
-        new(name, category, size, color, model, barcode, image, note, purchasePrice, salePrice,
+        new(name, category, attributes, barcode, image, note, purchasePrice, salePrice,
             quantity, minStock, currency, supplierId, location, store, warehouse, shelf, box, expenses);
 
     /// <summary>
@@ -142,9 +140,7 @@ public sealed class Product : Entity
     public void Update(
         string name,
         string category,
-        string size,
-        string color,
-        string model,
+        IReadOnlyList<ProductAttribute> attributes,
         string barcode,
         string image,
         string note,
@@ -163,9 +159,7 @@ public sealed class Product : Entity
     {
         Name = name;
         Category = category;
-        Size = size;
-        Color = color;
-        Model = model;
+        Attributes = attributes;
         Barcode = barcode;
         Image = image;
         Note = note;

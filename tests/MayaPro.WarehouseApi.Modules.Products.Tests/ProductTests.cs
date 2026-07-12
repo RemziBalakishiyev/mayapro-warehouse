@@ -86,9 +86,7 @@ public sealed class ProductTests
         Product.Create(
             name: "Test məhsul",
             category: "Test",
-            size: "M",
-            color: "Qara",
-            model: "T-1",
+            attributes: new List<ProductAttribute> { new("Ölçü", "M"), new("Rəng", "Qara") },
             barcode: "TST001",
             image: string.Empty,
             note: string.Empty,

@@ -17,6 +17,8 @@ public sealed class ProductsDbContext(DbContextOptions<ProductsDbContext> option
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<Category> Categories => Set<Category>();
+
     public Task EnlistAsync(DbTransaction transaction, CancellationToken cancellationToken = default) =>
         Database.UseTransactionAsync(transaction, cancellationToken);
 

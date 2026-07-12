@@ -10,9 +10,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProdu
 public sealed record CreateProductCommand(
     string Name,
     string Category,
-    string Size,
-    string Color,
-    string Model,
+    IReadOnlyList<ProductAttributeDto> Attributes,
     string Barcode,
     string Image,
     string Note,

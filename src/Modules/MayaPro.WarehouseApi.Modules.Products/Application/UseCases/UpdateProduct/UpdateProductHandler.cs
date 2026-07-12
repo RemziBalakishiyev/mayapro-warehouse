@@ -33,12 +33,14 @@ public sealed class UpdateProductHandler(
             command.Expenses.Packaging,
             command.Expenses.Other);
 
+        var attributes = (command.Attributes ?? Array.Empty<ProductAttributeDto>())
+            .Select(a => new ProductAttribute(a.Name.Trim(), a.Value))
+            .ToList();
+
         product.Update(
             command.Name,
             command.Category,
-            command.Size,
-            command.Color,
-            command.Model,
+            attributes,
             command.Barcode,
             command.Image,
             command.Note,

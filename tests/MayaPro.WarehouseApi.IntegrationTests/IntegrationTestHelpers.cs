@@ -31,9 +31,7 @@ internal static class IntegrationTestHelpers
         {
             name = "Satış test malı",
             category = "Test",
-            size = "M",
-            color = "Qara",
-            model = "T-1",
+            attributes = new[] { new { name = "Ölçü", value = "M" }, new { name = "Rəng", value = "Qara" } },
             barcode,
             image = "",
             note = "",

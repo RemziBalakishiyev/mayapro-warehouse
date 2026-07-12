@@ -1,11 +1,19 @@
+using System.Text.Json;
 using MayaPro.WarehouseApi.Modules.Products.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Configurations;
 
 public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
+    // camelCase so the stored JSON is [{"name":"Ölçü","value":"..."}] — the exact shape the data-migration
+    // SQL writes and the frontend wire contract uses. Kept private so EF read/write and the migration agree.
+    private static readonly JsonSerializerOptions AttributesJson =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     public void Configure(EntityTypeBuilder<Product> builder)
     {
         builder.ToTable("Products");
@@ -14,9 +22,6 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
         builder.Property(p => p.Category).HasMaxLength(100);
-        builder.Property(p => p.Size).HasMaxLength(50);
-        builder.Property(p => p.Color).HasMaxLength(50);
-        builder.Property(p => p.Model).HasMaxLength(100);
         builder.Property(p => p.Barcode).HasMaxLength(100);
         builder.Property(p => p.Currency).IsRequired().HasMaxLength(10);
         builder.Property(p => p.SupplierId).HasMaxLength(100);
@@ -25,6 +30,23 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Warehouse).HasMaxLength(100);
         builder.Property(p => p.Shelf).HasMaxLength(100);
         builder.Property(p => p.Box).HasMaxLength(100);
+
+        // Dynamic attributes live inline as a JSON array (nvarchar(max)). A value comparer is required so EF
+        // change-tracking treats the collection by value, not by reference.
+        var attributesConverter = new ValueConverter<IReadOnlyList<ProductAttribute>, string>(
+            v => JsonSerializer.Serialize(v, AttributesJson),
+            v => JsonSerializer.Deserialize<List<ProductAttribute>>(v, AttributesJson) ?? new List<ProductAttribute>());
+
+        var attributesComparer = new ValueComparer<IReadOnlyList<ProductAttribute>>(
+            (a, b) => (a ?? new List<ProductAttribute>()).SequenceEqual(b ?? new List<ProductAttribute>()),
+            v => v.Aggregate(0, (hash, attr) => HashCode.Combine(hash, attr.GetHashCode())),
+            v => v.ToList());
+
+        builder.Property(p => p.Attributes)
+            .HasConversion(attributesConverter, attributesComparer)
+            .HasColumnName("Attributes")
+            .HasColumnType("nvarchar(max)")
+            .IsRequired();
 
         // Batch expenses live inline as Expenses_Transport, Expenses_Labor... (no separate table).
         builder.OwnsOne(p => p.Expenses, expenses =>

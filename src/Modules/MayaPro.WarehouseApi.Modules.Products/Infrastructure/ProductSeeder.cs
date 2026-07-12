@@ -13,6 +13,12 @@ public sealed class ProductSeeder(ProductsDbContext db)
 {
     public async Task SeedAsync(CancellationToken ct = default)
     {
+        await SeedCategoriesAsync(ct);
+        await SeedProductsAsync(ct);
+    }
+
+    private async Task SeedProductsAsync(CancellationToken ct)
+    {
         if (await db.Products.AnyAsync(ct))
             return;
 
@@ -24,9 +30,7 @@ public sealed class ProductSeeder(ProductsDbContext db)
             var product = Product.Create(
                 raw.Name,
                 raw.Category,
-                raw.Size,
-                raw.Color,
-                raw.Model,
+                BuildAttributes(raw),
                 $"SDK{1000 + i + 1}",
                 image: string.Empty,
                 note: string.Empty,
@@ -51,6 +55,39 @@ public sealed class ProductSeeder(ProductsDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Seeds the managed category list from the unique category names of the demo products.</summary>
+    private async Task SeedCategoriesAsync(CancellationToken ct)
+    {
+        if (await db.Categories.AnyAsync(ct))
+            return;
+
+        IEnumerable<string> names = RawProducts
+            .Select(p => p.Category)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string name in names)
+            db.Categories.Add(Category.Create(name));
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Turns the demo product's fixed size/color/model into the new dynamic attributes — one entry each, and
+    /// only when the value is set — mirroring exactly what the data migration writes for existing rows.
+    /// </summary>
+    private static List<ProductAttribute> BuildAttributes(RawProduct raw)
+    {
+        var attributes = new List<ProductAttribute>();
+        if (!string.IsNullOrWhiteSpace(raw.Size))
+            attributes.Add(new ProductAttribute("Ölçü", raw.Size));
+        if (!string.IsNullOrWhiteSpace(raw.Color))
+            attributes.Add(new ProductAttribute("Rəng", raw.Color));
+        if (!string.IsNullOrWhiteSpace(raw.Model))
+            attributes.Add(new ProductAttribute("Model", raw.Model));
+        return attributes;
     }
 
     /// <summary>Splits "Anbar A / Rəf 3 / Qutu 12" into its parts, mirroring the frontend parseLocation.</summary>

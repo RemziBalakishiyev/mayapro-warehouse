@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MayaPro.WarehouseApi.Api\MayaPro.WarehouseApi.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Auth\MayaPro.WarehouseApi.Modules.Auth.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Products\MayaPro.WarehouseApi.Modules.Products.csproj" />
   </ItemGroup>
 
 </Project>

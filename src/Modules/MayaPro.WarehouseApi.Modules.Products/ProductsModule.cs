@@ -4,7 +4,9 @@ using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateCategory;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetCategories;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProducts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.UpdateProduct;
@@ -49,17 +51,21 @@ public sealed class ProductsModule : IModule
         services.AddScoped<IValidator<CreateProductCommand>, CreateProductValidator>();
         services.AddScoped<IValidator<UpdateProductCommand>, UpdateProductValidator>();
         services.AddScoped<IValidator<AdjustStockCommand>, AdjustStockValidator>();
+        services.AddScoped<IValidator<CreateCategoryCommand>, CreateCategoryValidator>();
 
         services.AddScoped<GetProductsHandler>();
         services.AddScoped<GetProductHandler>();
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<UpdateProductHandler>();
         services.AddScoped<AdjustStockHandler>();
+        services.AddScoped<GetCategoriesHandler>();
+        services.AddScoped<CreateCategoryHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapProductsEndpoints();
+        endpoints.MapCategoriesEndpoints();
     }
 
     public async Task MigrateAsync(IServiceProvider services)

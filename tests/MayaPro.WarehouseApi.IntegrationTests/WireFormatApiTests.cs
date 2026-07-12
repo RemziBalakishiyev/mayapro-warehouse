@@ -4,11 +4,15 @@ using System.Text.Json;
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
 /// <summary>
-/// Guards the frozen frontend wire contract after the Azerbaijani→English identifier refactor. The C#
-/// members are now English, but the JSON the API sends and accepts must be byte-for-byte what it was:
-/// expense-breakdown keys (yol/fehle/yer/paket/diger), paymentType ("Nağd"...), category ("Yol"...) and
-/// role ("sahib"...). Every assertion reads the RAW JSON, not a typed DTO, so a renamed property that
-/// changed the wire key would fail here.
+/// Guards the frontend wire contract. Most of it is frozen (expense-breakdown keys yol/fehle/yer/paket/diger,
+/// paymentType "Nağd"..., category "Yol"..., role "sahib"...): those must stay byte-for-byte. Every assertion
+/// reads RAW JSON, not a typed DTO, so a renamed property that changed a frozen wire key would fail here.
+/// <para>
+/// DELIBERATE CONTRACT CHANGE (agreed with the frontend): the fixed product fields <c>size</c>/<c>color</c>/
+/// <c>model</c> are GONE, replaced by a dynamic <c>attributes: [{ name, value }]</c> array (camelCase), and a
+/// new managed <c>GET/POST /api/categories</c> endpoint is added. The tests below assert the NEW shape on
+/// purpose — if this file is regenerated from the old contract it should fail.
+/// </para>
 /// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class WireFormatApiTests : IAsyncLifetime
@@ -31,9 +35,7 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         {
             name = "Wire test malı",
             category = "Test",
-            size = "M",
-            color = "Qara",
-            model = "T-1",
+            attributes = new[] { new { name = "Ölçü", value = "M" } },
             barcode = "WIRE-EXP",
             image = "",
             note = "",
@@ -69,6 +71,89 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         // The English identifiers must NOT leak onto the wire.
         Assert.False(expenses.TryGetProperty("transport", out _));
         Assert.False(expenses.TryGetProperty("labor", out _));
+    }
+
+    /// <summary>
+    /// The NEW product shape: dynamic <c>attributes: [{ name, value }]</c> (camelCase) instead of the removed
+    /// size/color/model fields. Sending size/color/model must have no effect, and they must never appear on
+    /// the wire in the response.
+    /// </summary>
+    [Fact]
+    public async Task Product_Attributes_Replace_Size_Color_Model_As_A_CamelCase_Array()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        object body = new
+        {
+            name = "Attributes wire malı",
+            category = "Test",
+            attributes = new[]
+            {
+                new { name = "Ölçü", value = "42-44" },
+                new { name = "Rəng", value = "Qırmızı" }
+            },
+            // Old fields sent on purpose — the API must ignore them (they are no longer part of the contract).
+            size = "SHOULD-BE-IGNORED",
+            color = "SHOULD-BE-IGNORED",
+            model = "SHOULD-BE-IGNORED",
+            barcode = "WIRE-ATTR",
+            image = "",
+            note = "",
+            purchasePrice = 5m,
+            salePrice = 10m,
+            quantity = 10,
+            minStock = 1,
+            currency = "AZN",
+            supplierId = "sup_1",
+            location = "Anbar A / Rəf 1 / Qutu 1",
+            store = "Anbar A",
+            warehouse = "Anbar A",
+            shelf = "1",
+            box = "1",
+            expenses = new { yol = 0m, fehle = 0m, yer = 0m, paket = 0m, diger = 0m }
+        };
+
+        HttpResponseMessage post = await client.PostAsJsonAsync("/api/products", body);
+        post.EnsureSuccessStatusCode();
+        var created = (await post.Content.ReadFromJsonAsync<IntegrationTestHelpers.ProductDto>())!;
+
+        using JsonDocument doc = JsonDocument.Parse(
+            await (await client.GetAsync($"/api/products/{created.Id}")).Content.ReadAsStringAsync());
+        JsonElement root = doc.RootElement;
+
+        JsonElement attributes = root.GetProperty("attributes");
+        Assert.Equal(JsonValueKind.Array, attributes.ValueKind);
+        Assert.Equal(2, attributes.GetArrayLength());
+
+        Assert.Equal("Ölçü", attributes[0].GetProperty("name").GetString());
+        Assert.Equal("42-44", attributes[0].GetProperty("value").GetString());
+        Assert.Equal("Rəng", attributes[1].GetProperty("name").GetString());
+        Assert.Equal("Qırmızı", attributes[1].GetProperty("value").GetString());
+
+        // The removed fields must not appear on the wire, and the ignored input must not have leaked in.
+        Assert.False(root.TryGetProperty("size", out _));
+        Assert.False(root.TryGetProperty("color", out _));
+        Assert.False(root.TryGetProperty("model", out _));
+    }
+
+    /// <summary>NEW endpoint: a category created via POST comes back in the GET list (objects with id + name).</summary>
+    [Fact]
+    public async Task Categories_Endpoint_Lists_And_Creates_Categories()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage post = await client.PostAsJsonAsync("/api/categories", new { name = "Wire kateqoriya" });
+        post.EnsureSuccessStatusCode();
+
+        using JsonDocument list = JsonDocument.Parse(
+            await (await client.GetAsync("/api/categories")).Content.ReadAsStringAsync());
+        JsonElement root = list.RootElement;
+
+        Assert.Equal(JsonValueKind.Array, root.ValueKind);
+        bool found = root.EnumerateArray().Any(c =>
+            c.GetProperty("name").GetString() == "Wire kateqoriya" &&
+            c.TryGetProperty("id", out _));
+        Assert.True(found);
     }
 
     [Fact]
