@@ -18,6 +18,7 @@ public sealed class DashboardCalculatorTests
         IReadOnlyList<ExpenseReportRow>? expenses = null,
         IReadOnlyList<RecentSaleInfo>? recentSales = null,
         IReadOnlyList<RecentPaymentInfo>? recentPayments = null,
+        IReadOnlyDictionary<Guid, string>? customerNames = null,
         decimal customerDebt = 0m,
         decimal supplierDebt = 0m,
         ClosingSnapshot? lastClosing = null) =>
@@ -28,6 +29,7 @@ public sealed class DashboardCalculatorTests
             expenses ?? [],
             recentSales ?? [],
             recentPayments ?? [],
+            customerNames ?? new Dictionary<Guid, string>(),
             customerDebt,
             supplierDebt,
             lastClosing,
@@ -187,17 +189,31 @@ public sealed class DashboardCalculatorTests
     {
         Guid saleId = Guid.NewGuid(), payId = Guid.NewGuid();
         var dto = Build(
-            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", 2, 40m, Cash)],
+            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", 2, 40m, Cash, CustomerId: null)],
             recentPayments: [new RecentPaymentInfo(payId, Today, "Əli", 25m)]);
 
         RecentSaleDto s = Assert.Single(dto.RecentSales);
         Assert.Equal(saleId, s.Id);
         Assert.Equal("Şalvar", s.ProductName);
         Assert.Equal(Cash, s.PaymentType);
+        Assert.Null(s.CustomerName);   // cash sale → no customer
 
         RecentPaymentDto p = Assert.Single(dto.RecentPayments);
         Assert.Equal(payId, p.Id);
         Assert.Equal("Əli", p.CustomerName);
         Assert.Equal(25m, p.Amount);
+    }
+
+    [Fact]
+    public void Recent_Credit_Sale_Gets_Its_Customer_Name_From_The_Lookup()
+    {
+        Guid saleId = Guid.NewGuid(), customerId = Guid.NewGuid();
+        const string Credit = WireFormat.PaymentTypes.Credit;
+        var dto = Build(
+            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", 2, 40m, Credit, customerId)],
+            customerNames: new Dictionary<Guid, string> { [customerId] = "Nisyə müştəri" });
+
+        RecentSaleDto s = Assert.Single(dto.RecentSales);
+        Assert.Equal("Nisyə müştəri", s.CustomerName);
     }
 }

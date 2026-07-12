@@ -51,14 +51,18 @@ public sealed record DailyPointDto(DateOnly Date, decimal Sales, decimal Profit)
 /// <summary>One month of the 6-month trend: profit. Month is <c>yyyy-MM</c>.</summary>
 public sealed record MonthlyPointDto(string Month, decimal Profit);
 
-/// <summary>A recent sale for the activity feed.</summary>
+/// <summary>
+/// A recent sale for the activity feed. <see cref="CustomerName"/> is set only for credit (Nisyə) sales;
+/// null for cash and card sales.
+/// </summary>
 public sealed record RecentSaleDto(
     Guid Id,
     DateOnly Date,
     string ProductName,
     int Quantity,
     decimal TotalAmount,
-    string PaymentType);
+    string PaymentType,
+    string? CustomerName);
 
 /// <summary>A recent customer payment for the activity feed.</summary>
 public sealed record RecentPaymentDto(Guid Id, DateOnly Date, string CustomerName, decimal Amount);

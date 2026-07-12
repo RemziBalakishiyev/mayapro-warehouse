@@ -25,7 +25,7 @@ internal static class IntegrationTestHelpers
     }
 
     public static async Task<ProductDto> CreateProductAsync(
-        this HttpClient client, string barcode, int quantity, decimal salePrice = 10m)
+        this HttpClient client, string barcode, int quantity, decimal salePrice = 10m, string supplierId = "sup_1")
     {
         object body = new
         {
@@ -40,7 +40,7 @@ internal static class IntegrationTestHelpers
             quantity,
             minStock = 1,
             currency = "AZN",
-            supplierId = "sup_1",
+            supplierId,
             location = "Anbar A / Rəf 1 / Qutu 1",
             store = "Anbar A",
             warehouse = "Anbar A",
@@ -98,7 +98,7 @@ internal static class IntegrationTestHelpers
 
     internal sealed record CustomerDto(Guid Id, string Name, decimal Debt);
 
-    internal sealed record SupplierDto(Guid Id, string Name, decimal Debt);
+    internal sealed record SupplierDto(Guid Id, string Name, decimal Debt, int ItemCount);
 
     internal sealed record ExpenseDto(Guid Id, string Title, string Category, decimal Amount, Guid? ProductId);
 
@@ -168,7 +168,7 @@ internal static class IntegrationTestHelpers
 
     internal sealed record MonthlyPointDto(string Month, decimal Profit);
 
-    internal sealed record RecentSaleDto(Guid Id, DateOnly Date, string ProductName, int Quantity, decimal TotalAmount, string PaymentType);
+    internal sealed record RecentSaleDto(Guid Id, DateOnly Date, string ProductName, int Quantity, decimal TotalAmount, string PaymentType, string? CustomerName);
 
     internal sealed record RecentPaymentDto(Guid Id, DateOnly Date, string CustomerName, decimal Amount);
 

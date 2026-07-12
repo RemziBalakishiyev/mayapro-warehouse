@@ -45,4 +45,18 @@ internal sealed class CustomersModuleContract(ICustomersDbContext db, IDateProvi
             .Select(r => new RecentPaymentInfo(r.Id, dateProvider.ToLocalDate(r.Date), r.CustomerName, r.Amount))
             .ToList();
     }
+
+    public async Task<Dictionary<Guid, string>> GetNamesAsync(
+        IEnumerable<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        List<Guid> idSet = ids.Distinct().ToList();
+        if (idSet.Count == 0)
+            return new Dictionary<Guid, string>();
+
+        return await db.Customers
+            .AsNoTracking()
+            .Where(c => idSet.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
+    }
 }

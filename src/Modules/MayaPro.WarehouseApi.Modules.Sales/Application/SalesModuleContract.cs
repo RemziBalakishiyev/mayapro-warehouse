@@ -85,7 +85,8 @@ internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider date
                 s.ProductName,
                 s.Quantity,
                 s.TotalAmount,
-                s.PaymentType.ToCode()))
+                s.PaymentType.ToCode(),
+                s.CustomerId))
             .ToList();
     }
 

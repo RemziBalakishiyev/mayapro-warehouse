@@ -74,6 +74,24 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         return Result.Success();
     }
 
+    public async Task<Dictionary<Guid, int>> GetCountBySupplierAsync(CancellationToken cancellationToken = default)
+    {
+        // Group by the string supplier reference in SQL (a single query); Product.SupplierId is a loose
+        // cross-module string, so parse to Guid in memory and drop blank/unparseable references.
+        var grouped = await db.Products
+            .AsNoTracking()
+            .GroupBy(p => p.SupplierId)
+            .Select(g => new { SupplierId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var result = new Dictionary<Guid, int>();
+        foreach (var row in grouped)
+            if (Guid.TryParse(row.SupplierId, out Guid supplierId))
+                result[supplierId] = row.Count;
+
+        return result;
+    }
+
     private static ProductExpenseKind ToKind(ProductCostBucket bucket) => bucket switch
     {
         ProductCostBucket.Transport => ProductExpenseKind.Transport,

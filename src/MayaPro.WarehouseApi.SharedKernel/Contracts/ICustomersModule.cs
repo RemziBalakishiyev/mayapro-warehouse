@@ -28,6 +28,14 @@ public interface ICustomersModule
     Task<IReadOnlyList<RecentPaymentInfo>> GetRecentPaymentsAsync(
         int take,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resolves the names of the given customers in a single query. Missing ids are simply absent from the
+    /// result. Used by the read-only Reports module to label recent credit sales without an N+1 lookup.
+    /// </summary>
+    Task<Dictionary<Guid, string>> GetNamesAsync(
+        IEnumerable<Guid> ids,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>A recent customer payment for the dashboard feed. Date is the business-zone (local) date.</summary>

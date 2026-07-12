@@ -75,6 +75,23 @@ public sealed class ReportsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Dashboard_RecentSales_Include_CustomerName_For_Credit_Sale()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var product = await client.CreateProductAsync("RPT-CREDIT", quantity: 10, salePrice: 10m);
+        var customer = await client.CreateCustomerAsync("Nisyə müştəri");
+        await SellOnCreditAsync(client, product.Id, quantity: 1, customer.Id);
+
+        var d = (await client.GetFromJsonAsync<IntegrationTestHelpers.DashboardDto>("/api/reports/dashboard"))!;
+
+        // The credit sale was the most recent, so it appears in the feed with its customer's name resolved.
+        Assert.Contains(d.RecentSales, r => r.PaymentType == "Nisyə" && r.CustomerName == "Nisyə müştəri");
+        // Cash/card sales stay anonymous — no customer name.
+        Assert.All(d.RecentSales.Where(r => r.PaymentType != "Nisyə"), r => Assert.Null(r.CustomerName));
+    }
+
+    [Fact]
     public async Task Summary_Today_Aggregates_And_Is_Self_Consistent()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
@@ -138,6 +155,17 @@ public sealed class ReportsApiTests : IAsyncLifetime
             discount = 0m,
             paymentType,
             customerId = (Guid?)null
+        });
+
+    private static Task SellOnCreditAsync(HttpClient client, Guid productId, int quantity, Guid customerId) =>
+        client.PostAsJsonAsync("/api/sales", new
+        {
+            productId,
+            quantity,
+            salePrice = 10m,
+            discount = 0m,
+            paymentType = "Nisyə",
+            customerId = (Guid?)customerId
         });
 
     private static Task AddGeneralExpenseAsync(HttpClient client, decimal amount) =>

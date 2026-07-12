@@ -37,6 +37,13 @@ public interface IProductsModule
         ProductCostBucket bucket,
         decimal amount,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the number of products linked to each supplier, keyed by the supplier's id. Products whose
+    /// supplier reference is blank or not a valid id are omitted. Computed with a single grouped query.
+    /// Used by the Suppliers module for each supplier's item count.
+    /// </summary>
+    Task<Dictionary<Guid, int>> GetCountBySupplierAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Snapshot of a product at sale time: its name and current real cost per unit.</summary>

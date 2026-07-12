@@ -34,6 +34,12 @@ public sealed class GetDashboardHandler(
         decimal totalSupplierDebt = await suppliers.GetTotalDebtAsync(ct);
         ClosingSnapshot? lastClosing = await dayEnd.GetLastClosingAsync(ct);
 
+        // Resolve the names of customers on recent credit sales in one query, so the feed can label them.
+        IEnumerable<Guid> customerIds = recentSales
+            .Where(s => s.CustomerId is not null)
+            .Select(s => s.CustomerId!.Value);
+        Dictionary<Guid, string> customerNames = await customers.GetNamesAsync(customerIds, ct);
+
         return DashboardCalculator.Build(
             snapshots,
             allSales,
@@ -41,6 +47,7 @@ public sealed class GetDashboardHandler(
             allExpenses,
             recentSales,
             recentPayments,
+            customerNames,
             totalCustomerDebt,
             totalSupplierDebt,
             lastClosing,

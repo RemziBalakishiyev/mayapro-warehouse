@@ -33,6 +33,23 @@ public sealed class SuppliersApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Supplier_ItemCount_Reflects_Linked_Products()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var supplier = await client.CreateSupplierAsync("Mallı təchizatçı");
+
+        // A freshly created supplier has no products yet.
+        var before = await client.GetSupplierAsync(supplier.Id);
+        Assert.Equal(0, before.ItemCount);
+
+        // Link a product to this supplier by its id, then the count reflects it.
+        await client.CreateProductAsync("SUP-ITEMCOUNT", quantity: 5, supplierId: supplier.Id.ToString());
+
+        var after = await client.GetSupplierAsync(supplier.Id);
+        Assert.True(after.ItemCount >= 1);
+    }
+
+    [Fact]
     public async Task Payment_Reduces_Supplier_Debt()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();

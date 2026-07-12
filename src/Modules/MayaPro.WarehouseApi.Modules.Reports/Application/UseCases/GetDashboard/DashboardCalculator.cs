@@ -22,6 +22,7 @@ public static class DashboardCalculator
         IReadOnlyList<ExpenseReportRow> allExpenses,
         IReadOnlyList<RecentSaleInfo> recentSales,
         IReadOnlyList<RecentPaymentInfo> recentPayments,
+        IReadOnlyDictionary<Guid, string> customerNames,
         decimal totalCustomerDebt,
         decimal totalSupplierDebt,
         ClosingSnapshot? lastClosing,
@@ -52,7 +53,9 @@ public static class DashboardCalculator
             DailySeries: BuildDailySeries(allSales, today),
             MonthlySeries: BuildMonthlySeries(allSales, today),
             RecentSales: recentSales
-                .Select(s => new RecentSaleDto(s.Id, s.Date, s.ProductName, s.Quantity, s.TotalAmount, s.PaymentType))
+                .Select(s => new RecentSaleDto(
+                    s.Id, s.Date, s.ProductName, s.Quantity, s.TotalAmount, s.PaymentType,
+                    s.CustomerId is { } cid && customerNames.TryGetValue(cid, out string? name) ? name : null))
                 .ToList(),
             RecentPayments: recentPayments
                 .Select(p => new RecentPaymentDto(p.Id, p.Date, p.CustomerName, p.Amount))

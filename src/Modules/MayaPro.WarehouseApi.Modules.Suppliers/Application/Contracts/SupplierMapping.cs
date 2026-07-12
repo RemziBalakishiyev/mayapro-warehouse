@@ -8,9 +8,10 @@ public static class SupplierMapping
     public static SupplierDto ToDto(
         this Supplier supplier,
         decimal paidAmount = 0m,
-        DateTime? lastPaymentDate = null) =>
+        DateTime? lastPaymentDate = null,
+        int itemCount = 0) =>
         new(supplier.Id, supplier.Name, supplier.ContactName, supplier.Phone, supplier.Note,
-            supplier.Debt, paidAmount, lastPaymentDate, supplier.CreatedAt, supplier.UpdatedAt);
+            supplier.Debt, paidAmount, lastPaymentDate, itemCount, supplier.CreatedAt, supplier.UpdatedAt);
 
     public static SupplierPaymentDto ToDto(this SupplierPayment payment) =>
         new(payment.Id, payment.SupplierId, payment.Amount, payment.Note,

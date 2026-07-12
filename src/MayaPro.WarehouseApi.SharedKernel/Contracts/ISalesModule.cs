@@ -38,14 +38,18 @@ public sealed record SalesDayTotals(decimal Cash, decimal Card, decimal Credit);
 /// <summary>The most recent sale date for a product.</summary>
 public sealed record ProductLastSale(Guid ProductId, DateOnly LastSale);
 
-/// <summary>A recent sale for the dashboard feed. Date is the business-zone (local) date.</summary>
+/// <summary>
+/// A recent sale for the dashboard feed. Date is the business-zone (local) date. <see cref="CustomerId"/>
+/// is set only for credit (Nisyə) sales; null for cash and card sales.
+/// </summary>
 public sealed record RecentSaleInfo(
     Guid Id,
     DateOnly Date,
     string ProductName,
     int Quantity,
     decimal TotalAmount,
-    string PaymentType);
+    string PaymentType,
+    Guid? CustomerId);
 
 /// <summary>A customer's most recent credit-purchase timestamp (UTC).</summary>
 public sealed record CustomerLastPurchase(Guid CustomerId, DateTime Date);
