@@ -34,9 +34,31 @@ public static class ModuleExtensions
     public static async Task MigrateModulesAsync(this IServiceProvider services)
     {
         foreach (IModule module in DiscoveredModules)
+            await MigrateModuleWithRetryAsync(services, module);
+    }
+
+    /// <summary>
+    /// Runs a module's migrate + seed with a few retries and an increasing delay. A freshly started (cold)
+    /// SQL Server can be slow to accept the very first connections, so the first attempt may hit a connection
+    /// timeout that a short wait resolves. This is startup-only; it is NOT EnableRetryOnFailure (that would
+    /// clash with the hand-rolled BeginTransaction flow) — each attempt uses a fresh scope so a failed
+    /// attempt never reuses a half-open connection.
+    /// </summary>
+    private static async Task MigrateModuleWithRetryAsync(IServiceProvider services, IModule module)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; ; attempt++)
         {
-            await using AsyncServiceScope scope = services.CreateAsyncScope();
-            await module.MigrateAsync(scope.ServiceProvider);
+            try
+            {
+                await using AsyncServiceScope scope = services.CreateAsyncScope();
+                await module.MigrateAsync(scope.ServiceProvider);
+                return;
+            }
+            catch when (attempt < maxAttempts)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
+            }
         }
     }
 

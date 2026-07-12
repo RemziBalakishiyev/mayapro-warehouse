@@ -16,16 +16,33 @@ public sealed class UnitOfWork(
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         DbConnection connection = connectionFactory.GetConnection();
-        if (connection.State != ConnectionState.Open)
+        bool openedHere = connection.State != ConnectionState.Open;
+        if (openedHere)
             await connection.OpenAsync(cancellationToken);
 
-        DbTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
+        DbTransaction? transaction = null;
+        try
+        {
+            transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        var enlisted = contexts.ToList();
-        foreach (ITransactionalDbContext context in enlisted)
-            await context.EnlistAsync(transaction, cancellationToken);
+            var enlisted = contexts.ToList();
+            foreach (ITransactionalDbContext context in enlisted)
+                await context.EnlistAsync(transaction, cancellationToken);
 
-        return new UnitOfWorkTransaction(transaction, enlisted);
+            return new UnitOfWorkTransaction(transaction, enlisted);
+        }
+        catch
+        {
+            // Something failed between opening the connection and handing back a disposable wrapper — the
+            // caller never gets a transaction to dispose, so unwind here: kill the dangling transaction and,
+            // if we were the ones who opened the connection, hand it straight back to the pool. Otherwise a
+            // transient begin/enlist failure would pin this pooled connection until the scope ends.
+            if (transaction is not null)
+                await transaction.DisposeAsync();
+            if (openedHere && connection.State == ConnectionState.Open)
+                await connection.CloseAsync();
+            throw;
+        }
     }
 
     private sealed class UnitOfWorkTransaction(
