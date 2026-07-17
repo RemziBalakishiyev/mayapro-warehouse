@@ -54,12 +54,17 @@ public sealed record RecentSaleInfo(
 /// <summary>A customer's most recent credit-purchase timestamp (UTC).</summary>
 public sealed record CustomerLastPurchase(Guid CustomerId, DateTime Date);
 
-/// <summary>A single sale as seen by reports: date, net amount, profit, payment code and product line.</summary>
+/// <summary>
+/// A single sale as seen by reports: date, net amount, profit, payment code and product line.
+/// <see cref="Profit"/> is null when the sale's cost is unknown (a free-form sale with no cost) — reports
+/// exclude it from profit sums instead of counting it as zero. <see cref="ProductId"/> is null for a
+/// free-form sale, which keeps such sales out of per-product aggregates (top products, frozen stock).
+/// </summary>
 public sealed record SalesReportRow(
     DateOnly Date,
     decimal TotalAmount,
-    decimal Profit,
+    decimal? Profit,
     string PaymentType,
-    Guid ProductId,
+    Guid? ProductId,
     string ProductName,
     int Quantity);

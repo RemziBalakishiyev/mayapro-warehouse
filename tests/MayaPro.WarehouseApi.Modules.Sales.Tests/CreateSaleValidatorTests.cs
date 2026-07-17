@@ -59,4 +59,43 @@ public sealed class CreateSaleValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void Manual_Sale_Without_ProductName_Is_Invalid()
+    {
+        // ProductId null → free-form sale, so the name is mandatory (nothing else supplies it).
+        var command = new CreateSaleCommand(
+            ProductId: null,
+            Quantity: 1,
+            SalePrice: 10m,
+            Discount: 0m,
+            PaymentType: "Nağd",
+            CustomerId: null,
+            Note: null,
+            ProductName: "   ");   // blank → not a real name
+
+        var result = Validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage == "Sərbəst satışda mal adı məcburidir");
+    }
+
+    [Fact]
+    public void Valid_Manual_Sale_With_Name_Passes()
+    {
+        var command = new CreateSaleCommand(
+            ProductId: null,
+            Quantity: 2,
+            SalePrice: 15m,
+            Discount: 0m,
+            PaymentType: "Nağd",
+            CustomerId: null,
+            Note: null,
+            ProductName: "Əl ilə mal",
+            CostPerUnit: null);   // cost optional — unknown is allowed
+
+        var result = Validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
 }

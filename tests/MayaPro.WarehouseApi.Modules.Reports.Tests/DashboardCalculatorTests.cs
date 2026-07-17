@@ -38,7 +38,7 @@ public sealed class DashboardCalculatorTests
     private static ProductSnapshot Snap(Guid id, int qty, int min, decimal realCost, decimal salePrice) =>
         new(id, "P", "Cat", qty, min, realCost, salePrice);
 
-    private static SalesReportRow Sale(DateOnly date, decimal total, decimal profit, int qty = 1, string? payment = null, Guid product = default, string name = "P") =>
+    private static SalesReportRow Sale(DateOnly date, decimal total, decimal? profit, int qty = 1, string? payment = null, Guid? product = null, string name = "P") =>
         new(date, total, profit, payment ?? Cash, product, name, qty);
 
     private static ExpenseReportRow Exp(DateOnly date, decimal amount) => new(date, "Yol", amount);
@@ -59,6 +59,42 @@ public sealed class DashboardCalculatorTests
         Assert.Equal(23m, dto.TodayProfit);
         Assert.Equal(40m, dto.TodayExpenses);
         Assert.Equal(2, dto.TodaySalesCount);
+        Assert.Equal(0, dto.UnknownProfitSalesCount);
+        Assert.Equal(0m, dto.UnknownProfitAmount);
+    }
+
+    [Fact]
+    public void Unknown_Profit_Sales_Are_Excluded_From_Profit_But_Counted_And_Reported()
+    {
+        Guid product = Guid.NewGuid();
+        var dto = Build(sales:
+        [
+            Sale(Today, total: 30, profit: 15, product: product),  // normal sale
+            Sale(Today, total: 50, profit: null),                  // free-form, unknown profit
+            Sale(Today, total: 20, profit: null)                   // free-form, unknown profit
+        ]);
+
+        Assert.Equal(100m, dto.TodaySales);         // all revenue counts — the money is real
+        Assert.Equal(15m, dto.TodayProfit);          // unknown-profit sales excluded, NOT counted as 0
+        Assert.Equal(3, dto.TodaySalesCount);
+        Assert.Equal(2, dto.UnknownProfitSalesCount);
+        Assert.Equal(70m, dto.UnknownProfitAmount);  // 50 + 20 (their revenue sum)
+    }
+
+    [Fact]
+    public void Manual_Sales_Do_Not_Appear_In_Top_Products()
+    {
+        Guid a = Guid.NewGuid();
+        var dto = Build(sales:
+        [
+            Sale(Today, total: 30, profit: 10, qty: 3, product: a),
+            Sale(Today, total: 100, profit: null, qty: 9, name: "Sərbəst")  // manual: no product
+        ]);
+
+        // Only the catalogued product is ranked; the higher-quantity manual sale is absent (no ProductId).
+        TopProductDto top = Assert.Single(dto.TopProducts);
+        Assert.Equal(a, top.ProductId);
+        Assert.Equal(3, top.QuantitySold);
     }
 
     [Fact]

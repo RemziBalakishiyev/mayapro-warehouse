@@ -74,6 +74,90 @@ public sealed class SalesApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Manual_Cash_Sale_Records_Revenue_And_Touches_No_Stock()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        // A catalogued product exists in the same DB; a free-form sale must leave its stock alone.
+        var product = await client.CreateProductAsync("SALE-MANUAL", quantity: 20, salePrice: 10m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,           // free-form: no catalogued product
+            productName = "Əl ilə mal",
+            quantity = 2,
+            salePrice = 15m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var sale = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+        Assert.Null(sale.ProductId);
+        Assert.True(sale.IsManual);
+        Assert.Null(sale.CostPerUnit);   // no cost given → unknown
+        Assert.Null(sale.Profit);        // → profit unknown, not zero
+        Assert.Equal(30m, sale.TotalAmount);
+
+        // No product's stock moved — the manual sale referenced no catalogue item.
+        var afterSale = await client.GetProductAsync(product.Id);
+        Assert.Equal(20, afterSale.Quantity);
+
+        // The revenue is still recorded and listed like any other sale.
+        List<IntegrationTestHelpers.SaleDto> allSales =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SaleDto>>("/api/sales"))!;
+        Assert.Contains(allSales, s => s.Id == sale.Id);
+    }
+
+    [Fact]
+    public async Task Manual_Credit_Sale_Increases_Customer_Debt_By_Net_Amount()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("Sərbəst nisyə müştəri", debt: 0m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Əl ilə nisyə mal",
+            quantity = 3,
+            salePrice = 10m,
+            discount = 0m,
+            paymentType = "Nisyə",
+            customerId = customer.Id
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var sale = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+        Assert.True(sale.IsManual);
+        Assert.Equal(customer.Id, sale.CustomerId);
+
+        // The credit flow is identical to a catalogued sale — the money owed is just as real.
+        var afterSale = await client.GetCustomerAsync(customer.Id);
+        Assert.Equal(30m, afterSale.Debt);
+    }
+
+    [Fact]
+    public async Task Manual_Sale_Without_ProductName_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "",   // blank → invalid free-form sale
+            quantity = 1,
+            salePrice = 10m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Sərbəst satışda mal adı məcburidir", error.Message);
+    }
+
+    [Fact]
     public async Task Sale_Beyond_Stock_Returns_400_And_Leaves_Stock_Untouched()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();

@@ -3,8 +3,11 @@ using MayaPro.WarehouseApi.SharedKernel.Domain;
 namespace MayaPro.WarehouseApi.Modules.Sales.Domain;
 
 /// <summary>
-/// A completed sale. Snapshots the product name and its real cost at sale time, so historical profit is
-/// stable even if the product's cost later changes. Amounts are computed once in <see cref="Create"/>.
+/// A completed sale. A normal sale references a catalogued product and snapshots the product name and its
+/// real cost at sale time, so historical profit is stable even if the product's cost later changes. A
+/// free-form ("manual") sale has no product: the seller types the name by hand and may or may not know the
+/// cost — when the cost is unknown, <see cref="Profit"/> is left null rather than inventing a phantom gain.
+/// Amounts are computed once in <see cref="Create"/> / <see cref="CreateManual"/>.
 /// </summary>
 public sealed class Sale : Entity
 {
@@ -12,15 +15,16 @@ public sealed class Sale : Entity
     private Sale() { }
 
     private Sale(
-        Guid productId,
+        Guid? productId,
+        bool isManual,
         string productName,
         int quantity,
         decimal unitPrice,
         decimal subtotal,
         decimal discount,
         decimal totalAmount,
-        decimal costPerUnit,
-        decimal profit,
+        decimal? costPerUnit,
+        decimal? profit,
         PaymentType paymentType,
         Guid? customerId,
         Guid? soldByUserId,
@@ -28,6 +32,7 @@ public sealed class Sale : Entity
         DateTime date)
     {
         ProductId = productId;
+        IsManual = isManual;
         ProductName = productName;
         Quantity = quantity;
         UnitPrice = unitPrice;
@@ -43,7 +48,11 @@ public sealed class Sale : Entity
         Date = date;
     }
 
-    public Guid ProductId { get; private set; }
+    /// <summary>The catalogued product sold; null for a free-form (manual) sale.</summary>
+    public Guid? ProductId { get; private set; }
+
+    /// <summary>True when the item was typed by hand and is not in the catalogue (no product, no stock move).</summary>
+    public bool IsManual { get; private set; }
 
     public string ProductName { get; private set; } = string.Empty;
 
@@ -59,11 +68,15 @@ public sealed class Sale : Entity
     /// <summary>Net after discount: <see cref="Subtotal"/> − <see cref="Discount"/>.</summary>
     public decimal TotalAmount { get; private set; }
 
-    /// <summary>Real cost per unit at sale time (snapshot).</summary>
-    public decimal CostPerUnit { get; private set; }
+    /// <summary>Real cost per unit at sale time (snapshot). Null on a manual sale whose cost is unknown.</summary>
+    public decimal? CostPerUnit { get; private set; }
 
-    /// <summary>(<see cref="UnitPrice"/> − <see cref="CostPerUnit"/>) × <see cref="Quantity"/> − <see cref="Discount"/>.</summary>
-    public decimal Profit { get; private set; }
+    /// <summary>
+    /// (<see cref="UnitPrice"/> − <see cref="CostPerUnit"/>) × <see cref="Quantity"/> − <see cref="Discount"/>.
+    /// Null when the cost is unknown (a manual sale with no cost) — the gain is genuinely unknown, so reports
+    /// exclude it rather than counting it as zero profit.
+    /// </summary>
+    public decimal? Profit { get; private set; }
 
     public PaymentType PaymentType { get; private set; }
 
@@ -94,6 +107,7 @@ public sealed class Sale : Entity
 
         return new Sale(
             productId,
+            isManual: false,
             productName,
             quantity,
             unitPrice,
@@ -104,6 +118,46 @@ public sealed class Sale : Entity
             profit,
             paymentType,
             // Only credit sales carry a customer, matching the frontend rule.
+            paymentType == PaymentType.Credit ? customerId : null,
+            soldByUserId,
+            soldByName,
+            DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// A free-form sale: no catalogued product, so no stock is moved. The seller supplies the name and may
+    /// pass the unit cost if known — pass null when it is not, and <see cref="Profit"/> stays null so the
+    /// sale's revenue is still recorded while its gain is reported as unknown.
+    /// </summary>
+    public static Sale CreateManual(
+        string productName,
+        int quantity,
+        decimal unitPrice,
+        decimal discount,
+        decimal? costPerUnit,
+        PaymentType paymentType,
+        Guid? customerId,
+        Guid? soldByUserId,
+        string soldByName)
+    {
+        decimal subtotal = unitPrice * quantity;
+        decimal totalAmount = subtotal - discount;
+        decimal? profit = costPerUnit is { } cost
+            ? (unitPrice - cost) * quantity - discount
+            : null;
+
+        return new Sale(
+            productId: null,
+            isManual: true,
+            productName,
+            quantity,
+            unitPrice,
+            subtotal,
+            discount,
+            totalAmount,
+            costPerUnit,
+            profit,
+            paymentType,
             paymentType == PaymentType.Credit ? customerId : null,
             soldByUserId,
             soldByName,

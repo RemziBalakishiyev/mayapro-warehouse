@@ -57,9 +57,11 @@ internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider date
 
     public async Task<IReadOnlyList<ProductLastSale>> GetLastSaleDatesAsync(CancellationToken cancellationToken = default)
     {
+        // Free-form sales have no product, so they can't be "frozen stock" — exclude them from the grouping.
         var rows = await db.Sales
             .AsNoTracking()
-            .GroupBy(s => s.ProductId)
+            .Where(s => s.ProductId != null)
+            .GroupBy(s => s.ProductId!.Value)
             .Select(g => new { ProductId = g.Key, Last = g.Max(s => s.Date) })
             .ToListAsync(cancellationToken);
 

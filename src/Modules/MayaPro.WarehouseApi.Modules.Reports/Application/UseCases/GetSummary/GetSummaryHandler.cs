@@ -19,7 +19,9 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
         IReadOnlyList<ExpenseReportRow> expenseRows = await expenses.GetExpensesAsync(window.From, window.To, ct);
 
         decimal salesTotal = salesRows.Sum(s => s.TotalAmount);
-        decimal profit = salesRows.Sum(s => s.Profit);
+        // Unknown-profit sales (free-form, no cost) are excluded from the profit total rather than counted
+        // as zero, and reported separately so the frontend can flag "N sales with unknown profit".
+        decimal profit = salesRows.Sum(s => s.Profit ?? 0m);
         decimal expensesTotal = expenseRows.Sum(e => e.Amount);
 
         return Result.Success(new SummaryDto(
@@ -33,6 +35,8 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
             NetProfit: profit - expensesTotal,
             CashSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash).Sum(s => s.TotalAmount),
             CardSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Card).Sum(s => s.TotalAmount),
-            CreditSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Credit).Sum(s => s.TotalAmount)));
+            CreditSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Credit).Sum(s => s.TotalAmount),
+            UnknownProfitSalesCount: salesRows.Count(s => s.Profit is null),
+            UnknownProfitAmount: salesRows.Where(s => s.Profit is null).Sum(s => s.TotalAmount)));
     }
 }

@@ -156,6 +156,69 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         Assert.True(found);
     }
 
+    /// <summary>
+    /// DELIBERATE CONTRACT CHANGE (agreed with the frontend): the <c>Sale</c> wire shape now supports free-form
+    /// ("manual") sales. <c>productId</c> becomes nullable, a boolean <c>isManual</c> is added, and
+    /// <c>costPerUnit</c>/<c>profit</c> become nullable — for a manual sale with no cost they are JSON <c>null</c>
+    /// (unknown), never coerced to 0. The assertions below pin the NEW shape on purpose.
+    /// </summary>
+    [Fact]
+    public async Task Manual_Sale_Exposes_Null_Product_And_Profit_With_IsManual_Flag()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Sərbəst mal",
+            quantity = 2,
+            salePrice = 12.5m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+        sale.EnsureSuccessStatusCode();
+
+        using JsonDocument doc = JsonDocument.Parse(await sale.Content.ReadAsStringAsync());
+        JsonElement root = doc.RootElement;
+
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("productId").ValueKind);
+        Assert.True(root.GetProperty("isManual").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("costPerUnit").ValueKind);   // cost unknown → null, not 0
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("profit").ValueKind);        // profit unknown → null, not 0
+        Assert.Equal("Sərbəst mal", root.GetProperty("productName").GetString());
+        Assert.Equal(25m, root.GetProperty("totalAmount").GetDecimal());               // revenue is still recorded
+        Assert.Equal("Nağd", root.GetProperty("paymentType").GetString());
+    }
+
+    /// <summary>A manual sale WITH a cost reports a real, computed profit — the field is nullable, not absent.</summary>
+    [Fact]
+    public async Task Manual_Sale_With_Cost_Reports_Computed_Profit_On_The_Wire()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Sərbəst maya bilinən",
+            quantity = 2,
+            salePrice = 20m,
+            discount = 0m,
+            costPerUnit = 12m,   // cost known → profit computes: (20-12)*2 = 16
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+        sale.EnsureSuccessStatusCode();
+
+        using JsonDocument doc = JsonDocument.Parse(await sale.Content.ReadAsStringAsync());
+        JsonElement root = doc.RootElement;
+
+        Assert.True(root.GetProperty("isManual").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("productId").ValueKind);
+        Assert.Equal(12m, root.GetProperty("costPerUnit").GetDecimal());
+        Assert.Equal(16m, root.GetProperty("profit").GetDecimal());
+    }
+
     [Fact]
     public async Task PaymentType_Category_And_Role_Round_Trip_In_Azerbaijani()
     {

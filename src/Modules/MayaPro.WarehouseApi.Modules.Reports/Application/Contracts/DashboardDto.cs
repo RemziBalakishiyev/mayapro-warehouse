@@ -13,6 +13,8 @@ public sealed record DashboardDto(
     decimal StockRetailValue,
     decimal TodaySales,
     decimal TodayProfit,
+    int UnknownProfitSalesCount,
+    decimal UnknownProfitAmount,
     decimal TodayExpenses,
     int TodaySalesCount,
     decimal TotalCustomerDebt,

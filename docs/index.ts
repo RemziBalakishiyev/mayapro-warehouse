@@ -62,7 +62,8 @@ export interface Product {
 
 export interface Sale {
   id: string;
-  productId: string;
+  /** Sərbəst (əl ilə) satışda null — mal kataloqda yoxdur */
+  productId: string | null;
   productName: string;
   quantity: number;
   salePrice: number;
@@ -73,9 +74,12 @@ export interface Sale {
   totalAmount: number;
   paymentType: PaymentType;
   customerId: string | null;
-  /** Satış anındakı real maya snapshot-u (1 ədəd) */
-  costPerUnit?: number;
-  profit: number;
+  /** Satış anındakı real maya snapshot-u (1 ədəd). Sərbəst satışda maya bilinmirsə null */
+  costPerUnit: number | null;
+  /** Qazanc. Sərbəst satışda maya bilinmirsə null — yalançı qazanc yazılmır */
+  profit: number | null;
+  /** Sərbəst satış: mal əl ilə yazılıb, stok dəyişməyib */
+  isManual: boolean;
   createdAt: string;
   employeeId: string;
 }

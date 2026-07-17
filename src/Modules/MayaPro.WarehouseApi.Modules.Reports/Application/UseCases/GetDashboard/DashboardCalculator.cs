@@ -37,7 +37,12 @@ public static class DashboardCalculator
             StockCostValue: snapshots.Sum(p => p.Quantity * p.RealCostPerUnit),
             StockRetailValue: snapshots.Sum(p => p.Quantity * p.SalePrice),
             TodaySales: todaySales.Sum(s => s.TotalAmount),
-            TodayProfit: todaySales.Sum(s => s.Profit),
+            // Sales whose cost is unknown (free-form sales without a cost) carry a null profit. They are
+            // excluded from the profit total rather than counted as zero, and surfaced separately below so
+            // the frontend can say "N of today's sales have unknown profit".
+            TodayProfit: todaySales.Sum(s => s.Profit ?? 0m),
+            UnknownProfitSalesCount: todaySales.Count(s => s.Profit is null),
+            UnknownProfitAmount: todaySales.Where(s => s.Profit is null).Sum(s => s.TotalAmount),
             TodayExpenses: allExpenses.Where(e => e.Date == today).Sum(e => e.Amount),
             TodaySalesCount: todaySales.Count,
             TotalCustomerDebt: totalCustomerDebt,
@@ -124,7 +129,9 @@ public static class DashboardCalculator
 
     private static IReadOnlyList<TopProductDto> BuildTopProducts(IReadOnlyList<SalesReportRow> allSales) =>
         allSales
-            .GroupBy(s => new { s.ProductId, s.ProductName })
+            // Free-form sales have no product, so they don't belong in a per-product ranking.
+            .Where(s => s.ProductId is not null)
+            .GroupBy(s => new { ProductId = s.ProductId!.Value, s.ProductName })
             .Select(g => new TopProductDto(
                 g.Key.ProductId,
                 g.Key.ProductName,
@@ -141,7 +148,8 @@ public static class DashboardCalculator
     {
         var byDay = allSales
             .GroupBy(s => s.Date)
-            .ToDictionary(g => g.Key, g => (Sales: g.Sum(s => s.TotalAmount), Profit: g.Sum(s => s.Profit)));
+            // Unknown-profit sales still count toward sales, but not toward profit (null → excluded, not zero-counted).
+            .ToDictionary(g => g.Key, g => (Sales: g.Sum(s => s.TotalAmount), Profit: g.Sum(s => s.Profit ?? 0m)));
 
         var series = new List<DailyPointDto>(DailySeriesDays);
         for (int i = DailySeriesDays - 1; i >= 0; i--)
@@ -160,7 +168,7 @@ public static class DashboardCalculator
     {
         var byMonth = allSales
             .GroupBy(s => new { s.Date.Year, s.Date.Month })
-            .ToDictionary(g => (g.Key.Year, g.Key.Month), g => g.Sum(s => s.Profit));
+            .ToDictionary(g => (g.Key.Year, g.Key.Month), g => g.Sum(s => s.Profit ?? 0m));
 
         DateOnly firstOfThisMonth = new(today.Year, today.Month, 1);
         var series = new List<MonthlyPointDto>(MonthlySeriesMonths);

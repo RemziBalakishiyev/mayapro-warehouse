@@ -7,6 +7,11 @@ public sealed class CreateSaleValidator : AbstractValidator<CreateSaleCommand>
 {
     public CreateSaleValidator()
     {
+        // Free-form (manual) sale: no product is chosen, so the name must be typed by hand.
+        RuleFor(x => x.ProductName)
+            .NotEmpty().When(x => x.ProductId is null)
+            .WithMessage("Sərbəst satışda mal adı məcburidir");
+
         RuleFor(x => x.Quantity)
             .GreaterThanOrEqualTo(1).WithMessage("Say ən azı 1 olmalıdır");
 

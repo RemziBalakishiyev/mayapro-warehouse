@@ -36,40 +36,67 @@ public sealed class CreateSaleHandler(
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
-        // ③ Reserve stock (cost snapshot comes back for the sale record).
-        Result<ProductStockSnapshot> stock =
-            await products.TryDecreaseStockAsync(command.ProductId, command.Quantity, ct);
-        if (stock.IsFailure)
-            return Result.Failure<SaleDto>(stock.Error);
-
-        // ④ Credit sale → increase the customer's debt by the net (post-discount) amount.
-        if (paymentType == PaymentType.Credit)
+        // ③ Build the sale. A normal sale reserves stock and snapshots the product's real cost; a free-form
+        // (manual) sale has no product, so the stock step is skipped and the seller-supplied name/cost are used.
+        Sale sale;
+        if (command.ProductId is { } productId)
         {
-            Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
-            if (debt.IsFailure)
-                return Result.Failure<SaleDto>(debt.Error);
+            Result<ProductStockSnapshot> stock =
+                await products.TryDecreaseStockAsync(productId, command.Quantity, ct);
+            if (stock.IsFailure)
+                return Result.Failure<SaleDto>(stock.Error);
+
+            // ④ Credit sale → increase the customer's debt by the net (post-discount) amount.
+            if (paymentType == PaymentType.Credit)
+            {
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
+                if (debt.IsFailure)
+                    return Result.Failure<SaleDto>(debt.Error);
+            }
+
+            sale = Sale.Create(
+                productId,
+                stock.Value.ProductName,
+                command.Quantity,
+                command.SalePrice,
+                command.Discount,
+                stock.Value.RealCostPerUnit,
+                paymentType,
+                command.CustomerId,
+                currentUser.UserId,
+                currentUser.Name ?? string.Empty);
+        }
+        else
+        {
+            // ④ Credit still increases the customer's debt — the money is just as real as a catalogued sale.
+            if (paymentType == PaymentType.Credit)
+            {
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
+                if (debt.IsFailure)
+                    return Result.Failure<SaleDto>(debt.Error);
+            }
+
+            sale = Sale.CreateManual(
+                command.ProductName!,
+                command.Quantity,
+                command.SalePrice,
+                command.Discount,
+                command.CostPerUnit,
+                paymentType,
+                command.CustomerId,
+                currentUser.UserId,
+                currentUser.Name ?? string.Empty);
         }
 
-        // ⑤ Record the sale with the cost snapshot.
-        var sale = Sale.Create(
-            command.ProductId,
-            stock.Value.ProductName,
-            command.Quantity,
-            command.SalePrice,
-            command.Discount,
-            stock.Value.RealCostPerUnit,
-            paymentType,
-            command.CustomerId,
-            currentUser.UserId,
-            currentUser.Name ?? string.Empty);
-
+        // ⑤ Record the sale.
         db.Sales.Add(sale);
 
-        // ⑥ Activity log (note the discount if any).
+        // ⑥ Activity log (note the discount if any, and flag free-form sales).
         string discountNote = command.Discount > 0 ? $" (endirim {command.Discount:0.00})" : string.Empty;
+        string manualNote = sale.IsManual ? " (sərbəst satış)" : string.Empty;
         await activityLogger.LogAsync(
             "Satış etdi",
-            $"{sale.ProductName} × {sale.Quantity} — {sale.TotalAmount:0.00} AZN{discountNote}",
+            $"{sale.ProductName} × {sale.Quantity} — {sale.TotalAmount:0.00} AZN{discountNote}{manualNote}",
             currentUser.UserId,
             ct);
 

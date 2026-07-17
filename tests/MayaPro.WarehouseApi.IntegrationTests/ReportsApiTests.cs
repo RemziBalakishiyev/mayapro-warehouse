@@ -92,6 +92,37 @@ public sealed class ReportsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Manual_Sale_Without_Cost_Counts_In_Sales_But_Reports_Unknown_Profit()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        // Free-form cash sale, no cost supplied → revenue is real, profit is unknown.
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Sərbəst mal",
+            quantity = 1,
+            salePrice = 77m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+        sale.EnsureSuccessStatusCode();
+
+        var d = (await client.GetFromJsonAsync<IntegrationTestHelpers.DashboardDto>("/api/reports/dashboard"))!;
+        Assert.True(d.TodaySales >= 77m);                    // revenue counts toward sales
+        Assert.True(d.UnknownProfitSalesCount >= 1);         // …but is flagged as unknown-profit
+        Assert.True(d.UnknownProfitAmount >= 77m);
+
+        var s = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+        Assert.True(s.SalesTotal >= 77m);
+        Assert.True(s.CashSales >= 77m);                     // cash split includes the manual sale
+        Assert.True(s.UnknownProfitSalesCount >= 1);
+        Assert.True(s.UnknownProfitAmount >= 77m);
+    }
+
+    [Fact]
     public async Task Summary_Today_Aggregates_And_Is_Self_Consistent()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();

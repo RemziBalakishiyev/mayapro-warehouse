@@ -21,5 +21,6 @@ public static class SaleMapping
             sale.CustomerId,
             sale.SoldByUserId,
             sale.SoldByName,
-            sale.Date);
+            sale.Date,
+            sale.IsManual);
 }

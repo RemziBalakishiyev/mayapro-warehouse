@@ -43,4 +43,65 @@ public sealed class SaleTests
 
         Assert.Null(sale.CustomerId);
     }
+
+    [Fact]
+    public void CreateManual_Without_Cost_Leaves_Profit_Unknown()
+    {
+        // No cost supplied → the gain is genuinely unknown, so Profit stays null (no phantom gain written).
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal",
+            quantity: 2,
+            unitPrice: 15m,
+            discount: 0m,
+            costPerUnit: null,
+            paymentType: PaymentType.Cash,
+            customerId: null,
+            soldByUserId: Guid.NewGuid(),
+            soldByName: "Satıcı");
+
+        Assert.True(sale.IsManual);
+        Assert.Null(sale.ProductId);
+        Assert.Null(sale.CostPerUnit);
+        Assert.Null(sale.Profit);
+        Assert.Equal(30m, sale.Subtotal);      // revenue is still recorded
+        Assert.Equal(30m, sale.TotalAmount);
+    }
+
+    [Fact]
+    public void CreateManual_With_Cost_Computes_Profit_Like_A_Normal_Sale()
+    {
+        // (20 − 12) × 3 − 5 = 19 — same formula as a catalogued sale once the cost is known.
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal",
+            quantity: 3,
+            unitPrice: 20m,
+            discount: 5m,
+            costPerUnit: 12m,
+            paymentType: PaymentType.Cash,
+            customerId: null,
+            soldByUserId: null,
+            soldByName: "Satıcı");
+
+        Assert.True(sale.IsManual);
+        Assert.Null(sale.ProductId);
+        Assert.Equal(12m, sale.CostPerUnit);
+        Assert.Equal(19m, sale.Profit);
+        Assert.Equal(55m, sale.TotalAmount);
+    }
+
+    [Fact]
+    public void CreateManual_Keeps_Customer_Only_For_Credit()
+    {
+        Guid customerId = Guid.NewGuid();
+
+        Sale credit = Sale.CreateManual(
+            productName: "Əl ilə mal", quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
+            paymentType: PaymentType.Credit, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
+        Sale cash = Sale.CreateManual(
+            productName: "Əl ilə mal", quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
+            paymentType: PaymentType.Cash, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
+
+        Assert.Equal(customerId, credit.CustomerId);
+        Assert.Null(cash.CustomerId);
+    }
 }

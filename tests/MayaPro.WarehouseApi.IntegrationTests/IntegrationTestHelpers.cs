@@ -104,12 +104,14 @@ internal static class IntegrationTestHelpers
 
     internal sealed record SaleDto(
         Guid Id,
-        Guid ProductId,
+        Guid? ProductId,
         int Quantity,
         decimal TotalAmount,
-        decimal Profit,
+        decimal? CostPerUnit,
+        decimal? Profit,
         string PaymentType,
-        Guid? CustomerId);
+        Guid? CustomerId,
+        bool IsManual);
 
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
 
@@ -143,6 +145,8 @@ internal static class IntegrationTestHelpers
         decimal StockRetailValue,
         decimal TodaySales,
         decimal TodayProfit,
+        int UnknownProfitSalesCount,
+        decimal UnknownProfitAmount,
         decimal TodayExpenses,
         int TodaySalesCount,
         decimal TotalCustomerDebt,
@@ -183,7 +187,9 @@ internal static class IntegrationTestHelpers
         decimal NetProfit,
         decimal CashSales,
         decimal CardSales,
-        decimal CreditSales);
+        decimal CreditSales,
+        int UnknownProfitSalesCount,
+        decimal UnknownProfitAmount);
 
     internal sealed record ErrorDto(string Code, string Message);
 }
