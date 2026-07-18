@@ -113,6 +113,9 @@ internal static class IntegrationTestHelpers
         Guid? CustomerId,
         bool IsManual);
 
+    /// <summary>Wire shape of <c>GET /api/sales</c> — SharedKernel <c>PagedResult&lt;SaleDto&gt;</c> (items/total/skip/take).</summary>
+    internal sealed record PagedSalesDto(List<SaleDto> Items, int Total, int Skip, int Take);
+
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
 
     internal sealed record SupplierPaymentDto(Guid Id, Guid SupplierId, decimal Amount);

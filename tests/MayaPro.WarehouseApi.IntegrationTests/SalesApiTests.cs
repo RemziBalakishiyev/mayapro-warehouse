@@ -43,9 +43,8 @@ public sealed class SalesApiTests : IAsyncLifetime
         var afterSale = await client.GetProductAsync(product.Id);
         Assert.Equal(17, afterSale.Quantity);
 
-        List<IntegrationTestHelpers.SaleDto> allSales =
-            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SaleDto>>("/api/sales"))!;
-        Assert.Contains(allSales, s => s.Id == sale.Id);
+        var page = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>("/api/sales"))!;
+        Assert.Contains(page.Items, s => s.Id == sale.Id);
     }
 
     [Fact]
@@ -104,9 +103,8 @@ public sealed class SalesApiTests : IAsyncLifetime
         Assert.Equal(20, afterSale.Quantity);
 
         // The revenue is still recorded and listed like any other sale.
-        List<IntegrationTestHelpers.SaleDto> allSales =
-            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SaleDto>>("/api/sales"))!;
-        Assert.Contains(allSales, s => s.Id == sale.Id);
+        var page = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>("/api/sales"))!;
+        Assert.Contains(page.Items, s => s.Id == sale.Id);
     }
 
     [Fact]
@@ -207,5 +205,57 @@ public sealed class SalesApiTests : IAsyncLifetime
         // Atomicity proof: the stock decrement was rolled back.
         var afterSale = await client.GetProductAsync(product.Id);
         Assert.Equal(8, afterSale.Quantity);
+    }
+
+    [Fact]
+    public async Task GetSales_Pages_And_Filters_By_From_To_Range()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        // Shared test DB is reset once per run — measure baseline so earlier tests' sales don't break counts.
+        int baseline = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>(
+            "/api/sales?take=1"))!.Total;
+
+        // Free-form sales avoid stock setup; 60 rows so take=50 must leave a second page.
+        for (int i = 0; i < 60; i++)
+        {
+            HttpResponseMessage created = await client.PostAsJsonAsync("/api/sales", new
+            {
+                productId = (Guid?)null,
+                productName = $"Səhifə malı {i}",
+                quantity = 1,
+                salePrice = 1m,
+                discount = 0m,
+                paymentType = "Nağd",
+                customerId = (Guid?)null
+            });
+            created.EnsureSuccessStatusCode();
+        }
+
+        int expectedTotal = baseline + 60;
+
+        var firstPage = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>(
+            "/api/sales?take=50&skip=0"))!;
+        Assert.Equal(expectedTotal, firstPage.Total);
+        Assert.Equal(50, firstPage.Items.Count);
+        Assert.Equal(0, firstPage.Skip);
+        Assert.Equal(50, firstPage.Take);
+
+        var secondPage = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>(
+            "/api/sales?take=50&skip=50"))!;
+        Assert.Equal(expectedTotal, secondPage.Total);
+        Assert.Equal(expectedTotal - 50, secondPage.Items.Count);
+
+        // All new sales fall on today (Baku, UTC+4) — from/to for today keeps them; a distant past window is empty.
+        string today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(4)).ToString("yyyy-MM-dd");
+        var todayRange = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>(
+            $"/api/sales?from={today}&to={today}&take=200"))!;
+        Assert.Equal(expectedTotal, todayRange.Total);
+        Assert.Equal(expectedTotal, todayRange.Items.Count);
+
+        var emptyRange = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>(
+            "/api/sales?from=2020-01-01&to=2020-01-02&take=50"))!;
+        Assert.Equal(0, emptyRange.Total);
+        Assert.Empty(emptyRange.Items);
     }
 }

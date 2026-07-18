@@ -15,8 +15,15 @@ internal static class SalesEndpoints
             .WithTags("Sales")
             .RequireAuthorization(); // selling is open to every role — sellers are the main users
 
-        group.MapGet("/", async (string? date, GetSalesHandler handler, CancellationToken ct) =>
-                Results.Ok(await handler.Handle(date, ct)))
+        group.MapGet("/", async (
+                string? date,
+                string? from,
+                string? to,
+                int? take,
+                int? skip,
+                GetSalesHandler handler,
+                CancellationToken ct) =>
+                Results.Ok(await handler.Handle(date, from, to, take, skip, ct)))
             .WithName("GetSales");
 
         group.MapPost("/", async (

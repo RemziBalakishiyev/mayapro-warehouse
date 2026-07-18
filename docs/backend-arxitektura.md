@@ -166,7 +166,7 @@ Frontend-in hər `api.ts`-i bir endpoint qrupudur. Ümumi qaydalar: bütün rout
 |---|---|
 | Identity | `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/employees` |
 | Products | `GET/POST /api/products`, `GET/PUT /api/products/{id}`, `POST /api/products/{id}/adjust-stock` |
-| Sales | `GET /api/sales?date=`, `POST /api/sales` |
+| Sales | `GET /api/sales?date=&from=&to=&take=50&skip=0` (PagedResult), `POST /api/sales` |
 | Customers | `GET/POST /api/customers`, `GET /api/customers/{id}`, `POST /api/customers/{id}/payments`, `GET /api/customers/{id}/payments` |
 | Suppliers | eyni pattern + `POST /api/suppliers/{id}/debts` |
 | Expenses | `GET /api/expenses?month=`, `POST /api/expenses` |

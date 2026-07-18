@@ -157,7 +157,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// <summary>
     /// DELIBERATE CONTRACT CHANGE (agreed with the frontend): the <c>Sale</c> wire shape now supports free-form
     /// ("manual") sales. <c>productId</c> becomes nullable, a boolean <c>isManual</c> is added, and
     /// <c>costPerUnit</c>/<c>profit</c> become nullable — for a manual sale with no cost they are JSON <c>null</c>
@@ -223,6 +222,38 @@ public sealed class WireFormatApiTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// DELIBERATE CONTRACT CHANGE: <c>GET /api/sales</c> returns SharedKernel <c>PagedResult</c>
+    /// (<c>items</c>/<c>total</c>/<c>skip</c>/<c>take</c>), not a bare array. Frontend updates the same day.
+    /// </summary>
+    [Fact]
+    public async Task GetSales_Returns_PagedResult_Not_Bare_Array()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Paged wire",
+            quantity = 1,
+            salePrice = 5m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+
+        using JsonDocument doc = JsonDocument.Parse(
+            await (await client.GetAsync("/api/sales?take=50&skip=0")).Content.ReadAsStringAsync());
+        JsonElement root = doc.RootElement;
+
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("items").ValueKind);
+        Assert.True(root.GetProperty("total").GetInt32() >= 1);
+        Assert.Equal(0, root.GetProperty("skip").GetInt32());
+        Assert.Equal(50, root.GetProperty("take").GetInt32());
+        Assert.False(root.TryGetProperty("totalCount", out _)); // PagedResult.Total → "total", not totalCount
+    }
+
+    /// <summary>
     /// DELIBERATE CONTRACT CHANGE: a catalogued sale snapshots the product's <c>category</c> onto the sale
     /// wire (and GetSales / dashboard recentSales). CreateProductAsync seeds category "Test".
     /// </summary>
@@ -247,12 +278,13 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         Assert.Equal("Test", saleDoc.RootElement.GetProperty("category").GetString());
         Assert.False(saleDoc.RootElement.GetProperty("isManual").GetBoolean());
 
-        // GetSales also returns the snapshot.
+        // GetSales also returns the snapshot (DELIBERATE CONTRACT CHANGE: root is PagedResult, not a bare array).
         using JsonDocument listDoc = JsonDocument.Parse(
             await (await client.GetAsync("/api/sales")).Content.ReadAsStringAsync());
-        JsonElement match = listDoc.RootElement.EnumerateArray()
+        JsonElement match = listDoc.RootElement.GetProperty("items").EnumerateArray()
             .First(s => s.GetProperty("id").GetGuid() == saleDoc.RootElement.GetProperty("id").GetGuid());
         Assert.Equal("Test", match.GetProperty("category").GetString());
+        Assert.True(listDoc.RootElement.GetProperty("total").GetInt32() >= 1);
 
         // Dashboard recentSales carries the same snapshot.
         using JsonDocument dashDoc = JsonDocument.Parse(
