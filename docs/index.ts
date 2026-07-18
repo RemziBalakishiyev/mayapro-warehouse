@@ -65,6 +65,8 @@ export interface Sale {
   /** Sərbəst (əl ilə) satışda null — mal kataloqda yoxdur */
   productId: string | null;
   productName: string;
+  /** Satış anındakı kateqoriya snapshot-u. Kataloq satışında məhsuldan; sərbəst satışda optional; köhnə sətirlərdə null */
+  category: string | null;
   quantity: number;
   salePrice: number;
   /** Endirimdən əvvəlki cəm (salePrice × quantity) */

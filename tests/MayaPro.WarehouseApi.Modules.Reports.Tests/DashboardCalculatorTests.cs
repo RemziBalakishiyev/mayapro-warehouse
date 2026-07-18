@@ -225,12 +225,13 @@ public sealed class DashboardCalculatorTests
     {
         Guid saleId = Guid.NewGuid(), payId = Guid.NewGuid();
         var dto = Build(
-            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", 2, 40m, Cash, CustomerId: null)],
+            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", "Geyim", 2, 40m, Cash, CustomerId: null)],
             recentPayments: [new RecentPaymentInfo(payId, Today, "Əli", 25m)]);
 
         RecentSaleDto s = Assert.Single(dto.RecentSales);
         Assert.Equal(saleId, s.Id);
         Assert.Equal("Şalvar", s.ProductName);
+        Assert.Equal("Geyim", s.Category);
         Assert.Equal(Cash, s.PaymentType);
         Assert.Null(s.CustomerName);   // cash sale → no customer
 
@@ -246,7 +247,7 @@ public sealed class DashboardCalculatorTests
         Guid saleId = Guid.NewGuid(), customerId = Guid.NewGuid();
         const string Credit = WireFormat.PaymentTypes.Credit;
         var dto = Build(
-            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", 2, 40m, Credit, customerId)],
+            recentSales: [new RecentSaleInfo(saleId, Today, "Şalvar", "Geyim", 2, 40m, Credit, customerId)],
             customerNames: new Dictionary<Guid, string> { [customerId] = "Nisyə müştəri" });
 
         RecentSaleDto s = Assert.Single(dto.RecentSales);

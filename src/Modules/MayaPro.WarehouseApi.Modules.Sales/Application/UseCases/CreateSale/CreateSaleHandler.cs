@@ -57,6 +57,7 @@ public sealed class CreateSaleHandler(
             sale = Sale.Create(
                 productId,
                 stock.Value.ProductName,
+                stock.Value.Category,
                 command.Quantity,
                 command.SalePrice,
                 command.Discount,
@@ -78,6 +79,7 @@ public sealed class CreateSaleHandler(
 
             sale = Sale.CreateManual(
                 command.ProductName!,
+                command.Category,
                 command.Quantity,
                 command.SalePrice,
                 command.Discount,

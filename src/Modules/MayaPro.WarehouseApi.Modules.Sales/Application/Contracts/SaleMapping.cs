@@ -10,6 +10,7 @@ public static class SaleMapping
             sale.Id,
             sale.ProductId,
             sale.ProductName,
+            sale.Category,
             sale.Quantity,
             sale.UnitPrice,
             sale.Subtotal,

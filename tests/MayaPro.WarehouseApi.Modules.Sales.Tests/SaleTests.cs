@@ -12,6 +12,7 @@ public sealed class SaleTests
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(),
             productName: "Mal",
+            category: "Şalvar",
             quantity: 3,
             unitPrice: 20m,
             discount: 5m,
@@ -24,6 +25,8 @@ public sealed class SaleTests
         Assert.Equal(60m, sale.Subtotal);
         Assert.Equal(55m, sale.TotalAmount);
         Assert.Equal(19m, sale.Profit);
+        Assert.Equal("Şalvar", sale.Category);
+        Assert.False(sale.IsManual);
     }
 
     [Fact]
@@ -32,6 +35,7 @@ public sealed class SaleTests
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(),
             productName: "Mal",
+            category: "Test",
             quantity: 1,
             unitPrice: 10m,
             discount: 0m,
@@ -50,6 +54,7 @@ public sealed class SaleTests
         // No cost supplied → the gain is genuinely unknown, so Profit stays null (no phantom gain written).
         Sale sale = Sale.CreateManual(
             productName: "Əl ilə mal",
+            category: null,
             quantity: 2,
             unitPrice: 15m,
             discount: 0m,
@@ -63,6 +68,7 @@ public sealed class SaleTests
         Assert.Null(sale.ProductId);
         Assert.Null(sale.CostPerUnit);
         Assert.Null(sale.Profit);
+        Assert.Null(sale.Category);
         Assert.Equal(30m, sale.Subtotal);      // revenue is still recorded
         Assert.Equal(30m, sale.TotalAmount);
     }
@@ -73,6 +79,7 @@ public sealed class SaleTests
         // (20 − 12) × 3 − 5 = 19 — same formula as a catalogued sale once the cost is known.
         Sale sale = Sale.CreateManual(
             productName: "Əl ilə mal",
+            category: "Aksesuar",
             quantity: 3,
             unitPrice: 20m,
             discount: 5m,
@@ -87,6 +94,7 @@ public sealed class SaleTests
         Assert.Equal(12m, sale.CostPerUnit);
         Assert.Equal(19m, sale.Profit);
         Assert.Equal(55m, sale.TotalAmount);
+        Assert.Equal("Aksesuar", sale.Category);
     }
 
     [Fact]
@@ -95,10 +103,10 @@ public sealed class SaleTests
         Guid customerId = Guid.NewGuid();
 
         Sale credit = Sale.CreateManual(
-            productName: "Əl ilə mal", quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
+            productName: "Əl ilə mal", category: null, quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
             paymentType: PaymentType.Credit, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
         Sale cash = Sale.CreateManual(
-            productName: "Əl ilə mal", quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
+            productName: "Əl ilə mal", category: null, quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
             paymentType: PaymentType.Cash, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
 
         Assert.Equal(customerId, credit.CustomerId);

@@ -133,6 +133,7 @@ export const saleHandlers = {
       id: uid("sal"),
       productId: product.id,
       productName: product.name,
+      category: product.category,
       quantity: qty,
       salePrice: input.salePrice,
       subtotal,
@@ -142,6 +143,7 @@ export const saleHandlers = {
       customerId: isCredit ? input.customerId : null,
       costPerUnit: product.realCostPerUnit,
       profit,
+      isManual: false,
       createdAt: todayISO(),
       employeeId,
     };

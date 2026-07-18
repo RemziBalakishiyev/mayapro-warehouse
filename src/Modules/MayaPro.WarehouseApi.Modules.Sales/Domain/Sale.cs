@@ -3,10 +3,11 @@ using MayaPro.WarehouseApi.SharedKernel.Domain;
 namespace MayaPro.WarehouseApi.Modules.Sales.Domain;
 
 /// <summary>
-/// A completed sale. A normal sale references a catalogued product and snapshots the product name and its
-/// real cost at sale time, so historical profit is stable even if the product's cost later changes. A
-/// free-form ("manual") sale has no product: the seller types the name by hand and may or may not know the
-/// cost — when the cost is unknown, <see cref="Profit"/> is left null rather than inventing a phantom gain.
+/// A completed sale. A normal sale references a catalogued product and snapshots the product name,
+/// category and its real cost at sale time, so historical profit (and category reporting) stay stable
+/// even if the product later changes. A free-form ("manual") sale has no product: the seller types the
+/// name by hand and may or may not know the cost — when the cost is unknown, <see cref="Profit"/> is
+/// left null rather than inventing a phantom gain. Category on a manual sale is optional.
 /// Amounts are computed once in <see cref="Create"/> / <see cref="CreateManual"/>.
 /// </summary>
 public sealed class Sale : Entity
@@ -18,6 +19,7 @@ public sealed class Sale : Entity
         Guid? productId,
         bool isManual,
         string productName,
+        string? category,
         int quantity,
         decimal unitPrice,
         decimal subtotal,
@@ -34,6 +36,7 @@ public sealed class Sale : Entity
         ProductId = productId;
         IsManual = isManual;
         ProductName = productName;
+        Category = category;
         Quantity = quantity;
         UnitPrice = unitPrice;
         Subtotal = subtotal;
@@ -55,6 +58,12 @@ public sealed class Sale : Entity
     public bool IsManual { get; private set; }
 
     public string ProductName { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Category snapshot at sale time. For a catalogued sale this is the product's category; for a manual
+    /// sale it is whatever the seller supplied (or null). Existing rows predate this field and stay null.
+    /// </summary>
+    public string? Category { get; private set; }
 
     public int Quantity { get; private set; }
 
@@ -92,6 +101,7 @@ public sealed class Sale : Entity
     public static Sale Create(
         Guid productId,
         string productName,
+        string? category,
         int quantity,
         decimal unitPrice,
         decimal discount,
@@ -109,6 +119,7 @@ public sealed class Sale : Entity
             productId,
             isManual: false,
             productName,
+            category,
             quantity,
             unitPrice,
             subtotal,
@@ -127,10 +138,11 @@ public sealed class Sale : Entity
     /// <summary>
     /// A free-form sale: no catalogued product, so no stock is moved. The seller supplies the name and may
     /// pass the unit cost if known — pass null when it is not, and <see cref="Profit"/> stays null so the
-    /// sale's revenue is still recorded while its gain is reported as unknown.
+    /// sale's revenue is still recorded while its gain is reported as unknown. Category is optional.
     /// </summary>
     public static Sale CreateManual(
         string productName,
+        string? category,
         int quantity,
         decimal unitPrice,
         decimal discount,
@@ -150,6 +162,7 @@ public sealed class Sale : Entity
             productId: null,
             isManual: true,
             productName,
+            category,
             quantity,
             unitPrice,
             subtotal,

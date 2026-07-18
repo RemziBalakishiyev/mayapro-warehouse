@@ -13,6 +13,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.HasKey(s => s.Id);
 
         builder.Property(s => s.ProductName).IsRequired().HasMaxLength(200);
+        builder.Property(s => s.Category).HasMaxLength(100);
         builder.Property(s => s.SoldByName).HasMaxLength(200);
 
         // Existing rows predate free-form sales, so default them (and any row that omits it) to a normal sale.

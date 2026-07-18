@@ -55,12 +55,13 @@ public sealed record MonthlyPointDto(string Month, decimal Profit);
 
 /// <summary>
 /// A recent sale for the activity feed. <see cref="CustomerName"/> is set only for credit (Nisyə) sales;
-/// null for cash and card sales.
+/// null for cash and card sales. <see cref="Category"/> is the sale-time snapshot.
 /// </summary>
 public sealed record RecentSaleDto(
     Guid Id,
     DateOnly Date,
     string ProductName,
+    string? Category,
     int Quantity,
     decimal TotalAmount,
     string PaymentType,

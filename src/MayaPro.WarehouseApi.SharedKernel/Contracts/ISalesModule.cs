@@ -40,12 +40,14 @@ public sealed record ProductLastSale(Guid ProductId, DateOnly LastSale);
 
 /// <summary>
 /// A recent sale for the dashboard feed. Date is the business-zone (local) date. <see cref="CustomerId"/>
-/// is set only for credit (Nisyə) sales; null for cash and card sales.
+/// is set only for credit (Nisyə) sales; null for cash and card sales. <see cref="Category"/> is the
+/// sale-time snapshot (null on older rows or when a manual sale omitted it).
 /// </summary>
 public sealed record RecentSaleInfo(
     Guid Id,
     DateOnly Date,
     string ProductName,
+    string? Category,
     int Quantity,
     decimal TotalAmount,
     string PaymentType,

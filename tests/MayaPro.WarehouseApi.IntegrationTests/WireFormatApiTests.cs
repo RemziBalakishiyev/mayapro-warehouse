@@ -157,10 +157,12 @@ public sealed class WireFormatApiTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// <summary>
     /// DELIBERATE CONTRACT CHANGE (agreed with the frontend): the <c>Sale</c> wire shape now supports free-form
     /// ("manual") sales. <c>productId</c> becomes nullable, a boolean <c>isManual</c> is added, and
     /// <c>costPerUnit</c>/<c>profit</c> become nullable — for a manual sale with no cost they are JSON <c>null</c>
-    /// (unknown), never coerced to 0. The assertions below pin the NEW shape on purpose.
+    /// (unknown), never coerced to 0. A nullable <c>category</c> snapshot is also on the wire; omitted on a
+    /// manual sale → JSON <c>null</c>. The assertions below pin the NEW shape on purpose.
     /// </summary>
     [Fact]
     public async Task Manual_Sale_Exposes_Null_Product_And_Profit_With_IsManual_Flag()
@@ -186,6 +188,7 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         Assert.True(root.GetProperty("isManual").GetBoolean());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("costPerUnit").ValueKind);   // cost unknown → null, not 0
         Assert.Equal(JsonValueKind.Null, root.GetProperty("profit").ValueKind);        // profit unknown → null, not 0
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("category").ValueKind);      // category omitted → null
         Assert.Equal("Sərbəst mal", root.GetProperty("productName").GetString());
         Assert.Equal(25m, root.GetProperty("totalAmount").GetDecimal());               // revenue is still recorded
         Assert.Equal("Nağd", root.GetProperty("paymentType").GetString());
@@ -219,13 +222,82 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         Assert.Equal(16m, root.GetProperty("profit").GetDecimal());
     }
 
+    /// <summary>
+    /// DELIBERATE CONTRACT CHANGE: a catalogued sale snapshots the product's <c>category</c> onto the sale
+    /// wire (and GetSales / dashboard recentSales). CreateProductAsync seeds category "Test".
+    /// </summary>
+    [Fact]
+    public async Task Catalogued_Sale_Snapshots_Product_Category_On_The_Wire()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("WIRE-CAT-SNAP", quantity: 5, salePrice: 10m);
+
+        HttpResponseMessage created = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 10m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+        created.EnsureSuccessStatusCode();
+
+        using JsonDocument saleDoc = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        Assert.Equal("Test", saleDoc.RootElement.GetProperty("category").GetString());
+        Assert.False(saleDoc.RootElement.GetProperty("isManual").GetBoolean());
+
+        // GetSales also returns the snapshot.
+        using JsonDocument listDoc = JsonDocument.Parse(
+            await (await client.GetAsync("/api/sales")).Content.ReadAsStringAsync());
+        JsonElement match = listDoc.RootElement.EnumerateArray()
+            .First(s => s.GetProperty("id").GetGuid() == saleDoc.RootElement.GetProperty("id").GetGuid());
+        Assert.Equal("Test", match.GetProperty("category").GetString());
+
+        // Dashboard recentSales carries the same snapshot.
+        using JsonDocument dashDoc = JsonDocument.Parse(
+            await (await client.GetAsync("/api/reports/dashboard")).Content.ReadAsStringAsync());
+        JsonElement recent = dashDoc.RootElement.GetProperty("recentSales").EnumerateArray()
+            .First(s => s.GetProperty("id").GetGuid() == saleDoc.RootElement.GetProperty("id").GetGuid());
+        Assert.Equal("Test", recent.GetProperty("category").GetString());
+    }
+
+    /// <summary>
+    /// DELIBERATE CONTRACT CHANGE: a free-form sale may send an optional <c>category</c>; when supplied it is
+    /// stored as-is on the sale wire.
+    /// </summary>
+    [Fact]
+    public async Task Manual_Sale_Persists_Supplied_Category_On_The_Wire()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Sərbəst kateqoriyalı",
+            category = "Aksesuar",
+            quantity = 1,
+            salePrice = 8m,
+            discount = 0m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+        sale.EnsureSuccessStatusCode();
+
+        using JsonDocument doc = JsonDocument.Parse(await sale.Content.ReadAsStringAsync());
+        JsonElement root = doc.RootElement;
+
+        Assert.True(root.GetProperty("isManual").GetBoolean());
+        Assert.Equal("Aksesuar", root.GetProperty("category").GetString());
+    }
+
     [Fact]
     public async Task PaymentType_Category_And_Role_Round_Trip_In_Azerbaijani()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
         var product = await client.CreateProductAsync("WIRE-ENUM", quantity: 10, salePrice: 10m);
 
-        // paymentType stays "Nağd" on the wire.
+        // paymentType stays "Nağd" on the wire; category is snapshotted from the product ("Test").
         HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
         {
             productId = product.Id,
@@ -236,8 +308,9 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             customerId = (Guid?)null
         });
         sale.EnsureSuccessStatusCode();
-        Assert.Equal("Nağd", JsonDocument.Parse(await sale.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("paymentType").GetString());
+        using JsonDocument saleDoc = JsonDocument.Parse(await sale.Content.ReadAsStringAsync());
+        Assert.Equal("Nağd", saleDoc.RootElement.GetProperty("paymentType").GetString());
+        Assert.Equal("Test", saleDoc.RootElement.GetProperty("category").GetString());
 
         // category stays "Yol" on the wire.
         HttpResponseMessage expense = await client.PostAsJsonAsync("/api/expenses", new

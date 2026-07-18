@@ -59,7 +59,7 @@ public static class DashboardCalculator
             MonthlySeries: BuildMonthlySeries(allSales, today),
             RecentSales: recentSales
                 .Select(s => new RecentSaleDto(
-                    s.Id, s.Date, s.ProductName, s.Quantity, s.TotalAmount, s.PaymentType,
+                    s.Id, s.Date, s.ProductName, s.Category, s.Quantity, s.TotalAmount, s.PaymentType,
                     s.CustomerId is { } cid && customerNames.TryGetValue(cid, out string? name) ? name : null))
                 .ToList(),
             RecentPayments: recentPayments

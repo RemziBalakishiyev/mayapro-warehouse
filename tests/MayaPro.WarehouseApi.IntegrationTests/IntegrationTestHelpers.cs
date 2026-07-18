@@ -172,7 +172,7 @@ internal static class IntegrationTestHelpers
 
     internal sealed record MonthlyPointDto(string Month, decimal Profit);
 
-    internal sealed record RecentSaleDto(Guid Id, DateOnly Date, string ProductName, int Quantity, decimal TotalAmount, string PaymentType, string? CustomerName);
+    internal sealed record RecentSaleDto(Guid Id, DateOnly Date, string ProductName, string? Category, int Quantity, decimal TotalAmount, string PaymentType, string? CustomerName);
 
     internal sealed record RecentPaymentDto(Guid Id, DateOnly Date, string CustomerName, decimal Amount);
 

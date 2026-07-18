@@ -85,6 +85,7 @@ internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider date
                 s.Id,
                 dateProvider.ToLocalDate(s.Date),
                 s.ProductName,
+                s.Category,
                 s.Quantity,
                 s.TotalAmount,
                 s.PaymentType.ToCode(),

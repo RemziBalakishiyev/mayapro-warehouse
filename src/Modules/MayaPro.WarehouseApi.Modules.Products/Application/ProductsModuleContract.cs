@@ -26,7 +26,7 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         if (decrease.IsFailure)
             return Result.Failure<ProductStockSnapshot>(decrease.Error);
 
-        return Result.Success(new ProductStockSnapshot(product.Name, product.RealCostPerUnit));
+        return Result.Success(new ProductStockSnapshot(product.Name, product.Category, product.RealCostPerUnit));
     }
 
     public async Task<Result<ProductSnapshot>> GetSnapshotAsync(

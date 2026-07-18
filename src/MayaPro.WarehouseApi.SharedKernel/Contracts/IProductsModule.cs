@@ -10,8 +10,8 @@ public interface IProductsModule
 {
     /// <summary>
     /// Reserves <paramref name="quantity"/> units of a product for a sale. On success returns a snapshot
-    /// (name + real cost) for the sale record. The change is made on the shared context but <b>not</b>
-    /// saved — the caller commits it inside its own unit of work.
+    /// (name + category + real cost) for the sale record. The change is made on the shared context but
+    /// <b>not</b> saved — the caller commits it inside its own unit of work.
     /// </summary>
     Task<Result<ProductStockSnapshot>> TryDecreaseStockAsync(
         Guid productId,
@@ -46,8 +46,8 @@ public interface IProductsModule
     Task<Dictionary<Guid, int>> GetCountBySupplierAsync(CancellationToken cancellationToken = default);
 }
 
-/// <summary>Snapshot of a product at sale time: its name and current real cost per unit.</summary>
-public sealed record ProductStockSnapshot(string ProductName, decimal RealCostPerUnit);
+/// <summary>Snapshot of a product at sale time: its name, category and current real cost per unit.</summary>
+public sealed record ProductStockSnapshot(string ProductName, string Category, decimal RealCostPerUnit);
 
 /// <summary>
 /// A read-only product snapshot. Carries enough for the Reports module to value stock and flag low

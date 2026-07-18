@@ -6,13 +6,15 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
 /// <para>
 /// For a free-form (manual) sale, <c>productId</c> is null, <c>isManual</c> is true, and <c>costPerUnit</c>
 /// / <c>profit</c> are null when the seller did not supply a cost — the revenue is recorded but the gain is
-/// unknown.
+/// unknown. <c>category</c> is the snapshot at sale time (product category for catalogued sales; optional
+/// for manual; null on older rows).
 /// </para>
 /// </summary>
 public sealed record SaleDto(
     Guid Id,
     Guid? ProductId,
     string ProductName,
+    string? Category,
     int Quantity,
     decimal SalePrice,
     decimal Subtotal,
