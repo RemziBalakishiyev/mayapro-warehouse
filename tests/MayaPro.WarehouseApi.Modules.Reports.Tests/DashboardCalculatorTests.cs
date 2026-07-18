@@ -39,7 +39,7 @@ public sealed class DashboardCalculatorTests
         new(id, "P", "Cat", qty, min, realCost, salePrice);
 
     private static SalesReportRow Sale(DateOnly date, decimal total, decimal? profit, int qty = 1, string? payment = null, Guid? product = null, string name = "P") =>
-        new(date, total, profit, payment ?? Cash, product, name, qty);
+        new(date, total, profit, payment ?? Cash, product, name, qty, UnitPrice: total / qty, Discount: 0m, IsManual: false);
 
     private static ExpenseReportRow Exp(DateOnly date, decimal amount) => new(date, "Yol", amount);
 

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" />
+    <PackageReference Include="QuestPDF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\MayaPro.WarehouseApi.SharedKernel\MayaPro.WarehouseApi.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Fonts\NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="Resources\Fonts\NotoSans-Bold.ttf" />
+  </ItemGroup>
+
+</Project>

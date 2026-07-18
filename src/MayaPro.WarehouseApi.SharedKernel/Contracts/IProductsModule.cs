@@ -45,6 +45,13 @@ public interface IProductsModule
     /// Used by the Suppliers module for each supplier's item count.
     /// </summary>
     Task<Dictionary<Guid, int>> GetCountBySupplierAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every product with the fields needed for the Excel catalogue export. Used by the
+    /// read-only Exports module — richer than <see cref="ProductSnapshot"/> but still a contract DTO,
+    /// not the Products API shape.
+    /// </summary>
+    Task<IReadOnlyList<ProductExportRow>> GetExportProductsAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Snapshot of a product at sale time: its name, category and current real cost per unit.</summary>
@@ -62,4 +69,23 @@ public sealed record ProductSnapshot(
     int MinStock,
     decimal RealCostPerUnit,
     decimal SalePrice);
+
+/// <summary>
+/// A product row for Excel export: catalogue fields plus expenses total and supplier reference.
+/// <see cref="AttributesText"/> is already formatted as <c>name: value; …</c> (empty attributes omitted).
+/// </summary>
+public sealed record ProductExportRow(
+    Guid Id,
+    string Name,
+    string Category,
+    string AttributesText,
+    string Barcode,
+    decimal PurchasePrice,
+    decimal ExpensesTotal,
+    decimal RealCostPerUnit,
+    decimal SalePrice,
+    int Quantity,
+    int MinStock,
+    string Location,
+    string SupplierId);
 

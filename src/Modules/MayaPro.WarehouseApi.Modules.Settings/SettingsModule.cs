@@ -1,10 +1,12 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.Settings.Application;
 using MayaPro.WarehouseApi.Modules.Settings.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Settings.Application.UseCases.GetSettings;
 using MayaPro.WarehouseApi.Modules.Settings.Application.UseCases.UpdateSettings;
 using MayaPro.WarehouseApi.Modules.Settings.Endpoints;
 using MayaPro.WarehouseApi.Modules.Settings.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -33,6 +35,9 @@ public sealed class SettingsModule : IModule
             options.AddInterceptors(new AuditInterceptor());
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<ISettingsDbContext>(sp => sp.GetRequiredService<SettingsDbContext>());
+
+        // Cross-module contract: store name for export headers (and similar read-only surfaces).
+        services.AddScoped<ISettingsModule, SettingsModuleContract>();
 
         services.AddScoped<IValidator<UpdateSettingsCommand>, UpdateSettingsValidator>();
 

@@ -91,4 +91,35 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
 
         return result;
     }
+
+    public async Task<IReadOnlyList<ProductExportRow>> GetExportProductsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        List<Product> products = await db.Products
+            .AsNoTracking()
+            .OrderBy(p => p.Name)
+            .ToListAsync(cancellationToken);
+
+        return products.Select(ToExportRow).ToList();
+    }
+
+    private static ProductExportRow ToExportRow(Product product) => new(
+        product.Id,
+        product.Name,
+        product.Category,
+        FormatAttributes(product.Attributes),
+        product.Barcode,
+        product.PurchasePrice,
+        ProductExpenses.Total(product.Expenses),
+        product.RealCostPerUnit,
+        product.SalePrice,
+        product.Quantity,
+        product.MinStock,
+        product.Location,
+        product.SupplierId);
+
+    private static string FormatAttributes(IReadOnlyList<ProductAttribute> attributes) =>
+        string.Join("; ", attributes
+            .Where(a => !string.IsNullOrWhiteSpace(a.Name) && !string.IsNullOrWhiteSpace(a.Value))
+            .Select(a => $"{a.Name.Trim()}: {a.Value.Trim()}"));
 }

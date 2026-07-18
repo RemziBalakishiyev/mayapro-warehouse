@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.DayEnd\MayaPro.WarehouseApi.Modules.DayEnd.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Reports\MayaPro.WarehouseApi.Modules.Reports.csproj" />
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Settings\MayaPro.WarehouseApi.Modules.Settings.csproj" />
+    <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Exports\MayaPro.WarehouseApi.Modules.Exports.csproj" />
   </ItemGroup>
 
 </Project>

@@ -69,4 +69,7 @@ public sealed record SalesReportRow(
     string PaymentType,
     Guid? ProductId,
     string ProductName,
-    int Quantity);
+    int Quantity,
+    decimal UnitPrice,
+    decimal Discount,
+    bool IsManual);
