@@ -24,12 +24,10 @@ public sealed class CreateProductHandler(
         if (!validation.IsValid)
             return Result.Failure<ProductDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
-        var expenses = new ProductExpenses(
-            command.Expenses.Transport,
-            command.Expenses.Labor,
-            command.Expenses.Storage,
-            command.Expenses.Packaging,
-            command.Expenses.Other);
+        var expenses = (command.Expenses ?? Array.Empty<ProductExpenseItemDto>())
+            .Select(e => new ProductExpenseItem(e.Name.Trim(), e.Amount))
+            .Where(e => !string.IsNullOrWhiteSpace(e.Name))
+            .ToList();
 
         var attributes = (command.Attributes ?? Array.Empty<ProductAttributeDto>())
             .Select(a => new ProductAttribute(a.Name.Trim(), a.Value))

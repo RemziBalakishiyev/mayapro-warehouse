@@ -26,12 +26,7 @@ public static class ProductMapping
             product.Warehouse,
             product.Shelf,
             product.Box,
-            new ExpenseBreakdownDto(
-                product.Expenses.Transport,
-                product.Expenses.Labor,
-                product.Expenses.Storage,
-                product.Expenses.Packaging,
-                product.Expenses.Other),
+            product.Expenses.Select(e => new ProductExpenseItemDto(e.Name, e.Amount)).ToList(),
             product.RealCostPerUnit,
             product.CreatedAt,
             product.UpdatedAt);

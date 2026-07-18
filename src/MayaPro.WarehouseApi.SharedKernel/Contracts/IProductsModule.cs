@@ -28,13 +28,14 @@ public interface IProductsModule
     Task<IReadOnlyList<ProductSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Adds a batch expense to a product's cost bucket, which recomputes its real cost. Used by the
-    /// Expenses module when an expense is attached to a product. The change is made on the shared context
-    /// but <b>not</b> saved — the caller commits it inside its own unit of work.
+    /// Adds a named batch expense line to a product (same name accumulates), which recomputes its real
+    /// cost. Used by the Expenses module when an expense is attached to a product — the caller's category
+    /// name is passed through as the line name. The change is made on the shared context but <b>not</b>
+    /// saved — the caller commits it inside its own unit of work.
     /// </summary>
     Task<Result> AddExpenseToProductAsync(
         Guid productId,
-        ProductCostBucket bucket,
+        string category,
         decimal amount,
         CancellationToken cancellationToken = default);
 
@@ -62,16 +63,3 @@ public sealed record ProductSnapshot(
     decimal RealCostPerUnit,
     decimal SalePrice);
 
-/// <summary>
-/// The buckets an expense can contribute to a product's real cost. A provider-neutral mirror of the
-/// product cost breakdown, so callers (Expenses) map their own categories onto it without referencing
-/// the Products domain.
-/// </summary>
-public enum ProductCostBucket
-{
-    Transport = 1,
-    Labor = 2,
-    Storage = 3,
-    Packaging = 4,
-    Other = 5
-}

@@ -2,10 +2,9 @@ namespace MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 /// <summary>
 /// The frozen wire vocabulary shared with the frontend. These Azerbaijani strings are the API contract —
-/// the frontend sends and reads them verbatim (payment types, expense categories, roles, and the
-/// expense-breakdown JSON keys), so they must never change even though the C# identifiers around them are
-/// English. Every enum↔wire converter and every wire-facing DTO resolves to these constants, so the
-/// contract lives in exactly one place.
+/// the frontend sends and reads them verbatim (payment types, expense categories, roles), so they must
+/// never change even though the C# identifiers around them are English. Every enum↔wire converter and
+/// every wire-facing DTO resolves to these constants, so the contract lives in exactly one place.
 /// </summary>
 public static class WireFormat
 {
@@ -34,15 +33,5 @@ public static class WireFormat
         public const string Owner = "sahib";
         public const string Manager = "menecer";
         public const string Seller = "satici";
-    }
-
-    /// <summary>The JSON keys of the product expense breakdown object (<c>ExpenseBreakdown</c>).</summary>
-    public static class ExpenseKeys
-    {
-        public const string Transport = "yol";
-        public const string Labor = "fehle";
-        public const string Storage = "yer";
-        public const string Packaging = "paket";
-        public const string Other = "diger";
     }
 }

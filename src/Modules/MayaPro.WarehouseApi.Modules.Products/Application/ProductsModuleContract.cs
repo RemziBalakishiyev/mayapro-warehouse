@@ -62,7 +62,7 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
 
     public async Task<Result> AddExpenseToProductAsync(
         Guid productId,
-        ProductCostBucket bucket,
+        string category,
         decimal amount,
         CancellationToken cancellationToken = default)
     {
@@ -70,7 +70,7 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         if (product is null)
             return Result.Failure(ProductErrors.NotFound);
 
-        product.AddExpense(ToKind(bucket), amount);
+        product.AddExpense(category, amount);
         return Result.Success();
     }
 
@@ -91,14 +91,4 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
 
         return result;
     }
-
-    private static ProductExpenseKind ToKind(ProductCostBucket bucket) => bucket switch
-    {
-        ProductCostBucket.Transport => ProductExpenseKind.Transport,
-        ProductCostBucket.Labor => ProductExpenseKind.Labor,
-        ProductCostBucket.Storage => ProductExpenseKind.Storage,
-        ProductCostBucket.Packaging => ProductExpenseKind.Packaging,
-        ProductCostBucket.Other => ProductExpenseKind.Other,
-        _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket, "Naməlum xərc növü")
-    };
 }

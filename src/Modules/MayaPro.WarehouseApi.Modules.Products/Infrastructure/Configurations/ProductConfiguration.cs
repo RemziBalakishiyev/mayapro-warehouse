@@ -9,9 +9,9 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Configurations;
 
 public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
-    // camelCase so the stored JSON is [{"name":"Ölçü","value":"..."}] — the exact shape the data-migration
-    // SQL writes and the frontend wire contract uses. Kept private so EF read/write and the migration agree.
-    private static readonly JsonSerializerOptions AttributesJson =
+    // camelCase so the stored JSON is [{"name":"...","value":"..."}] / [{"name":"...","amount":…}] —
+    // the exact shape the data-migration SQL writes and the frontend wire contract uses.
+    private static readonly JsonSerializerOptions JsonOptions =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public void Configure(EntityTypeBuilder<Product> builder)
@@ -34,8 +34,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         // Dynamic attributes live inline as a JSON array (nvarchar(max)). A value comparer is required so EF
         // change-tracking treats the collection by value, not by reference.
         var attributesConverter = new ValueConverter<IReadOnlyList<ProductAttribute>, string>(
-            v => JsonSerializer.Serialize(v, AttributesJson),
-            v => JsonSerializer.Deserialize<List<ProductAttribute>>(v, AttributesJson) ?? new List<ProductAttribute>());
+            v => JsonSerializer.Serialize(v, JsonOptions),
+            v => JsonSerializer.Deserialize<List<ProductAttribute>>(v, JsonOptions) ?? new List<ProductAttribute>());
 
         var attributesComparer = new ValueComparer<IReadOnlyList<ProductAttribute>>(
             (a, b) => (a ?? new List<ProductAttribute>()).SequenceEqual(b ?? new List<ProductAttribute>()),
@@ -48,16 +48,21 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasColumnType("nvarchar(max)")
             .IsRequired();
 
-        // Batch expenses live inline as Expenses_Transport, Expenses_Labor... (no separate table).
-        builder.OwnsOne(p => p.Expenses, expenses =>
-        {
-            expenses.Property(e => e.Transport).HasColumnName("Expenses_Transport");
-            expenses.Property(e => e.Labor).HasColumnName("Expenses_Labor");
-            expenses.Property(e => e.Storage).HasColumnName("Expenses_Storage");
-            expenses.Property(e => e.Packaging).HasColumnName("Expenses_Packaging");
-            expenses.Property(e => e.Other).HasColumnName("Expenses_Other");
-        });
-        builder.Navigation(p => p.Expenses).IsRequired();
+        // Free-form batch expenses — same JSON array pattern as attributes.
+        var expensesConverter = new ValueConverter<IReadOnlyList<ProductExpenseItem>, string>(
+            v => JsonSerializer.Serialize(v, JsonOptions),
+            v => JsonSerializer.Deserialize<List<ProductExpenseItem>>(v, JsonOptions) ?? new List<ProductExpenseItem>());
+
+        var expensesComparer = new ValueComparer<IReadOnlyList<ProductExpenseItem>>(
+            (a, b) => (a ?? new List<ProductExpenseItem>()).SequenceEqual(b ?? new List<ProductExpenseItem>()),
+            v => v.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())),
+            v => v.ToList());
+
+        builder.Property(p => p.Expenses)
+            .HasConversion(expensesConverter, expensesComparer)
+            .HasColumnName("Expenses")
+            .HasColumnType("nvarchar(max)")
+            .IsRequired();
 
         // Barcode is unique, but only where it is actually set — many products may have no barcode.
         builder.HasIndex(p => p.Barcode)

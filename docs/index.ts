@@ -20,13 +20,10 @@ export type ExpenseCategory =
 /** Auth istifadəçisinin rolu. */
 export type Role = "sahib" | "menecer" | "satici";
 
-/** Partiya xərclərinin bölgüsü. */
-export interface ExpenseBreakdown {
-  yol: number;
-  fehle: number;
-  yer: number;
-  paket: number;
-  diger: number;
+/** Partiya xərc sətiri — sərbəst ad + məbləğ (köhnə yol/fehle obyekti əvəzinə). */
+export interface ProductExpenseItem {
+  name: string;
+  amount: number;
 }
 
 /** Anbardakı mal. */
@@ -53,7 +50,7 @@ export interface Product {
   warehouse: string;
   shelf: string;
   box: string;
-  expenses: ExpenseBreakdown;
+  expenses: ProductExpenseItem[];
   /** Hesablanmış 1 ədədin real mayası */
   realCostPerUnit: number;
   createdAt: string;

@@ -45,7 +45,7 @@ public sealed class ProductSeeder(ProductsDbContext db)
                 warehouse,
                 shelf,
                 box,
-                new ProductExpenses(raw.Transport, raw.Labor, raw.Storage, raw.Packaging, raw.Other));
+                BuildExpenses(raw));
 
             // Bring stock down from the initial batch to what is currently on hand (sales to date).
             if (raw.Quantity != raw.InitialQuantity)
@@ -88,6 +88,21 @@ public sealed class ProductSeeder(ProductsDbContext db)
         if (!string.IsNullOrWhiteSpace(raw.Model))
             attributes.Add(new ProductAttribute("Model", raw.Model));
         return attributes;
+    }
+
+    /// <summary>
+    /// Demo batch expenses as free-form named lines (Azerbaijani labels matching the column→JSON migration).
+    /// Zero amounts are omitted so the wire array stays sparse.
+    /// </summary>
+    private static List<ProductExpenseItem> BuildExpenses(RawProduct raw)
+    {
+        var expenses = new List<ProductExpenseItem>();
+        if (raw.Transport != 0) expenses.Add(new ProductExpenseItem("Yol pulu", raw.Transport));
+        if (raw.Labor != 0) expenses.Add(new ProductExpenseItem("Fəhlə pulu", raw.Labor));
+        if (raw.Storage != 0) expenses.Add(new ProductExpenseItem("Yer/Anbar xərci", raw.Storage));
+        if (raw.Packaging != 0) expenses.Add(new ProductExpenseItem("Paket/Qutu", raw.Packaging));
+        if (raw.Other != 0) expenses.Add(new ProductExpenseItem("Digər", raw.Other));
+        return expenses;
     }
 
     /// <summary>Splits "Anbar A / Rəf 3 / Qutu 12" into its parts, mirroring the frontend parseLocation.</summary>

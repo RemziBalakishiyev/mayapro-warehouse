@@ -43,9 +43,9 @@ public sealed class CreateExpenseHandler(
 
             productName = snapshot.Value.Name;
 
-            // Core rule: raise the product's real cost by this expense.
+            // Core rule: raise the product's real cost — category code becomes the free-form line name.
             Result attach = await products.AddExpenseToProductAsync(
-                productId, category.ToCostBucket(), command.Amount, ct);
+                productId, category.ToCode(), command.Amount, ct);
             if (attach.IsFailure)
                 return Result.Failure<ExpenseDto>(attach.Error);
         }

@@ -5,6 +5,8 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Domain;
 /// <summary>
 /// Expense categories. Persisted by name; the wire contract uses the frontend codes
 /// (<c>EXP_CATS</c>: "Yol" | "Fəhlə" | "Anbar/Yer" | "Paket/Qutu" | "Mağaza" | "Digər").
+/// This is the Expenses module's own classification — when an expense is attached to a product, the
+/// category code is passed through as the free-form product expense line name.
 /// </summary>
 public enum ExpenseCategory
 {
@@ -17,9 +19,8 @@ public enum ExpenseCategory
 }
 
 /// <summary>
-/// Maps <see cref="ExpenseCategory"/> to/from the frontend codes, and to the product cost bucket it
-/// contributes to when the expense is attached to a product (the frontend <c>categoryToExpenseKey</c>).
-/// The code values live in <see cref="WireFormat"/> (single source of truth).
+/// Maps <see cref="ExpenseCategory"/> to/from the frontend codes. The code values live in
+/// <see cref="WireFormat"/> (single source of truth).
 /// </summary>
 public static class ExpenseCategoryCode
 {
@@ -54,19 +55,4 @@ public static class ExpenseCategoryCode
             default: category = default; return false;
         }
     }
-
-    /// <summary>
-    /// The product cost bucket this category feeds. "Mağaza" (store rent) has no dedicated product bucket,
-    /// so it — like "Digər" — falls into <see cref="ProductCostBucket.Other"/>.
-    /// </summary>
-    public static ProductCostBucket ToCostBucket(this ExpenseCategory category) => category switch
-    {
-        ExpenseCategory.Transport => ProductCostBucket.Transport,
-        ExpenseCategory.Labor => ProductCostBucket.Labor,
-        ExpenseCategory.Storage => ProductCostBucket.Storage,
-        ExpenseCategory.Packaging => ProductCostBucket.Packaging,
-        ExpenseCategory.Store => ProductCostBucket.Other,
-        ExpenseCategory.Other => ProductCostBucket.Other,
-        _ => throw new ArgumentOutOfRangeException(nameof(category), category, "Naməlum xərc kateqoriyası")
-    };
 }

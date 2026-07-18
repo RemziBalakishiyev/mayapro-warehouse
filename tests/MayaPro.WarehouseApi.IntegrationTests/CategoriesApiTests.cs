@@ -96,7 +96,7 @@ public sealed class CategoriesApiTests : IAsyncLifetime
             warehouse = "Anbar A",
             shelf = "1",
             box = "1",
-            expenses = new { yol = 0m, fehle = 0m, yer = 0m, paket = 0m, diger = 0m }
+            expenses = Array.Empty<object>()
         };
 
         HttpResponseMessage post = await client.PostAsJsonAsync("/api/products", body);

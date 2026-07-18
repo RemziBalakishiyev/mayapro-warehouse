@@ -35,7 +35,7 @@ public sealed class Product : Entity
         string warehouse,
         string shelf,
         string box,
-        ProductExpenses expenses)
+        IReadOnlyList<ProductExpenseItem> expenses)
     {
         Name = name;
         Category = category;
@@ -106,7 +106,11 @@ public sealed class Product : Entity
 
     public string Box { get; private set; } = string.Empty;
 
-    public ProductExpenses Expenses { get; private set; } = ProductExpenses.Empty();
+    /// <summary>
+    /// Free-form batch expense lines (name/amount), replacing the old fixed Transport/Labor/… buckets.
+    /// Persisted as a JSON array on this row via a value converter.
+    /// </summary>
+    public IReadOnlyList<ProductExpenseItem> Expenses { get; private set; } = ProductExpenses.Empty;
 
     /// <summary>Computed real cost of one unit; recalculated whenever inputs change.</summary>
     public decimal RealCostPerUnit { get; private set; }
@@ -129,7 +133,7 @@ public sealed class Product : Entity
         string warehouse,
         string shelf,
         string box,
-        ProductExpenses expenses) =>
+        IReadOnlyList<ProductExpenseItem> expenses) =>
         new(name, category, attributes, barcode, image, note, purchasePrice, salePrice,
             quantity, minStock, currency, supplierId, location, store, warehouse, shelf, box, expenses);
 
@@ -155,7 +159,7 @@ public sealed class Product : Entity
         string warehouse,
         string shelf,
         string box,
-        ProductExpenses expenses)
+        IReadOnlyList<ProductExpenseItem> expenses)
     {
         Name = name;
         Category = category;
@@ -194,10 +198,13 @@ public sealed class Product : Entity
         return Result.Success();
     }
 
-    /// <summary>Attaches a batch expense to the given bucket and recomputes the real cost.</summary>
-    public void AddExpense(ProductExpenseKind kind, decimal amount)
+    /// <summary>
+    /// Attaches a named batch expense line and recomputes the real cost. When a line with the same name
+    /// already exists (case-insensitive), the amount is added to it; otherwise a new line is appended.
+    /// </summary>
+    public void AddExpense(string name, decimal amount)
     {
-        Expenses.Add(kind, amount);
+        Expenses = ProductExpenses.Add(Expenses, name, amount);
         RecalculateRealCost();
     }
 
@@ -209,10 +216,13 @@ public sealed class Product : Entity
     /// rounded to money precision. With no initial quantity there is nothing to spread over, so the real
     /// cost is just the purchase price.
     /// </summary>
-    public static decimal CalculateRealCost(decimal purchasePrice, int initialQuantity, ProductExpenses expenses)
+    public static decimal CalculateRealCost(
+        decimal purchasePrice,
+        int initialQuantity,
+        IReadOnlyList<ProductExpenseItem> expenses)
     {
         decimal perUnit = initialQuantity > 0
-            ? purchasePrice + expenses.Total / initialQuantity
+            ? purchasePrice + ProductExpenses.Total(expenses) / initialQuantity
             : purchasePrice;
 
         return Math.Round(perUnit, 2, MidpointRounding.AwayFromZero);

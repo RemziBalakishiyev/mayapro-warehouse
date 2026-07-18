@@ -105,7 +105,7 @@ public sealed class ProductsApiTests : IAsyncLifetime
         warehouse = "Anbar A",
         shelf = "1",
         box = "1",
-        expenses = new { yol = 100m, fehle = 0m, yer = 0m, paket = 0m, diger = 0m }
+        expenses = new[] { new { name = "Yol pulu", amount = 100m } }
     };
 
     private sealed record LoginResponseDto(string Token);

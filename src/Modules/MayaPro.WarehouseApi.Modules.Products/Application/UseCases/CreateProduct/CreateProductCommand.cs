@@ -25,4 +25,4 @@ public sealed record CreateProductCommand(
     string Warehouse,
     string Shelf,
     string Box,
-    ExpenseBreakdownDto Expenses);
+    IReadOnlyList<ProductExpenseItemDto> Expenses);

@@ -92,5 +92,5 @@ public sealed class ProductAttributeValidationTests
             Warehouse: "Anbar A",
             Shelf: "1",
             Box: "1",
-            Expenses: new ExpenseBreakdownDto(0, 0, 0, 0, 0));
+            Expenses: Array.Empty<ProductExpenseItemDto>());
 }

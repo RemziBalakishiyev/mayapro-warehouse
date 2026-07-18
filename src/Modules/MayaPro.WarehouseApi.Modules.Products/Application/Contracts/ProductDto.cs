@@ -1,6 +1,3 @@
-using System.Text.Json.Serialization;
-using MayaPro.WarehouseApi.SharedKernel.Contracts;
-
 namespace MayaPro.WarehouseApi.Modules.Products.Application.Contracts;
 
 /// <summary>
@@ -27,19 +24,7 @@ public sealed record ProductDto(
     string Warehouse,
     string Shelf,
     string Box,
-    ExpenseBreakdownDto Expenses,
+    IReadOnlyList<ProductExpenseItemDto> Expenses,
     decimal RealCostPerUnit,
     DateTime CreatedAt,
     DateTime UpdatedAt);
-
-/// <summary>
-/// The batch-expense breakdown. The C# members are English, but the JSON keys stay the frontend
-/// <c>ExpenseBreakdown</c> keys (<c>yol/fehle/yer/paket/diger</c>) via <see cref="JsonPropertyNameAttribute"/> —
-/// they are the wire contract and must not change.
-/// </summary>
-public sealed record ExpenseBreakdownDto(
-    [property: JsonPropertyName(WireFormat.ExpenseKeys.Transport)] decimal Transport,
-    [property: JsonPropertyName(WireFormat.ExpenseKeys.Labor)] decimal Labor,
-    [property: JsonPropertyName(WireFormat.ExpenseKeys.Storage)] decimal Storage,
-    [property: JsonPropertyName(WireFormat.ExpenseKeys.Packaging)] decimal Packaging,
-    [property: JsonPropertyName(WireFormat.ExpenseKeys.Other)] decimal Other);

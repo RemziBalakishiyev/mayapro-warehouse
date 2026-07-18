@@ -1,6 +1,5 @@
 /** Başlanğıc mock data — MVP-dəki realistik verilənlərdən köçürülüb. */
 import { uid, todayISO, daysAgoISO, fmtDate } from "@/lib/format";
-import { calcRealCost } from "@/features/products/lib";
 import type {
   Product,
   Sale,
@@ -102,7 +101,7 @@ const rawProducts: RawProduct[] = [
     minStock: 20,
     supplierId: "sup_4",
     location: "Anbar A / Rəf 3 / Qutu 12",
-    expenses: { yol: 240, fehle: 60, yer: 50, paket: 30, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 240 }, { name: "Fəhlə pulu", amount: 60 }, { name: "Yer/Anbar xərci", amount: 50 }, { name: "Paket/Qutu", amount: 30 }],
     createdAt: daysAgoISO(24),
   },
   {
@@ -118,7 +117,7 @@ const rawProducts: RawProduct[] = [
     minStock: 15,
     supplierId: "sup_1",
     location: "Anbar A / Rəf 1 / Qutu 4",
-    expenses: { yol: 160, fehle: 40, yer: 30, paket: 20, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 160 }, { name: "Fəhlə pulu", amount: 40 }, { name: "Yer/Anbar xərci", amount: 30 }, { name: "Paket/Qutu", amount: 20 }],
     createdAt: daysAgoISO(18),
   },
   {
@@ -134,7 +133,7 @@ const rawProducts: RawProduct[] = [
     minStock: 10,
     supplierId: "sup_2",
     location: "Anbar B / Rəf 2 / Qutu 7",
-    expenses: { yol: 300, fehle: 60, yer: 60, paket: 40, diger: 20 },
+    expenses: [{ name: "Yol pulu", amount: 300 }, { name: "Fəhlə pulu", amount: 60 }, { name: "Yer/Anbar xərci", amount: 60 }, { name: "Paket/Qutu", amount: 40 }, { name: "Digər", amount: 20 }],
     createdAt: daysAgoISO(15),
   },
   {
@@ -150,7 +149,7 @@ const rawProducts: RawProduct[] = [
     minStock: 8,
     supplierId: "sup_1",
     location: "Anbar A / Rəf 5 / Qutu 2",
-    expenses: { yol: 120, fehle: 30, yer: 20, paket: 10, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 120 }, { name: "Fəhlə pulu", amount: 30 }, { name: "Yer/Anbar xərci", amount: 20 }, { name: "Paket/Qutu", amount: 10 }],
     createdAt: daysAgoISO(40),
   },
   {
@@ -166,7 +165,7 @@ const rawProducts: RawProduct[] = [
     minStock: 10,
     supplierId: "sup_3",
     location: "Mağaza / Vitrin 1",
-    expenses: { yol: 90, fehle: 25, yer: 20, paket: 15, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 90 }, { name: "Fəhlə pulu", amount: 25 }, { name: "Yer/Anbar xərci", amount: 20 }, { name: "Paket/Qutu", amount: 15 }],
     createdAt: daysAgoISO(12),
   },
   {
@@ -182,7 +181,7 @@ const rawProducts: RawProduct[] = [
     minStock: 20,
     supplierId: "sup_1",
     location: "Anbar A / Rəf 2 / Qutu 9",
-    expenses: { yol: 180, fehle: 45, yer: 30, paket: 25, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 180 }, { name: "Fəhlə pulu", amount: 45 }, { name: "Yer/Anbar xərci", amount: 30 }, { name: "Paket/Qutu", amount: 25 }],
     createdAt: daysAgoISO(65),
   },
   {
@@ -198,7 +197,7 @@ const rawProducts: RawProduct[] = [
     minStock: 6,
     supplierId: "sup_1",
     location: "Anbar B / Rəf 4 / Qutu 1",
-    expenses: { yol: 200, fehle: 50, yer: 40, paket: 30, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 200 }, { name: "Fəhlə pulu", amount: 50 }, { name: "Yer/Anbar xərci", amount: 40 }, { name: "Paket/Qutu", amount: 30 }],
     createdAt: daysAgoISO(70),
   },
   {
@@ -214,7 +213,7 @@ const rawProducts: RawProduct[] = [
     minStock: 10,
     supplierId: "sup_4",
     location: "Anbar A / Rəf 6 / Qutu 3",
-    expenses: { yol: 110, fehle: 30, yer: 25, paket: 15, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 110 }, { name: "Fəhlə pulu", amount: 30 }, { name: "Yer/Anbar xərci", amount: 25 }, { name: "Paket/Qutu", amount: 15 }],
     createdAt: daysAgoISO(9),
   },
   {
@@ -230,7 +229,7 @@ const rawProducts: RawProduct[] = [
     minStock: 12,
     supplierId: "sup_2",
     location: "Anbar B / Rəf 1 / Qutu 5",
-    expenses: { yol: 140, fehle: 35, yer: 25, paket: 20, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 140 }, { name: "Fəhlə pulu", amount: 35 }, { name: "Yer/Anbar xərci", amount: 25 }, { name: "Paket/Qutu", amount: 20 }],
     createdAt: daysAgoISO(95),
   },
   {
@@ -246,7 +245,7 @@ const rawProducts: RawProduct[] = [
     minStock: 30,
     supplierId: "sup_3",
     location: "Mağaza / Vitrin 2",
-    expenses: { yol: 45, fehle: 15, yer: 10, paket: 10, diger: 0 },
+    expenses: [{ name: "Yol pulu", amount: 45 }, { name: "Fəhlə pulu", amount: 15 }, { name: "Yer/Anbar xərci", amount: 10 }, { name: "Paket/Qutu", amount: 10 }],
     createdAt: daysAgoISO(35),
   },
 ];
@@ -261,9 +260,20 @@ const parseLocation = (location: string) => {
   };
 };
 
+/** Real maya: purchasePrice + Σ amounts / initialQuantity (köhnə calcRealCost obyekt forması əvəzinə). */
+const calcRealCostFromLines = (
+  purchasePrice: number,
+  initialQuantity: number,
+  expenses: Product["expenses"],
+): number => {
+  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+  if (initialQuantity <= 0) return purchasePrice;
+  return Math.round((purchasePrice + total / initialQuantity) * 100) / 100;
+};
+
 const buildProducts = (): Product[] =>
   rawProducts.map((p, i) => {
-    const realCostPerUnit = calcRealCost(
+    const realCostPerUnit = calcRealCostFromLines(
       p.purchasePrice,
       p.initialQuantity,
       p.expenses,

@@ -4,14 +4,12 @@ using System.Text.Json;
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
 /// <summary>
-/// Guards the frontend wire contract. Most of it is frozen (expense-breakdown keys yol/fehle/yer/paket/diger,
-/// paymentType "Nağd"..., category "Yol"..., role "sahib"...): those must stay byte-for-byte. Every assertion
-/// reads RAW JSON, not a typed DTO, so a renamed property that changed a frozen wire key would fail here.
+/// Guards the frontend wire contract. Frozen pieces (paymentType "Nağd"..., expense category "Yol"..., role
+/// "sahib"...) must stay byte-for-byte. Every assertion reads RAW JSON, not a typed DTO.
 /// <para>
-/// DELIBERATE CONTRACT CHANGE (agreed with the frontend): the fixed product fields <c>size</c>/<c>color</c>/
-/// <c>model</c> are GONE, replaced by a dynamic <c>attributes: [{ name, value }]</c> array (camelCase), and a
-/// new managed <c>GET/POST /api/categories</c> endpoint is added. The tests below assert the NEW shape on
-/// purpose — if this file is regenerated from the old contract it should fail.
+/// DELIBERATE CONTRACT CHANGES (agreed with the frontend): product <c>attributes: [{ name, value }]</c>;
+/// product <c>expenses: [{ name, amount }]</c> (the old yol/fehle/yer/paket/diger object is gone); managed
+/// categories; sales PagedResult. The tests below assert the NEW shapes on purpose.
 /// </para>
 /// </summary>
 [Collection(ApiCollection.Name)]
@@ -25,12 +23,15 @@ public sealed class WireFormatApiTests : IAsyncLifetime
 
     public Task DisposeAsync() => Task.CompletedTask;
 
+    /// <summary>
+    /// DELIBERATE CONTRACT CHANGE: product <c>expenses</c> is a camelCase array of
+    /// <c>{ name, amount }</c> — the old fixed <c>yol/fehle/yer/paket/diger</c> object is gone.
+    /// </summary>
     [Fact]
-    public async Task Product_Expense_Breakdown_Keeps_Frontend_Json_Keys_And_Values()
+    public async Task Product_Expenses_Are_A_CamelCase_Name_Amount_Array()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
 
-        // Non-zero, distinct values per bucket so a swapped mapping (e.g. fehle↔diger) would be caught.
         object body = new
         {
             name = "Wire test malı",
@@ -50,7 +51,12 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             warehouse = "Anbar A",
             shelf = "1",
             box = "1",
-            expenses = new { yol = 11m, fehle = 22m, yer = 33m, paket = 44m, diger = 55m }
+            expenses = new[]
+            {
+                new { name = "Yol pulu", amount = 11m },
+                new { name = "Fəhlə pulu", amount = 22m },
+                new { name = "Xüsusi xərc", amount = 33m }
+            }
         };
 
         HttpResponseMessage post = await client.PostAsJsonAsync("/api/products", body);
@@ -61,16 +67,16 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             await (await client.GetAsync($"/api/products/{created.Id}")).Content.ReadAsStringAsync());
         JsonElement expenses = doc.RootElement.GetProperty("expenses");
 
-        // Keys are the frontend keys — and each value landed in the correct bucket (no swap).
-        Assert.Equal(11m, expenses.GetProperty("yol").GetDecimal());
-        Assert.Equal(22m, expenses.GetProperty("fehle").GetDecimal());
-        Assert.Equal(33m, expenses.GetProperty("yer").GetDecimal());
-        Assert.Equal(44m, expenses.GetProperty("paket").GetDecimal());
-        Assert.Equal(55m, expenses.GetProperty("diger").GetDecimal());
+        Assert.Equal(JsonValueKind.Array, expenses.ValueKind);
+        Assert.Equal(3, expenses.GetArrayLength());
+        Assert.Equal("Yol pulu", expenses[0].GetProperty("name").GetString());
+        Assert.Equal(11m, expenses[0].GetProperty("amount").GetDecimal());
+        Assert.Equal("Xüsusi xərc", expenses[2].GetProperty("name").GetString());
+        Assert.Equal(33m, expenses[2].GetProperty("amount").GetDecimal());
 
-        // The English identifiers must NOT leak onto the wire.
-        Assert.False(expenses.TryGetProperty("transport", out _));
-        Assert.False(expenses.TryGetProperty("labor", out _));
+        // Old fixed-object keys must NOT appear as product-level properties.
+        Assert.False(doc.RootElement.TryGetProperty("yol", out _));
+        Assert.False(doc.RootElement.TryGetProperty("fehle", out _));
     }
 
     /// <summary>
@@ -110,7 +116,7 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             warehouse = "Anbar A",
             shelf = "1",
             box = "1",
-            expenses = new { yol = 0m, fehle = 0m, yer = 0m, paket = 0m, diger = 0m }
+            expenses = Array.Empty<object>()
         };
 
         HttpResponseMessage post = await client.PostAsJsonAsync("/api/products", body);

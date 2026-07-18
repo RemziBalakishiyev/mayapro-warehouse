@@ -1,7 +1,5 @@
 /** Biznes məntiqli mock əməliyyatlar. */
 import { db } from "./db";
-import { calcRealCost } from "@/features/products/lib";
-import { categoryToExpenseKey } from "@/features/expenses/lib";
 import { uid, todayISO, fmtMoney } from "@/lib/format";
 import { useAuthStore } from "@/features/auth/store";
 import type {
@@ -14,7 +12,19 @@ import type {
   Expense,
   ExpenseCategory,
   Closing,
+  ProductExpenseItem,
 } from "@/types";
+
+/** Real maya: purchasePrice + Σ amounts / initialQuantity. */
+function calcRealCostFromLines(
+  purchasePrice: number,
+  initialQuantity: number,
+  expenses: ProductExpenseItem[],
+): number {
+  const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+  if (initialQuantity <= 0) return purchasePrice;
+  return Math.round((purchasePrice + total / initialQuantity) * 100) / 100;
+}
 
 /** Yeni mal üçün giriş — hesablanan/avtomatik sahələr xaric. */
 export type NewProduct = Omit<
@@ -42,7 +52,7 @@ export const productHandlers = {
   get: (id: string) => db.products.get(id),
 
   async create(input: NewProduct): Promise<Product> {
-    const realCostPerUnit = calcRealCost(
+    const realCostPerUnit = calcRealCostFromLines(
       input.purchasePrice,
       input.quantity,
       input.expenses,
@@ -61,7 +71,7 @@ export const productHandlers = {
   },
 
   async update(id: string, input: ProductUpdate): Promise<Product> {
-    const realCostPerUnit = calcRealCost(
+    const realCostPerUnit = calcRealCostFromLines(
       input.purchasePrice,
       input.quantity,
       input.expenses,
@@ -322,12 +332,19 @@ export const expenseHandlers = {
     if (expense.productId) {
       const p = await db.products.get(expense.productId);
       if (p) {
-        const key = categoryToExpenseKey(expense.category);
-        const expenses = {
-          ...p.expenses,
-          [key]: (Number(p.expenses[key]) || 0) + expense.amount,
-        };
-        const realCostPerUnit = calcRealCost(
+        // Kateqoriya adı birbaşa sərbəst xərc sətiri adına çevrilir (eyni ad cəmlənir).
+        const name = expense.category;
+        const existing = p.expenses.find(
+          (e) => e.name.toLowerCase() === name.toLowerCase(),
+        );
+        const expenses = existing
+          ? p.expenses.map((e) =>
+              e.name.toLowerCase() === name.toLowerCase()
+                ? { ...e, amount: e.amount + expense.amount }
+                : e,
+            )
+          : [...p.expenses, { name, amount: expense.amount }];
+        const realCostPerUnit = calcRealCostFromLines(
           p.purchasePrice,
           p.initialQuantity,
           expenses,
