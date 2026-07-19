@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSaleById;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSales;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
@@ -25,6 +26,14 @@ internal static class SalesEndpoints
                 CancellationToken ct) =>
                 Results.Ok(await handler.Handle(date, from, to, take, skip, ct)))
             .WithName("GetSales");
+
+        // Full detail of one sale, including customer name (credit) and the product's current name.
+        group.MapGet("/{id:guid}", async (
+                Guid id,
+                GetSaleByIdHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .WithName("GetSaleById");
 
         group.MapPost("/", async (
                 CreateSaleCommand command,

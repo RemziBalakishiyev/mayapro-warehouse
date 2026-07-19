@@ -77,6 +77,11 @@ public sealed class CreateSaleHandler(
                     return Result.Failure<SaleDto>(debt.Error);
             }
 
+            // Expense lines are documentation only — stored verbatim, never used to recompute the cost.
+            IReadOnlyList<SaleExpenseItem> expenseItems = command.ExpenseItems is { Count: > 0 } items
+                ? items.Select(e => new SaleExpenseItem(e.Name, e.Amount)).ToList()
+                : Array.Empty<SaleExpenseItem>();
+
             sale = Sale.CreateManual(
                 command.ProductName!,
                 command.Category,
@@ -87,7 +92,8 @@ public sealed class CreateSaleHandler(
                 paymentType,
                 command.CustomerId,
                 currentUser.UserId,
-                currentUser.Name ?? string.Empty);
+                currentUser.Name ?? string.Empty,
+                expenseItems);
         }
 
         // ⑤ Record the sale.

@@ -79,8 +79,32 @@ export interface Sale {
   profit: number | null;
   /** Sərbəst satış: mal əl ilə yazılıb, stok dəyişməyib */
   isManual: boolean;
+  /** Sərbəst satışda mayanı izah edən sərbəst xərc sətirləri; normal satışda boş massiv */
+  expenseItems: SaleExpenseItem[];
   createdAt: string;
   employeeId: string;
+}
+
+/** Sərbəst satış xərc sətri: { name: "Yol pulu", amount: 5 } */
+export interface SaleExpenseItem {
+  name: string;
+  amount: number;
+}
+
+/**
+ * WIRE QEYDİ (backend dəyişikliyi):
+ * - POST /api/sales artıq optional `expenseItems: {name, amount}[]` qəbul edir — yalnız sərbəst satışda
+ *   saxlanılır (sənədləşmə üçün; CostPerUnit/profit hesablanmasına təsir etmir), normal satışda boş qalır.
+ * - Sale DTO-suna `expenseItems` massivi əlavə olundu (list + detal cavablarında).
+ * - Yeni GET /api/sales/{id} — tək satışın tam detalı: bütün Sale sahələri + `customerName` (nisyədirsə) +
+ *   `currentProductName` (kataloq satışında məhsulun cari adı; snapshot `productName` yerində qalır).
+ *   Mövcud olmayan id → 404.
+ */
+export interface SaleDetail extends Sale {
+  /** Nisyə satışda müştərinin adı; əks halda null */
+  customerName: string | null;
+  /** Kataloq satışında məhsulun CARİ adı (silinibsə/sərbəstdirsə null); productName snapshot olaraq qalır */
+  currentProductName: string | null;
 }
 
 export interface Customer {

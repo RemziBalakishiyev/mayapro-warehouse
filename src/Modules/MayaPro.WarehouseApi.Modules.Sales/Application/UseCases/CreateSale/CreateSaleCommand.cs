@@ -1,3 +1,5 @@
+using MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
+
 namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 
 /// <summary>
@@ -10,6 +12,11 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 /// <see cref="CostPerUnit"/> and <see cref="Category"/> are optional. Cost fields are ignored when
 /// <see cref="ProductId"/> is set.
 /// </para>
+/// <para>
+/// <see cref="ExpenseItems"/> is optional and only meaningful for a free-form sale: it documents how the
+/// seller-supplied <see cref="CostPerUnit"/> was worked out. It is stored as-is and never recomputes the
+/// cost/profit; it is ignored for catalogued sales.
+/// </para>
 /// </summary>
 public sealed record CreateSaleCommand(
     Guid? ProductId,
@@ -21,4 +28,5 @@ public sealed record CreateSaleCommand(
     string? Note,
     string? ProductName = null,
     decimal? CostPerUnit = null,
-    string? Category = null);
+    string? Category = null,
+    IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null);

@@ -208,6 +208,81 @@ public sealed class SalesApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Manual_Sale_Persists_Expense_Items_And_Detail_Returns_Them()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Əl ilə mal (xərcli)",
+            quantity = 2,
+            salePrice = 20m,
+            discount = 0m,
+            costPerUnit = 12m,             // frontend-supplied; expense lines are documentation only
+            paymentType = "Nağd",
+            customerId = (Guid?)null,
+            expenseItems = new[]
+            {
+                new { name = "Yol pulu", amount = 5m },
+                new { name = "Fəhlə", amount = 3m }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        var detail = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+            $"/api/sales/{created.Id}"))!;
+
+        Assert.True(detail.IsManual);
+        Assert.Equal(2, detail.ExpenseItems.Count);
+        Assert.Contains(detail.ExpenseItems, e => e.Name == "Yol pulu" && e.Amount == 5m);
+        Assert.Contains(detail.ExpenseItems, e => e.Name == "Fəhlə" && e.Amount == 3m);
+    }
+
+    [Fact]
+    public async Task GetSaleById_Credit_Sale_Populates_CustomerName_And_Current_Product_Name()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("SALE-DETAIL", quantity: 10, salePrice: 20m);
+        var customer = await client.CreateCustomerAsync("Detal müştəri", debt: 0m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 20m,
+            discount = 0m,
+            paymentType = "Nisyə",
+            customerId = customer.Id
+        });
+        response.EnsureSuccessStatusCode();
+        var created = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        var detail = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+            $"/api/sales/{created.Id}"))!;
+
+        Assert.Equal(customer.Id, detail.CustomerId);
+        Assert.Equal("Detal müştəri", detail.CustomerName);
+        // The snapshot name and the product's current catalogue name both resolve to the same value here.
+        Assert.Equal(product.Name, detail.CurrentProductName);
+        Assert.Empty(detail.ExpenseItems);   // catalogued sale carries no free-form expense lines
+    }
+
+    [Fact]
+    public async Task GetSaleById_Nonexistent_Returns_404()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.GetAsync($"/api/sales/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Sales.NotFound", error.Code);
+    }
+
+    [Fact]
     public async Task GetSales_Pages_And_Filters_By_From_To_Range()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();

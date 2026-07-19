@@ -27,4 +27,5 @@ public sealed record SaleDto(
     Guid? EmployeeId,
     string SoldByName,
     DateTime CreatedAt,
-    bool IsManual);
+    bool IsManual,
+    IReadOnlyList<SaleExpenseItemDto> ExpenseItems);

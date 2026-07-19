@@ -116,6 +116,21 @@ internal static class IntegrationTestHelpers
     /// <summary>Wire shape of <c>GET /api/sales</c> — SharedKernel <c>PagedResult&lt;SaleDto&gt;</c> (items/total/skip/take).</summary>
     internal sealed record PagedSalesDto(List<SaleDto> Items, int Total, int Skip, int Take);
 
+    internal sealed record SaleExpenseItemDto(string Name, decimal Amount);
+
+    /// <summary>Subset of <c>GET /api/sales/{id}</c> detail (deserialised by name).</summary>
+    internal sealed record SaleDetailDto(
+        Guid Id,
+        Guid? ProductId,
+        string ProductName,
+        string? CurrentProductName,
+        int Quantity,
+        decimal TotalAmount,
+        Guid? CustomerId,
+        string? CustomerName,
+        bool IsManual,
+        List<SaleExpenseItemDto> ExpenseItems);
+
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
 
     internal sealed record CustomerHistoryEntryDto(DateTime Date, string Type, decimal Amount, string? Note);

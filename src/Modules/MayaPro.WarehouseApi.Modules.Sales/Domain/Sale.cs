@@ -31,7 +31,8 @@ public sealed class Sale : Entity
         Guid? customerId,
         Guid? soldByUserId,
         string soldByName,
-        DateTime date)
+        DateTime date,
+        IReadOnlyList<SaleExpenseItem> expenseItems)
     {
         ProductId = productId;
         IsManual = isManual;
@@ -49,6 +50,7 @@ public sealed class Sale : Entity
         SoldByUserId = soldByUserId;
         SoldByName = soldByName;
         Date = date;
+        ExpenseItems = expenseItems;
     }
 
     /// <summary>The catalogued product sold; null for a free-form (manual) sale.</summary>
@@ -98,6 +100,13 @@ public sealed class Sale : Entity
 
     public DateTime Date { get; private set; }
 
+    /// <summary>
+    /// Free-form expense lines that document how a manual sale's cost was worked out. Empty on a catalogued
+    /// sale (its cost comes from the product) and on manual sales where the seller entered no breakdown.
+    /// Stored inline as a JSON array; never used to (re)compute <see cref="Profit"/>.
+    /// </summary>
+    public IReadOnlyList<SaleExpenseItem> ExpenseItems { get; private set; } = Array.Empty<SaleExpenseItem>();
+
     public static Sale Create(
         Guid productId,
         string productName,
@@ -132,13 +141,17 @@ public sealed class Sale : Entity
             paymentType == PaymentType.Credit ? customerId : null,
             soldByUserId,
             soldByName,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            // A catalogued sale takes its cost from the product, so it carries no free-form expense lines.
+            Array.Empty<SaleExpenseItem>());
     }
 
     /// <summary>
     /// A free-form sale: no catalogued product, so no stock is moved. The seller supplies the name and may
     /// pass the unit cost if known — pass null when it is not, and <see cref="Profit"/> stays null so the
     /// sale's revenue is still recorded while its gain is reported as unknown. Category is optional.
+    /// <paramref name="expenseItems"/> are stored purely for documentation and never alter the cost/profit,
+    /// which the caller has already computed.
     /// </summary>
     public static Sale CreateManual(
         string productName,
@@ -150,7 +163,8 @@ public sealed class Sale : Entity
         PaymentType paymentType,
         Guid? customerId,
         Guid? soldByUserId,
-        string soldByName)
+        string soldByName,
+        IReadOnlyList<SaleExpenseItem>? expenseItems = null)
     {
         decimal subtotal = unitPrice * quantity;
         decimal totalAmount = subtotal - discount;
@@ -174,6 +188,7 @@ public sealed class Sale : Entity
             paymentType == PaymentType.Credit ? customerId : null,
             soldByUserId,
             soldByName,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            expenseItems ?? Array.Empty<SaleExpenseItem>());
     }
 }
