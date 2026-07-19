@@ -10,5 +10,7 @@ public interface ICustomersDbContext
 
     DbSet<CustomerPayment> CustomerPayments { get; }
 
+    DbSet<CustomerDebtAdjustment> CustomerDebtAdjustments { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -30,6 +30,14 @@ public interface ISalesModule
     /// </summary>
     Task<IReadOnlyList<CustomerLastPurchase>> GetLastCreditSaleDatesByCustomerAsync(
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns one customer's credit (Nisyə) sales, oldest first. Used by the Customers module to weave the
+    /// customer's purchases into their full debt history without querying the sales table directly.
+    /// </summary>
+    Task<IReadOnlyList<CustomerCreditSale>> GetCreditSalesByCustomerAsync(
+        Guid customerId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>A day's net sales split by payment type.</summary>
@@ -55,6 +63,9 @@ public sealed record RecentSaleInfo(
 
 /// <summary>A customer's most recent credit-purchase timestamp (UTC).</summary>
 public sealed record CustomerLastPurchase(Guid CustomerId, DateTime Date);
+
+/// <summary>A single credit (Nisyə) sale for a customer's debt history: when, what, and the net amount owed.</summary>
+public sealed record CustomerCreditSale(DateTime Date, string ProductName, int Quantity, decimal TotalAmount);
 
 /// <summary>
 /// A single sale as seen by reports: date, net amount, profit, payment code and product line.

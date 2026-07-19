@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.AddCustomerPayment;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.CreateCustomer;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -38,6 +39,14 @@ internal static class CustomersEndpoints
                 CancellationToken ct) =>
                 Results.Ok(await handler.Handle(id, ct)))
             .WithName("GetCustomerPayments");
+
+        // Full chronological debt history: opening balance, credit sales and payments in one feed.
+        group.MapGet("/{id:guid}/history", async (
+                Guid id,
+                GetCustomerHistoryHandler handler,
+                CancellationToken ct) =>
+                Results.Ok(await handler.Handle(id, ct)))
+            .WithName("GetCustomerHistory");
 
         group.MapPost("/{id:guid}/payments", async (
                 Guid id,

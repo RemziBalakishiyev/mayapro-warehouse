@@ -90,8 +90,26 @@ export interface Customer {
   totalDebt: number;
   paidAmount: number;
   remainingDebt: number;
+  /** Sistemə keçid zamanı yazılan ilkin (açılış) borcu. Təmiz başlayan müştəridə 0 */
+  initialDebt: number;
   lastPurchaseDate: string;
   lastPaymentDate: string;
+}
+
+/**
+ * WIRE QEYDİ (backend dəyişikliyi):
+ * - POST /api/customers artıq `initialDebt` qəbul edir (əvvəlki `debt` sahəsi bu ada dəyişdi).
+ *   InitialDebt > 0 olduqda müştəri + CustomerDebtAdjustment + activity log bir transaction-da yazılır.
+ * - CustomerDto cavabına `initialDebt` sahəsi əlavə olundu.
+ * - Yeni GET /api/customers/{id}/history — müştərinin TAM borc tarixçəsi (xronoloji):
+ *   ilkin borc + nisyə satışlar + ödənişlər. Köhnə GET /api/customers/{id}/payments toxunulmadı.
+ */
+export interface CustomerHistoryEntry {
+  date: string;
+  type: "initialDebt" | "sale" | "payment";
+  amount: number;
+  /** Satışda mal adı (× miqdar); ilkin borc / ödənişdə qeyd mətni */
+  note: string | null;
 }
 
 export interface Supplier {

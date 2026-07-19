@@ -9,7 +9,7 @@ public sealed class CreateCustomerValidator : AbstractValidator<CreateCustomerCo
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Ad boş ola bilməz");
 
-        RuleFor(x => x.Debt)
+        RuleFor(x => x.InitialDebt)
             .GreaterThanOrEqualTo(0).WithMessage("Borc mənfi ola bilməz");
     }
 }

@@ -58,7 +58,7 @@ internal static class IntegrationTestHelpers
         this HttpClient client, string name, decimal debt = 0m)
     {
         HttpResponseMessage response = await client.PostAsJsonAsync(
-            "/api/customers", new { name, phone = (string?)null, note = (string?)null, debt });
+            "/api/customers", new { name, phone = (string?)null, note = (string?)null, initialDebt = debt });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CustomerDto>())!;
     }
@@ -96,7 +96,7 @@ internal static class IntegrationTestHelpers
 
     internal sealed record ProductDto(Guid Id, string Name, int Quantity, int InitialQuantity, decimal RealCostPerUnit);
 
-    internal sealed record CustomerDto(Guid Id, string Name, decimal Debt);
+    internal sealed record CustomerDto(Guid Id, string Name, decimal Debt, decimal InitialDebt);
 
     internal sealed record SupplierDto(Guid Id, string Name, decimal Debt, int ItemCount);
 
@@ -117,6 +117,8 @@ internal static class IntegrationTestHelpers
     internal sealed record PagedSalesDto(List<SaleDto> Items, int Total, int Skip, int Take);
 
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
+
+    internal sealed record CustomerHistoryEntryDto(DateTime Date, string Type, decimal Amount, string? Note);
 
     internal sealed record SupplierPaymentDto(Guid Id, Guid SupplierId, decimal Amount);
 

@@ -110,4 +110,17 @@ internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider date
             .Select(r => new CustomerLastPurchase(r.CustomerId, r.Last))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<CustomerCreditSale>> GetCreditSalesByCustomerAsync(
+        Guid customerId,
+        CancellationToken cancellationToken = default)
+    {
+        // Only credit sales carry a customer id, so filtering by it already excludes cash/card sales.
+        return await db.Sales
+            .AsNoTracking()
+            .Where(s => s.CustomerId == customerId)
+            .OrderBy(s => s.Date)
+            .Select(s => new CustomerCreditSale(s.Date, s.ProductName, s.Quantity, s.TotalAmount))
+            .ToListAsync(cancellationToken);
+    }
 }

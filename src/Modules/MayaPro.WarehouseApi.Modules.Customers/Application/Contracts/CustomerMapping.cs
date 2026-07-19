@@ -7,10 +7,11 @@ public static class CustomerMapping
 {
     public static CustomerDto ToDto(
         this Customer customer,
+        decimal initialDebt = 0m,
         decimal paidAmount = 0m,
         DateTime? lastPurchaseDate = null,
         DateTime? lastPaymentDate = null) =>
-        new(customer.Id, customer.Name, customer.Phone, customer.Note, customer.Debt,
+        new(customer.Id, customer.Name, customer.Phone, customer.Note, customer.Debt, initialDebt,
             paidAmount, lastPurchaseDate, lastPaymentDate, customer.CreatedAt, customer.UpdatedAt);
 
     public static CustomerPaymentDto ToDto(this CustomerPayment payment) =>

@@ -27,6 +27,13 @@ public sealed class GetCustomersHandler(ICustomersDbContext db, ISalesModule sal
             .Select(g => new { CustomerId = g.Key, Paid = g.Sum(p => p.Amount), Last = g.Max(p => p.Date) })
             .ToDictionaryAsync(x => x.CustomerId, x => (x.Paid, x.Last), ct);
 
+        // One grouped query for the opening balances each customer was migrated in with.
+        Dictionary<Guid, decimal> initialDebts = await db.CustomerDebtAdjustments
+            .AsNoTracking()
+            .GroupBy(a => a.CustomerId)
+            .Select(g => new { CustomerId = g.Key, Total = g.Sum(a => a.Amount) })
+            .ToDictionaryAsync(x => x.CustomerId, x => x.Total, ct);
+
         // One cross-module query for the last credit-sale date per customer.
         Dictionary<Guid, DateTime> lastPurchase = (await sales.GetLastCreditSaleDatesByCustomerAsync(ct))
             .ToDictionary(x => x.CustomerId, x => x.Date);
@@ -38,7 +45,8 @@ public sealed class GetCustomersHandler(ICustomersDbContext db, ISalesModule sal
                     ? (stat.Paid, stat.Last)
                     : (0m, (DateTime?)null);
                 DateTime? lastPurchaseDate = lastPurchase.TryGetValue(c.Id, out DateTime lp) ? lp : null;
-                return c.ToDto(paid, lastPurchaseDate, lastPayment);
+                decimal initialDebt = initialDebts.TryGetValue(c.Id, out decimal init) ? init : 0m;
+                return c.ToDto(initialDebt, paid, lastPurchaseDate, lastPayment);
             })
             .ToList();
     }

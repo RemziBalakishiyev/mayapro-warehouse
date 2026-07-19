@@ -3,6 +3,7 @@ using MayaPro.WarehouseApi.Modules.Customers.Application;
 using MayaPro.WarehouseApi.Modules.Customers.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.AddCustomerPayment;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.CreateCustomer;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
 using MayaPro.WarehouseApi.Modules.Customers.Endpoints;
@@ -50,6 +51,7 @@ public sealed class CustomersModule : IModule
         services.AddScoped<GetCustomersHandler>();
         services.AddScoped<CreateCustomerHandler>();
         services.AddScoped<GetCustomerPaymentsHandler>();
+        services.AddScoped<GetCustomerHistoryHandler>();
         services.AddScoped<AddCustomerPaymentHandler>();
     }
 

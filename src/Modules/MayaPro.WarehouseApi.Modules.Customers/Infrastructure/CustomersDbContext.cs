@@ -19,6 +19,8 @@ public sealed class CustomersDbContext(DbContextOptions<CustomersDbContext> opti
 
     public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
 
+    public DbSet<CustomerDebtAdjustment> CustomerDebtAdjustments => Set<CustomerDebtAdjustment>();
+
     public Task EnlistAsync(DbTransaction transaction, CancellationToken cancellationToken = default) =>
         Database.UseTransactionAsync(transaction, cancellationToken);
 
