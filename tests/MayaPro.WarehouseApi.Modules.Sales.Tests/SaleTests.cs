@@ -112,4 +112,57 @@ public sealed class SaleTests
         Assert.Equal(customerId, credit.CustomerId);
         Assert.Null(cash.CustomerId);
     }
+
+    [Fact]
+    public void ReviseCatalogued_Recomputes_Money_And_Preserves_Identity_Date_And_Seller()
+    {
+        Guid seller = Guid.NewGuid();
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Köhnə", category: "Köhnə kateqoriya", quantity: 1,
+            unitPrice: 10m, discount: 0m, costPerUnit: 5m, paymentType: PaymentType.Cash,
+            customerId: null, soldByUserId: seller, soldByName: "Satıcı");
+
+        Guid originalId = sale.Id;
+        DateTime originalDate = sale.Date;
+        Guid newProductId = Guid.NewGuid();
+
+        // New values: (20 − 12) × 3 − 5 = 19; subtotal 60; total 55.
+        sale.ReviseCatalogued(
+            newProductId, "Yeni", "Yeni kateqoriya", quantity: 3, unitPrice: 20m, discount: 5m,
+            costPerUnit: 12m, paymentType: PaymentType.Cash, customerId: null);
+
+        Assert.Equal(newProductId, sale.ProductId);
+        Assert.Equal("Yeni", sale.ProductName);
+        Assert.Equal("Yeni kateqoriya", sale.Category);
+        Assert.Equal(60m, sale.Subtotal);
+        Assert.Equal(55m, sale.TotalAmount);
+        Assert.Equal(19m, sale.Profit);
+        Assert.False(sale.IsManual);
+        // Identity, sale date and seller are never rewritten by an update.
+        Assert.Equal(originalId, sale.Id);
+        Assert.Equal(originalDate, sale.Date);
+        Assert.Equal(seller, sale.SoldByUserId);
+    }
+
+    [Fact]
+    public void ReviseManual_Recomputes_And_Drops_Customer_For_Non_Credit()
+    {
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Köhnə", category: "K", quantity: 1,
+            unitPrice: 10m, discount: 0m, costPerUnit: 5m, paymentType: PaymentType.Credit,
+            customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı");
+
+        var items = new List<SaleExpenseItem> { new("Yol", 5m) };
+        // Cash → the supplied customer is dropped; no cost → profit stays unknown.
+        sale.ReviseManual(
+            "Əl ilə", category: null, quantity: 2, unitPrice: 15m, discount: 0m, costPerUnit: null,
+            paymentType: PaymentType.Cash, customerId: Guid.NewGuid(), expenseItems: items);
+
+        Assert.True(sale.IsManual);
+        Assert.Null(sale.ProductId);
+        Assert.Null(sale.CustomerId);
+        Assert.Null(sale.Profit);
+        Assert.Equal(30m, sale.TotalAmount);
+        Assert.Equal(new SaleExpenseItem("Yol", 5m), Assert.Single(sale.ExpenseItems));
+    }
 }

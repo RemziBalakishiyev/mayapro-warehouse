@@ -32,8 +32,23 @@ public sealed class Customer : Entity
     public static Customer Create(string name, string? phone = null, string? note = null, decimal debt = 0) =>
         new(name, phone, note, debt);
 
+    /// <summary>Updates the editable customer details (debt is never touched here).</summary>
+    public void Update(string name, string? phone, string? note)
+    {
+        Name = name;
+        Phone = phone;
+        Note = note;
+    }
+
     /// <summary>Adds to the debt (e.g. a credit sale).</summary>
     public void IncreaseDebt(decimal amount) => Debt += amount;
+
+    /// <summary>
+    /// Unwinds debt when a credit sale is deleted or revised — the inverse of <see cref="IncreaseDebt"/>.
+    /// Floors at zero (never pushes the customer into credit) if the debt was already paid down, so it can
+    /// always be applied without failing.
+    /// </summary>
+    public void ReverseDebt(decimal amount) => Debt = Math.Max(0m, Debt - amount);
 
     /// <summary>
     /// Reduces the debt by a payment. Fails if the payment exceeds the outstanding debt — a customer

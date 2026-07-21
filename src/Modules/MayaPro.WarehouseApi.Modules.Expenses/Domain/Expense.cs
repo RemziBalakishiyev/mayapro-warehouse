@@ -59,4 +59,27 @@ public sealed class Expense : Entity
         string? note,
         Guid? createdByUserId) =>
         new(name, category, amount, date, productId, productName, note, createdByUserId);
+
+    /// <summary>
+    /// Re-applies an expense's values in place after its old product-cost effect was reversed (the "reapply"
+    /// half of an update). <paramref name="productName"/> is the freshly-resolved snapshot for the (possibly
+    /// changed) product, or null for a general expense. Identity and creator are preserved.
+    /// </summary>
+    public void Update(
+        string name,
+        ExpenseCategory category,
+        decimal amount,
+        DateTime date,
+        Guid? productId,
+        string? productName,
+        string? note)
+    {
+        Name = name;
+        Category = category;
+        Amount = amount;
+        Date = date;
+        ProductId = productId;
+        ProductName = productName;
+        Note = note;
+    }
 }

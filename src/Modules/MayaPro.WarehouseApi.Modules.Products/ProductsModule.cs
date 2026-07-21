@@ -6,6 +6,7 @@ using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateCategory;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.DeleteProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetCategories;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProducts;
@@ -57,6 +58,7 @@ public sealed class ProductsModule : IModule
         services.AddScoped<GetProductHandler>();
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<UpdateProductHandler>();
+        services.AddScoped<DeleteProductHandler>();
         services.AddScoped<AdjustStockHandler>();
         services.AddScoped<GetCategoriesHandler>();
         services.AddScoped<CreateCategoryHandler>();

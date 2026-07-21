@@ -37,4 +37,18 @@ public sealed class SupplierTests
         Assert.Equal(SupplierErrors.PaymentExceedsDebt, result.Error);
         Assert.Equal(100m, supplier.Debt);
     }
+
+    [Fact]
+    public void Update_Changes_Details_But_Not_Debt()
+    {
+        Supplier supplier = Supplier.Create("Köhnə ad", contactName: "Əli", phone: "050", note: "köhnə", debt: 100);
+
+        supplier.Update("Yeni ad", "Vəli", "055", "yeni qeyd");
+
+        Assert.Equal("Yeni ad", supplier.Name);
+        Assert.Equal("Vəli", supplier.ContactName);
+        Assert.Equal("055", supplier.Phone);
+        Assert.Equal("yeni qeyd", supplier.Note);
+        Assert.Equal(100m, supplier.Debt); // untouched
+    }
 }

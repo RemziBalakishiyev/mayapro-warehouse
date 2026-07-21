@@ -1,8 +1,10 @@
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierDebt;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierPayment;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.CreateSupplier;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.DeleteSupplier;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSupplierPayments;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSuppliers;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.UpdateSupplier;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -12,8 +14,9 @@ namespace MayaPro.WarehouseApi.Modules.Suppliers.Endpoints;
 
 internal static class SuppliersEndpoints
 {
-    // Matches the host's role policy: only Owner or Manager may write supplier data.
+    // Host role policies: writing supplier data is Owner/Manager; deleting a supplier is Owner-only.
     private const string OwnerOrManager = "OwnerOrManager";
+    private const string OwnerOnly = "OwnerOnly";
 
     public static void MapSuppliersEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -67,6 +70,24 @@ internal static class SuppliersEndpoints
             })
             .RequireAuthorization(OwnerOrManager)
             .WithName("AddSupplierPayment");
+
+        group.MapPut("/{id:guid}", async (
+                Guid id,
+                UpdateSupplierCommand command,
+                UpdateSupplierHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(command with { Id = id }, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("UpdateSupplier");
+
+        // A supplier we still owe cannot be deleted (→ 409); their payment history is removed with them.
+        group.MapDelete("/{id:guid}", async (
+                Guid id,
+                DeleteSupplierHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOnly)
+            .WithName("DeleteSupplier");
     }
 
     /// <summary>Body for the supplier debt/payment endpoints — the id comes from the route.</summary>

@@ -3,9 +3,11 @@ using MayaPro.WarehouseApi.Modules.Customers.Application;
 using MayaPro.WarehouseApi.Modules.Customers.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.AddCustomerPayment;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.CreateCustomer;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomer;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.UpdateCustomer;
 using MayaPro.WarehouseApi.Modules.Customers.Endpoints;
 using MayaPro.WarehouseApi.Modules.Customers.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -47,12 +49,15 @@ public sealed class CustomersModule : IModule
 
         services.AddScoped<IValidator<CreateCustomerCommand>, CreateCustomerValidator>();
         services.AddScoped<IValidator<AddCustomerPaymentCommand>, AddCustomerPaymentValidator>();
+        services.AddScoped<IValidator<UpdateCustomerCommand>, UpdateCustomerValidator>();
 
         services.AddScoped<GetCustomersHandler>();
         services.AddScoped<CreateCustomerHandler>();
         services.AddScoped<GetCustomerPaymentsHandler>();
         services.AddScoped<GetCustomerHistoryHandler>();
         services.AddScoped<AddCustomerPaymentHandler>();
+        services.AddScoped<UpdateCustomerHandler>();
+        services.AddScoped<DeleteCustomerHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

@@ -191,4 +191,68 @@ public sealed class Sale : Entity
             DateTime.UtcNow,
             expenseItems ?? Array.Empty<SaleExpenseItem>());
     }
+
+    /// <summary>
+    /// Re-applies a catalogued sale's values in place after its old effects were reversed (the "reapply" half
+    /// of an update). Recomputes the money and profit exactly like <see cref="Create"/> but keeps this row's
+    /// identity, sale <see cref="Date"/> and seller — an update never rewrites when or by whom the sale was made.
+    /// </summary>
+    public void ReviseCatalogued(
+        Guid productId,
+        string productName,
+        string? category,
+        int quantity,
+        decimal unitPrice,
+        decimal discount,
+        decimal costPerUnit,
+        PaymentType paymentType,
+        Guid? customerId)
+    {
+        ProductId = productId;
+        IsManual = false;
+        ProductName = productName;
+        Category = category;
+        Quantity = quantity;
+        UnitPrice = unitPrice;
+        Subtotal = unitPrice * quantity;
+        Discount = discount;
+        TotalAmount = Subtotal - discount;
+        CostPerUnit = costPerUnit;
+        Profit = (unitPrice - costPerUnit) * quantity - discount;
+        PaymentType = paymentType;
+        CustomerId = paymentType == PaymentType.Credit ? customerId : null;
+        ExpenseItems = Array.Empty<SaleExpenseItem>();
+    }
+
+    /// <summary>
+    /// Re-applies a free-form sale's values in place after its old effects were reversed. Mirrors
+    /// <see cref="CreateManual"/> — profit stays null when the cost is unknown — while preserving this row's
+    /// identity, sale <see cref="Date"/> and seller.
+    /// </summary>
+    public void ReviseManual(
+        string productName,
+        string? category,
+        int quantity,
+        decimal unitPrice,
+        decimal discount,
+        decimal? costPerUnit,
+        PaymentType paymentType,
+        Guid? customerId,
+        IReadOnlyList<SaleExpenseItem> expenseItems)
+    {
+        ProductId = null;
+        IsManual = true;
+        ProductName = productName;
+        Category = category;
+        Quantity = quantity;
+        UnitPrice = unitPrice;
+        Subtotal = unitPrice * quantity;
+        Discount = discount;
+        TotalAmount = Subtotal - discount;
+        CostPerUnit = costPerUnit;
+        Profit = costPerUnit is { } cost ? (unitPrice - cost) * quantity - discount : null;
+        PaymentType = paymentType;
+        CustomerId = paymentType == PaymentType.Credit ? customerId : null;
+        ExpenseItems = expenseItems;
+    }
 }

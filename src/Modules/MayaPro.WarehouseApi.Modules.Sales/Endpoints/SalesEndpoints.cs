@@ -1,6 +1,8 @@
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSaleById;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSales;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.UpdateSale;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -10,6 +12,9 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Endpoints;
 
 internal static class SalesEndpoints
 {
+    // Matches the host's role policy: editing/deleting a sale is limited to Owner or Manager.
+    private const string OwnerOrManager = "OwnerOrManager";
+
     public static void MapSalesEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/sales")
@@ -45,5 +50,24 @@ internal static class SalesEndpoints
                 return result.ToCreatedResult(location);
             })
             .WithName("CreateSale");
+
+        // Reverse-and-reapply edit: old effects unwound, new values applied on the same row (date preserved).
+        group.MapPut("/{id:guid}", async (
+                Guid id,
+                UpdateSaleCommand command,
+                UpdateSaleHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(command with { Id = id }, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("UpdateSale");
+
+        // Deletes the sale and unwinds its chain (stock returns, credit debt reduces).
+        group.MapDelete("/{id:guid}", async (
+                Guid id,
+                DeleteSaleHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("DeleteSale");
     }
 }

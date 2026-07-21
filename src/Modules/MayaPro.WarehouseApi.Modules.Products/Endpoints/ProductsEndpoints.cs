@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.DeleteProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProducts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.UpdateProduct;
@@ -55,6 +56,15 @@ internal static class ProductsEndpoints
             })
             .RequireAuthorization(OwnerOrManager)
             .WithName("UpdateProduct");
+
+        // Deletion is safe (sales carry their own snapshots); a stock>0 warning is the frontend's job.
+        group.MapDelete("/{id:guid}", async (
+                Guid id,
+                DeleteProductHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("DeleteProduct");
 
         // Stock corrections are open to every role — a seller can fix stock too.
         group.MapPost("/{id:guid}/adjust-stock", async (

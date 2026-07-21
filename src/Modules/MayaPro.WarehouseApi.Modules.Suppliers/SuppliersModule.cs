@@ -4,8 +4,10 @@ using MayaPro.WarehouseApi.Modules.Suppliers.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierDebt;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierPayment;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.CreateSupplier;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.DeleteSupplier;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSupplierPayments;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSuppliers;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.UpdateSupplier;
 using MayaPro.WarehouseApi.Modules.Suppliers.Endpoints;
 using MayaPro.WarehouseApi.Modules.Suppliers.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -49,12 +51,15 @@ public sealed class SuppliersModule : IModule
         services.AddScoped<IValidator<CreateSupplierCommand>, CreateSupplierValidator>();
         services.AddScoped<IValidator<AddSupplierDebtCommand>, AddSupplierDebtValidator>();
         services.AddScoped<IValidator<AddSupplierPaymentCommand>, AddSupplierPaymentValidator>();
+        services.AddScoped<IValidator<UpdateSupplierCommand>, UpdateSupplierValidator>();
 
         services.AddScoped<GetSuppliersHandler>();
         services.AddScoped<CreateSupplierHandler>();
         services.AddScoped<AddSupplierDebtHandler>();
         services.AddScoped<AddSupplierPaymentHandler>();
         services.AddScoped<GetSupplierPaymentsHandler>();
+        services.AddScoped<UpdateSupplierHandler>();
+        services.AddScoped<DeleteSupplierHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

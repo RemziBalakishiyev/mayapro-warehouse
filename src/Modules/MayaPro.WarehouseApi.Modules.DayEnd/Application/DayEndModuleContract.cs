@@ -16,4 +16,7 @@ internal sealed class DayEndModuleContract(IDayEndDbContext db) : IDayEndModule
 
         return closing is null ? null : new ClosingSnapshot(closing.Date, closing.ActualCash);
     }
+
+    public async Task<bool> ClosingExistsAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+        await db.Closings.AsNoTracking().AnyAsync(c => c.Date == date, cancellationToken);
 }

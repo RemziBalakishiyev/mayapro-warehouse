@@ -10,4 +10,11 @@ public static class SupplierErrors
 
     public static readonly Error PaymentExceedsDebt =
         new("Suppliers.PaymentExceedsDebt", "Ödəniş borcdan çox ola bilməz");
+
+    /// <summary>
+    /// A supplier we still owe cannot be deleted. Code ends in <c>Conflict</c> so the shared Result→HTTP
+    /// convention maps it to 409.
+    /// </summary>
+    public static readonly Error HasDebtConflict =
+        new("Suppliers.HasDebtConflict", "Borcumuz olan təchizatçı silinə bilməz");
 }

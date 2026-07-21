@@ -185,6 +185,9 @@ public sealed class Product : Entity
     /// <summary>Manual stock correction by a signed delta. Never drops below zero.</summary>
     public void AdjustStock(int delta) => Quantity = Math.Max(0, Quantity + delta);
 
+    /// <summary>Returns reserved stock (a deleted or revised sale) — the inverse of <see cref="TryDecreaseStock"/>.</summary>
+    public void IncreaseStock(int quantity) => Quantity += quantity;
+
     /// <summary>
     /// Reserves stock for a sale. Fails with <see cref="ProductErrors.InsufficientStock"/> if the
     /// requested quantity exceeds what is on hand; otherwise decreases stock and succeeds.
@@ -205,6 +208,17 @@ public sealed class Product : Entity
     public void AddExpense(string name, decimal amount)
     {
         Expenses = ProductExpenses.Add(Expenses, name, amount);
+        RecalculateRealCost();
+    }
+
+    /// <summary>
+    /// Removes a previously-added batch expense amount from the matching named line (case-insensitive) and
+    /// recomputes the real cost — the inverse of <see cref="AddExpense"/>. Used when a product-linked expense
+    /// is deleted or revised. An unknown line is a no-op.
+    /// </summary>
+    public void RemoveExpense(string name, decimal amount)
+    {
+        Expenses = ProductExpenses.Remove(Expenses, name, amount);
         RecalculateRealCost();
     }
 

@@ -122,6 +122,57 @@ public sealed class ProductTests
         Assert.Equal(0, product.Quantity);
     }
 
+    [Fact]
+    public void IncreaseStock_Returns_Reserved_Units()
+    {
+        // A deleted/revised sale returns its quantity — the inverse of TryDecreaseStock.
+        Product product = CreateProduct(quantity: 6);
+
+        product.IncreaseStock(4);
+
+        Assert.Equal(10, product.Quantity);
+    }
+
+    [Fact]
+    public void RemoveExpense_Reverses_AddExpense_And_Lowers_Real_Cost_Back()
+    {
+        Product product = CreateProduct(purchasePrice: 10, quantity: 100, expenses: ProductExpenses.Empty);
+        product.AddExpense("Yol", 100); // 10 → 11.00
+
+        product.RemoveExpense("Yol", 100); // back to 10.00, line dropped
+
+        Assert.Equal(10m, product.RealCostPerUnit);
+        Assert.Empty(product.Expenses);
+    }
+
+    [Fact]
+    public void RemoveExpense_Partial_Keeps_The_Line_With_The_Remainder()
+    {
+        Product product = CreateProduct(
+            purchasePrice: 10,
+            quantity: 100,
+            expenses: [new("Yol", 100)]); // 10 + 100/100 = 11.00
+
+        product.RemoveExpense("yol", 40); // case-insensitive → 60 remains → 10.60
+
+        Assert.Equal(new ProductExpenseItem("Yol", 60m), Assert.Single(product.Expenses));
+        Assert.Equal(10.60m, product.RealCostPerUnit);
+    }
+
+    [Fact]
+    public void RemoveExpense_Unknown_Line_Is_A_No_Op()
+    {
+        Product product = CreateProduct(
+            purchasePrice: 10,
+            quantity: 100,
+            expenses: [new("Yol", 50)]);
+
+        product.RemoveExpense("Fəhlə", 30); // no matching line → unchanged
+
+        Assert.Equal(new ProductExpenseItem("Yol", 50m), Assert.Single(product.Expenses));
+        Assert.Equal(10.50m, product.RealCostPerUnit);
+    }
+
     private static Product CreateProduct(
         decimal purchasePrice = 10,
         int quantity = 10,

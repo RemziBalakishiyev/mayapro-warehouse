@@ -152,4 +152,69 @@ public sealed class CustomersApiTests : IAsyncLifetime
         Assert.True(history[0].Date <= history[1].Date);
         Assert.True(history[1].Date <= history[2].Date);
     }
+
+    [Fact]
+    public async Task Update_Customer_Changes_Details_And_Leaves_Debt_Untouched()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("Köhnə ad", debt: 40m);
+
+        HttpResponseMessage update = await client.PutAsJsonAsync(
+            $"/api/customers/{customer.Id}", new { name = "Yeni ad", phone = "0559998877", note = "VIP" });
+
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var after = await client.GetCustomerAsync(customer.Id);
+        Assert.Equal("Yeni ad", after.Name);
+        Assert.Equal(40m, after.Debt); // an edit never moves the balance
+    }
+
+    [Fact]
+    public async Task Delete_Customer_With_Debt_Returns_409_And_Keeps_The_Customer()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("Borclu, silinməz", debt: 75m);
+
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/customers/{customer.Id}");
+
+        Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
+        var error = (await delete.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Customers.HasDebtConflict", error.Code);
+
+        // Still there.
+        List<IntegrationTestHelpers.CustomerDto> all =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.CustomerDto>>("/api/customers"))!;
+        Assert.Contains(all, c => c.Id == customer.Id);
+    }
+
+    [Fact]
+    public async Task Delete_Debt_Free_Customer_Removes_The_Customer()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        // Opening debt then paid off to zero — leaves an adjustment + payment history to be removed with them.
+        var customer = await client.CreateCustomerAsync("Ödənilmiş, silinən", debt: 50m);
+        HttpResponseMessage pay = await client.PostAsJsonAsync(
+            $"/api/customers/{customer.Id}/payments", new { amount = 50m, note = (string?)null });
+        pay.EnsureSuccessStatusCode();
+
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/customers/{customer.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+
+        List<IntegrationTestHelpers.CustomerDto> all =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.CustomerDto>>("/api/customers"))!;
+        Assert.DoesNotContain(all, c => c.Id == customer.Id);
+    }
+
+    [Fact]
+    public async Task Seller_Cannot_Delete_Customer_Returns_403()
+    {
+        HttpClient owner = await _factory.AuthenticatedClientAsync();
+        var customer = await owner.CreateCustomerAsync("Satıcı silə bilməz", debt: 0m);
+
+        HttpClient seller = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.SellerPhone);
+        HttpResponseMessage delete = await seller.DeleteAsync($"/api/customers/{customer.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+    }
 }

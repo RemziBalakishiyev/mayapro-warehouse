@@ -1,5 +1,7 @@
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpense;
+using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.DeleteExpense;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenses;
+using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.UpdateExpense;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -33,5 +35,24 @@ internal static class ExpensesEndpoints
             })
             .RequireAuthorization(OwnerOrManager)
             .WithName("CreateExpense");
+
+        // Reverse-and-reapply edit: a product-linked expense re-runs the real-cost chain.
+        group.MapPut("/{id:guid}", async (
+                Guid id,
+                UpdateExpenseCommand command,
+                UpdateExpenseHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(command with { Id = id }, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("UpdateExpense");
+
+        // Deletes the expense and unwinds its product-cost effect.
+        group.MapDelete("/{id:guid}", async (
+                Guid id,
+                DeleteExpenseHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("DeleteExpense");
     }
 }

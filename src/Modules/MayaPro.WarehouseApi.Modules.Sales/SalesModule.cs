@@ -3,8 +3,10 @@ using MayaPro.WarehouseApi.Modules.Sales.Application;
 using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSaleById;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSales;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.UpdateSale;
 using MayaPro.WarehouseApi.Modules.Sales.Endpoints;
 using MayaPro.WarehouseApi.Modules.Sales.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -42,10 +44,13 @@ public sealed class SalesModule : IModule
         services.AddScoped<ISalesModule, SalesModuleContract>();
 
         services.AddScoped<IValidator<CreateSaleCommand>, CreateSaleValidator>();
+        services.AddScoped<IValidator<UpdateSaleCommand>, UpdateSaleValidator>();
 
         services.AddScoped<GetSalesHandler>();
         services.AddScoped<GetSaleByIdHandler>();
         services.AddScoped<CreateSaleHandler>();
+        services.AddScoped<UpdateSaleHandler>();
+        services.AddScoped<DeleteSaleHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

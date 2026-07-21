@@ -22,6 +22,16 @@ internal sealed class CustomersModuleContract(ICustomersDbContext db, IDateProvi
         return Result.Success();
     }
 
+    public async Task<Result> DecreaseDebtAsync(Guid customerId, decimal amount, CancellationToken cancellationToken = default)
+    {
+        Customer? customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken);
+        if (customer is null)
+            return Result.Failure(CustomerErrors.NotFound);
+
+        customer.ReverseDebt(amount);
+        return Result.Success();
+    }
+
     public async Task<decimal> GetTotalDebtAsync(CancellationToken cancellationToken = default) =>
         await db.Customers.AsNoTracking().SumAsync(c => c.Debt, cancellationToken);
 

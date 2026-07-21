@@ -333,4 +333,145 @@ public sealed class SalesApiTests : IAsyncLifetime
         Assert.Equal(0, emptyRange.Total);
         Assert.Empty(emptyRange.Items);
     }
+
+    [Fact]
+    public async Task Delete_Nonexistent_Sale_Returns_404()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.DeleteAsync($"/api/sales/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Sales.NotFound", error.Code);
+    }
+
+    [Fact]
+    public async Task Delete_Cash_Sale_Returns_Its_Stock()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("SALE-DEL-STOCK", quantity: 20, salePrice: 10m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id, quantity = 3, salePrice = 10m, discount = 0m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+        Assert.Equal(17, (await client.GetProductAsync(product.Id)).Quantity);
+
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/sales/{sale.Id}");
+
+        // The shared day may already be closed by the day-end tests — assert the right outcome either way.
+        var afterQty = (await client.GetProductAsync(product.Id)).Quantity;
+        if (delete.StatusCode == HttpStatusCode.OK)
+        {
+            Assert.Equal(20, afterQty); // reserved stock returned
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
+            var error = (await delete.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+            Assert.Equal("Sales.DayClosedConflict", error.Code);
+            Assert.Equal(17, afterQty); // guard held — nothing changed
+        }
+    }
+
+    [Fact]
+    public async Task Delete_Credit_Sale_Reduces_Customer_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("SALE-DEL-DEBT", quantity: 10, salePrice: 20m);
+        var customer = await client.CreateCustomerAsync("Nisyə, silinən satış", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id, quantity = 2, salePrice = 20m, discount = 5m,
+            paymentType = "Nisyə", customerId = customer.Id
+        });
+        Assert.Equal(35m, (await client.GetCustomerAsync(customer.Id)).Debt); // 20*2 - 5
+
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/sales/{sale.Id}");
+
+        decimal afterDebt = (await client.GetCustomerAsync(customer.Id)).Debt;
+        if (delete.StatusCode == HttpStatusCode.OK)
+            Assert.Equal(0m, afterDebt); // the credit was unwound
+        else
+        {
+            Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
+            Assert.Equal(35m, afterDebt); // guard held
+        }
+    }
+
+    [Fact]
+    public async Task Update_Sale_Applies_The_Stock_Difference()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("SALE-UPD-STOCK", quantity: 20, salePrice: 10m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id, quantity = 3, salePrice = 10m, discount = 0m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+        Assert.Equal(17, (await client.GetProductAsync(product.Id)).Quantity);
+
+        // Raise the quantity 3 → 5: reverse (+3) then reapply (−5) nets one more unit off stock.
+        HttpResponseMessage update = await client.PutAsJsonAsync($"/api/sales/{sale.Id}", new
+        {
+            productId = product.Id, quantity = 5, salePrice = 10m, discount = 0m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+
+        var afterQty = (await client.GetProductAsync(product.Id)).Quantity;
+        if (update.StatusCode == HttpStatusCode.OK)
+        {
+            Assert.Equal(15, afterQty); // 20 − 5
+            var detail = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+                $"/api/sales/{sale.Id}"))!;
+            Assert.Equal(5, detail.Quantity);
+            Assert.Equal(50m, detail.TotalAmount);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
+            var error = (await update.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+            Assert.Equal("Sales.DayClosedConflict", error.Code);
+            Assert.Equal(17, afterQty); // guard held
+        }
+    }
+
+    [Fact]
+    public async Task Update_Sale_Beyond_Available_Stock_Rolls_Back()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("SALE-UPD-OVER", quantity: 5, salePrice: 10m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id, quantity = 2, salePrice = 10m, discount = 0m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+        Assert.Equal(3, (await client.GetProductAsync(product.Id)).Quantity);
+
+        // Reversing returns 2 (→5 available), so 6 is still one beyond what exists → fail + rollback.
+        HttpResponseMessage update = await client.PutAsJsonAsync($"/api/sales/{sale.Id}", new
+        {
+            productId = product.Id, quantity = 6, salePrice = 10m, discount = 0m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+
+        // Either a closed day (409) or the stock shortfall (400) — in both cases nothing changes.
+        Assert.NotEqual(HttpStatusCode.OK, update.StatusCode);
+        Assert.Equal(3, (await client.GetProductAsync(product.Id)).Quantity); // rollback / guard
+        var still = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+            $"/api/sales/{sale.Id}"))!;
+        Assert.Equal(2, still.Quantity); // the sale kept its original quantity
+    }
+
+    private static async Task<IntegrationTestHelpers.SaleDto> CreateSaleAsync(HttpClient client, object body)
+    {
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", body);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+    }
 }

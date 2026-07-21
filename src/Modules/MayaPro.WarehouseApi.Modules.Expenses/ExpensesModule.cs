@@ -3,7 +3,9 @@ using MayaPro.WarehouseApi.Modules.Expenses.Application;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.Abstractions;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpense;
+using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.DeleteExpense;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenses;
+using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.UpdateExpense;
 using MayaPro.WarehouseApi.Modules.Expenses.Endpoints;
 using MayaPro.WarehouseApi.Modules.Expenses.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -41,9 +43,12 @@ public sealed class ExpensesModule : IModule
         services.AddScoped<IExpensesModule, ExpensesModuleContract>();
 
         services.AddScoped<IValidator<CreateExpenseCommand>, CreateExpenseValidator>();
+        services.AddScoped<IValidator<UpdateExpenseCommand>, UpdateExpenseValidator>();
 
         services.AddScoped<GetExpensesHandler>();
         services.AddScoped<CreateExpenseHandler>();
+        services.AddScoped<UpdateExpenseHandler>();
+        services.AddScoped<DeleteExpenseHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

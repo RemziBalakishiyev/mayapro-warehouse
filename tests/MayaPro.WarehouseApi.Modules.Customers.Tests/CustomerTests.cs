@@ -37,4 +37,39 @@ public sealed class CustomerTests
         Assert.Equal(CustomerErrors.PaymentExceedsDebt, result.Error);
         Assert.Equal(100m, customer.Debt);
     }
+
+    [Fact]
+    public void ReverseDebt_Unwinds_A_Credit_Sale_By_Its_Net_Amount()
+    {
+        // A deleted credit sale returns its net to the customer's balance (the inverse of the sale).
+        Customer customer = Customer.Create("Müştəri", debt: 100);
+
+        customer.ReverseDebt(35);
+
+        Assert.Equal(65m, customer.Debt);
+    }
+
+    [Fact]
+    public void ReverseDebt_Floors_At_Zero_When_The_Debt_Was_Already_Paid_Down()
+    {
+        // The sale's debt was since paid off; reversing it must never push the customer into credit.
+        Customer customer = Customer.Create("Müştəri", debt: 10);
+
+        customer.ReverseDebt(35);
+
+        Assert.Equal(0m, customer.Debt);
+    }
+
+    [Fact]
+    public void Update_Changes_Details_But_Not_Debt()
+    {
+        Customer customer = Customer.Create("Köhnə ad", phone: "050", note: "köhnə", debt: 100);
+
+        customer.Update("Yeni ad", "055", "yeni qeyd");
+
+        Assert.Equal("Yeni ad", customer.Name);
+        Assert.Equal("055", customer.Phone);
+        Assert.Equal("yeni qeyd", customer.Note);
+        Assert.Equal(100m, customer.Debt); // untouched
+    }
 }

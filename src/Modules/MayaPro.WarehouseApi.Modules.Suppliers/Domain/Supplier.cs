@@ -36,6 +36,15 @@ public sealed class Supplier : Entity
         string name, string? contactName = null, string? phone = null, string? note = null, decimal debt = 0) =>
         new(name, contactName, phone, note, debt);
 
+    /// <summary>Updates the editable supplier details (debt is never touched here).</summary>
+    public void Update(string name, string? contactName, string? phone, string? note)
+    {
+        Name = name;
+        ContactName = contactName;
+        Phone = phone;
+        Note = note;
+    }
+
     /// <summary>Adds to what we owe (a purchase on credit).</summary>
     public void IncreaseDebt(decimal amount) => Debt += amount;
 

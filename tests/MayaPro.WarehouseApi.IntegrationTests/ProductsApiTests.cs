@@ -75,6 +75,36 @@ public sealed class ProductsApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
     }
 
+    [Fact]
+    public async Task Delete_Product_With_Stock_Is_Allowed_And_Removes_It()
+    {
+        HttpClient client = await AuthenticatedClientAsync(OwnerPhone);
+        HttpResponseMessage create = await client.PostAsJsonAsync(
+            "/api/products", NewProductBody("Silinən mal", "TSTPRD-DELETE", quantity: 8));
+        ProductDto created = (await create.Content.ReadFromJsonAsync<ProductDto>())!;
+
+        // Stock > 0 does not block deletion — the frontend only warns; the backend allows it.
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/products/{created.Id}");
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+
+        HttpResponseMessage afterGet = await client.GetAsync($"/api/products/{created.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, afterGet.StatusCode);
+    }
+
+    [Fact]
+    public async Task Seller_Cannot_Delete_Product_Returns_403()
+    {
+        HttpClient owner = await AuthenticatedClientAsync(OwnerPhone);
+        HttpResponseMessage create = await owner.PostAsJsonAsync(
+            "/api/products", NewProductBody("Satıcı silə bilməz", "TSTPRD-DEL-403", quantity: 3));
+        ProductDto created = (await create.Content.ReadFromJsonAsync<ProductDto>())!;
+
+        HttpClient seller = await AuthenticatedClientAsync(SellerPhone);
+        HttpResponseMessage delete = await seller.DeleteAsync($"/api/products/{created.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+    }
+
     private async Task<HttpClient> AuthenticatedClientAsync(string phone)
     {
         HttpClient client = _factory.CreateClient();

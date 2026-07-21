@@ -29,6 +29,19 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         return Result.Success(new ProductStockSnapshot(product.Name, product.Category, product.RealCostPerUnit));
     }
 
+    public async Task<Result> IncreaseStockAsync(
+        Guid productId,
+        int quantity,
+        CancellationToken cancellationToken = default)
+    {
+        Product? product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null)
+            return Result.Failure(ProductErrors.NotFound);
+
+        product.IncreaseStock(quantity);
+        return Result.Success();
+    }
+
     public async Task<Result<ProductSnapshot>> GetSnapshotAsync(
         Guid productId,
         CancellationToken cancellationToken = default)
@@ -71,6 +84,20 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
             return Result.Failure(ProductErrors.NotFound);
 
         product.AddExpense(category, amount);
+        return Result.Success();
+    }
+
+    public async Task<Result> RemoveExpenseFromProductAsync(
+        Guid productId,
+        string category,
+        decimal amount,
+        CancellationToken cancellationToken = default)
+    {
+        Product? product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null)
+            return Result.Failure(ProductErrors.NotFound);
+
+        product.RemoveExpense(category, amount);
         return Result.Success();
     }
 

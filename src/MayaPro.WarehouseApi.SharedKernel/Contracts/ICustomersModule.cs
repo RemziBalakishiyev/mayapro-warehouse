@@ -16,6 +16,15 @@ public interface ICustomersModule
     Task<Result> IncreaseDebtAsync(Guid customerId, decimal amount, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reduces a customer's outstanding debt by <paramref name="amount"/> when a credit sale is deleted or
+    /// revised — the inverse of the credit-sale <see cref="IncreaseDebtAsync"/>. Unlike a payment, this never
+    /// fails on an over-reduction: if the debt has since been paid down, it simply floors at zero (the
+    /// customer is never pushed into credit). Fails only if the customer does not exist. The change is made
+    /// on the shared context but <b>not</b> saved — the caller commits it inside its own unit of work.
+    /// </summary>
+    Task<Result> DecreaseDebtAsync(Guid customerId, decimal amount, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Sums the outstanding debt across all customers. Used by the read-only Reports module for the
     /// receivables figure on the dashboard.
     /// </summary>
