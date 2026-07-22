@@ -403,6 +403,25 @@ public sealed class SalesApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Seller_Cannot_Delete_Sale_Returns_403()
+    {
+        // The owner records a sale; the seller may create sales but not delete them (OwnerOrManager policy).
+        HttpClient owner = await _factory.AuthenticatedClientAsync();
+        var product = await owner.CreateProductAsync("SALE-DEL-403", quantity: 5, salePrice: 10m);
+        var sale = await CreateSaleAsync(owner, new
+        {
+            productId = product.Id, quantity = 1, salePrice = 10m, discount = 0m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+
+        HttpClient seller = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.SellerPhone);
+        HttpResponseMessage delete = await seller.DeleteAsync($"/api/sales/{sale.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+        Assert.Equal(4, (await owner.GetProductAsync(product.Id)).Quantity); // nothing was unwound
+    }
+
+    [Fact]
     public async Task Update_Sale_Applies_The_Stock_Difference()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
