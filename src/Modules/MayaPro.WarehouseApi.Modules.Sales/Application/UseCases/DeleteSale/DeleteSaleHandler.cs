@@ -10,28 +10,23 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 /// Deletes a sale, unwinding its business chain in one transaction — the reverse of <c>CreateSale</c>:
 /// ① a catalogued sale returns its reserved stock (Products contract) ② a credit sale reduces the
 /// customer's debt, flooring at zero if it was already paid down (Customers contract) ③ the sale row is
-/// removed ④ the delete is logged. Guarded by the closed-day rule: a sale whose day is already closed
-/// cannot be deleted. Stock/debt reversals are best-effort — if the product or customer has since been
-/// deleted there is nothing to unwind, and the sale must still be deletable.
+/// removed ④ the delete is logged. Stock/debt reversals are best-effort — if the product or customer has
+/// since been deleted there is nothing to unwind, and the sale must still be deletable (including nisyə
+/// satışlar, borc qismən ödənilibsə belə — <see cref="ICustomersModule.DecreaseDebtAsync"/> floors at zero).
 /// </summary>
 public sealed class DeleteSaleHandler(
     ISalesDbContext db,
     IUnitOfWork unitOfWork,
     IProductsModule products,
     ICustomersModule customers,
-    IDayEndModule dayEnd,
     IActivityLogger activityLogger,
-    ICurrentUser currentUser,
-    IDateProvider dateProvider)
+    ICurrentUser currentUser)
 {
     public async Task<Result> Handle(Guid id, CancellationToken ct)
     {
         Sale? sale = await db.Sales.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (sale is null)
             return Result.Failure(SaleErrors.NotFound);
-
-        if (await dayEnd.ClosingExistsAsync(dateProvider.ToLocalDate(sale.Date), ct))
-            return Result.Failure(SaleErrors.DayClosedConflict);
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 

@@ -129,7 +129,6 @@ public sealed class ExportSalesPdfHandler(
                 columns.RelativeColumn(2.2f); // mal
                 columns.RelativeColumn(0.6f); // say
                 columns.RelativeColumn(0.9f); // qiymət
-                columns.RelativeColumn(0.9f); // endirim
                 columns.RelativeColumn(0.9f); // yekun
                 columns.RelativeColumn(0.9f); // ödəniş
                 columns.RelativeColumn(0.9f); // qazanc
@@ -141,7 +140,6 @@ public sealed class ExportSalesPdfHandler(
                 header.Cell().Element(HeaderCell).Text("Mal");
                 header.Cell().Element(HeaderCell).AlignRight().Text("Say");
                 header.Cell().Element(HeaderCell).AlignRight().Text("Qiymət");
-                header.Cell().Element(HeaderCell).AlignRight().Text("Endirim");
                 header.Cell().Element(HeaderCell).AlignRight().Text("Yekun");
                 header.Cell().Element(HeaderCell).Text("Ödəniş");
                 header.Cell().Element(HeaderCell).AlignRight().Text("Qazanc");
@@ -154,7 +152,6 @@ public sealed class ExportSalesPdfHandler(
                 table.Cell().Element(BodyCell).Text(productLabel);
                 table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString());
                 table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.UnitPrice));
-                table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.Discount));
                 table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.TotalAmount));
                 table.Cell().Element(BodyCell).Text(row.PaymentType);
                 table.Cell().Element(BodyCell).AlignRight().Text(

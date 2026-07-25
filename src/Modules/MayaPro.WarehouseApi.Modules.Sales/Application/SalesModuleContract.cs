@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 using MayaPro.WarehouseApi.Modules.Sales.Domain;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
@@ -11,7 +12,10 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application;
 /// reports. All day boundaries are the business time zone's (via <see cref="IDateProvider"/>), so a sale
 /// just after Baku midnight belongs to the Baku day even though it is still "yesterday" in UTC.
 /// </summary>
-internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider dateProvider) : ISalesModule
+internal sealed class SalesModuleContract(
+    ISalesDbContext db,
+    IDateProvider dateProvider,
+    DeleteSaleHandler deleteSale) : ISalesModule
 {
     public async Task<SalesDayTotals> GetDayTotalsAsync(DateOnly date, CancellationToken cancellationToken = default)
     {
@@ -53,7 +57,6 @@ internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider date
                 s.ProductName,
                 s.Quantity,
                 s.UnitPrice,
-                s.Discount,
                 s.IsManual))
             .ToList();
     }
@@ -120,7 +123,22 @@ internal sealed class SalesModuleContract(ISalesDbContext db, IDateProvider date
             .AsNoTracking()
             .Where(s => s.CustomerId == customerId)
             .OrderBy(s => s.Date)
-            .Select(s => new CustomerCreditSale(s.Date, s.ProductName, s.Quantity, s.TotalAmount))
+            .Select(s => new CustomerCreditSale(s.Id, s.Date, s.ProductName, s.Quantity, s.TotalAmount))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<Result> DeleteCreditSaleAsync(
+        Guid saleId,
+        Guid customerId,
+        CancellationToken cancellationToken = default)
+    {
+        Sale? sale = await db.Sales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == saleId, cancellationToken);
+
+        if (sale is null || sale.CustomerId != customerId || sale.PaymentType != PaymentType.Credit)
+            return Result.Failure(SaleErrors.NotFound);
+
+        return await deleteSale.Handle(saleId, cancellationToken);
     }
 }

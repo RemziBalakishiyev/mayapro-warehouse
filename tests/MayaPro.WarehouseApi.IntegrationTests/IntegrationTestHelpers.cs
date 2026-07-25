@@ -133,7 +133,8 @@ internal static class IntegrationTestHelpers
 
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
 
-    internal sealed record CustomerHistoryEntryDto(DateTime Date, string Type, decimal Amount, string? Note);
+    internal sealed record CustomerHistoryEntryDto(
+        DateTime Date, string Type, decimal Amount, string? Note, Guid? SaleId);
 
     internal sealed record SupplierPaymentDto(Guid Id, Guid SupplierId, decimal Amount);
 

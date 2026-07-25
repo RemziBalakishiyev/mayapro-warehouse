@@ -61,7 +61,8 @@ internal static class SalesEndpoints
             .RequireAuthorization(OwnerOrManager)
             .WithName("UpdateSale");
 
-        // Deletes the sale and unwinds its chain (stock returns, credit debt reduces).
+        // Deletes the sale and unwinds its chain (stock returns, credit debt reduces). No closed-day guard —
+        // nisyə satışlar borc qalsın/ödənilibsə belə silinə bilər; redaktə hələ gün bağlanışına tabedir.
         group.MapDelete("/{id:guid}", async (
                 Guid id,
                 DeleteSaleHandler handler,

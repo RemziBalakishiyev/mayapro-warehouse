@@ -103,7 +103,6 @@ public sealed class ReportsApiTests : IAsyncLifetime
             productName = "Sərbəst mal",
             quantity = 1,
             salePrice = 77m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -183,7 +182,6 @@ public sealed class ReportsApiTests : IAsyncLifetime
             productId,
             quantity,
             salePrice = 10m,
-            discount = 0m,
             paymentType,
             customerId = (Guid?)null
         });
@@ -194,7 +192,6 @@ public sealed class ReportsApiTests : IAsyncLifetime
             productId,
             quantity,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nisyə",
             customerId = (Guid?)customerId
         });

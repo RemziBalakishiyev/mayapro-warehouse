@@ -4,6 +4,7 @@ using MayaPro.WarehouseApi.Modules.Customers.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.AddCustomerPayment;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.CreateCustomer;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomer;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomerCredit;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
@@ -58,6 +59,7 @@ public sealed class CustomersModule : IModule
         services.AddScoped<AddCustomerPaymentHandler>();
         services.AddScoped<UpdateCustomerHandler>();
         services.AddScoped<DeleteCustomerHandler>();
+        services.AddScoped<DeleteCustomerCreditHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

@@ -76,7 +76,6 @@ public sealed class DayEndApiTests : IAsyncLifetime
             productId,
             quantity,
             salePrice = 10m,
-            discount = 0m,
             paymentType,
             customerId
         });

@@ -8,14 +8,13 @@ public sealed class SaleTests
     [Fact]
     public void Create_Computes_Subtotal_Total_And_Profit()
     {
-        // (20 − 12) × 3 − 5 = 19; subtotal 60; total 55.
+        // (20 − 12) × 3 = 24; subtotal/total 60.
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(),
             productName: "Mal",
             category: "Şalvar",
             quantity: 3,
             unitPrice: 20m,
-            discount: 5m,
             costPerUnit: 12m,
             paymentType: PaymentType.Cash,
             customerId: null,
@@ -23,8 +22,8 @@ public sealed class SaleTests
             soldByName: "Satıcı");
 
         Assert.Equal(60m, sale.Subtotal);
-        Assert.Equal(55m, sale.TotalAmount);
-        Assert.Equal(19m, sale.Profit);
+        Assert.Equal(60m, sale.TotalAmount);
+        Assert.Equal(24m, sale.Profit);
         Assert.Equal("Şalvar", sale.Category);
         Assert.False(sale.IsManual);
     }
@@ -38,7 +37,6 @@ public sealed class SaleTests
             category: "Test",
             quantity: 1,
             unitPrice: 10m,
-            discount: 0m,
             costPerUnit: 5m,
             paymentType: PaymentType.Cash,
             customerId: Guid.NewGuid(), // provided, but a cash sale keeps no customer
@@ -57,7 +55,6 @@ public sealed class SaleTests
             category: null,
             quantity: 2,
             unitPrice: 15m,
-            discount: 0m,
             costPerUnit: null,
             paymentType: PaymentType.Cash,
             customerId: null,
@@ -76,13 +73,12 @@ public sealed class SaleTests
     [Fact]
     public void CreateManual_With_Cost_Computes_Profit_Like_A_Normal_Sale()
     {
-        // (20 − 12) × 3 − 5 = 19 — same formula as a catalogued sale once the cost is known.
+        // (20 − 12) × 3 = 24 — same formula as a catalogued sale once the cost is known.
         Sale sale = Sale.CreateManual(
             productName: "Əl ilə mal",
             category: "Aksesuar",
             quantity: 3,
             unitPrice: 20m,
-            discount: 5m,
             costPerUnit: 12m,
             paymentType: PaymentType.Cash,
             customerId: null,
@@ -92,8 +88,8 @@ public sealed class SaleTests
         Assert.True(sale.IsManual);
         Assert.Null(sale.ProductId);
         Assert.Equal(12m, sale.CostPerUnit);
-        Assert.Equal(19m, sale.Profit);
-        Assert.Equal(55m, sale.TotalAmount);
+        Assert.Equal(24m, sale.Profit);
+        Assert.Equal(60m, sale.TotalAmount);
         Assert.Equal("Aksesuar", sale.Category);
     }
 
@@ -103,10 +99,10 @@ public sealed class SaleTests
         Guid customerId = Guid.NewGuid();
 
         Sale credit = Sale.CreateManual(
-            productName: "Əl ilə mal", category: null, quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
+            productName: "Əl ilə mal", category: null, quantity: 1, unitPrice: 10m, costPerUnit: null,
             paymentType: PaymentType.Credit, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
         Sale cash = Sale.CreateManual(
-            productName: "Əl ilə mal", category: null, quantity: 1, unitPrice: 10m, discount: 0m, costPerUnit: null,
+            productName: "Əl ilə mal", category: null, quantity: 1, unitPrice: 10m, costPerUnit: null,
             paymentType: PaymentType.Cash, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
 
         Assert.Equal(customerId, credit.CustomerId);
@@ -119,24 +115,24 @@ public sealed class SaleTests
         Guid seller = Guid.NewGuid();
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(), productName: "Köhnə", category: "Köhnə kateqoriya", quantity: 1,
-            unitPrice: 10m, discount: 0m, costPerUnit: 5m, paymentType: PaymentType.Cash,
+            unitPrice: 10m, costPerUnit: 5m, paymentType: PaymentType.Cash,
             customerId: null, soldByUserId: seller, soldByName: "Satıcı");
 
         Guid originalId = sale.Id;
         DateTime originalDate = sale.Date;
         Guid newProductId = Guid.NewGuid();
 
-        // New values: (20 − 12) × 3 − 5 = 19; subtotal 60; total 55.
+        // New values: (20 − 12) × 3 = 24; subtotal/total 60.
         sale.ReviseCatalogued(
-            newProductId, "Yeni", "Yeni kateqoriya", quantity: 3, unitPrice: 20m, discount: 5m,
+            newProductId, "Yeni", "Yeni kateqoriya", quantity: 3, unitPrice: 20m,
             costPerUnit: 12m, paymentType: PaymentType.Cash, customerId: null);
 
         Assert.Equal(newProductId, sale.ProductId);
         Assert.Equal("Yeni", sale.ProductName);
         Assert.Equal("Yeni kateqoriya", sale.Category);
         Assert.Equal(60m, sale.Subtotal);
-        Assert.Equal(55m, sale.TotalAmount);
-        Assert.Equal(19m, sale.Profit);
+        Assert.Equal(60m, sale.TotalAmount);
+        Assert.Equal(24m, sale.Profit);
         Assert.False(sale.IsManual);
         // Identity, sale date and seller are never rewritten by an update.
         Assert.Equal(originalId, sale.Id);
@@ -149,13 +145,13 @@ public sealed class SaleTests
     {
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(), productName: "Köhnə", category: "K", quantity: 1,
-            unitPrice: 10m, discount: 0m, costPerUnit: 5m, paymentType: PaymentType.Credit,
+            unitPrice: 10m, costPerUnit: 5m, paymentType: PaymentType.Credit,
             customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı");
 
         var items = new List<SaleExpenseItem> { new("Yol", 5m) };
         // Cash → the supplied customer is dropped; no cost → profit stays unknown.
         sale.ReviseManual(
-            "Əl ilə", category: null, quantity: 2, unitPrice: 15m, discount: 0m, costPerUnit: null,
+            "Əl ilə", category: null, quantity: 2, unitPrice: 15m, costPerUnit: null,
             paymentType: PaymentType.Cash, customerId: Guid.NewGuid(), expenseItems: items);
 
         Assert.True(sale.IsManual);

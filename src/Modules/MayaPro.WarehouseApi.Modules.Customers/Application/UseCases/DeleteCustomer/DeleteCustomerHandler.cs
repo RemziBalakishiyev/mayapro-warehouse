@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomer;
 
 /// <summary>
-/// Deletes a customer along with their payment and opening-balance history, in one transaction. A customer
-/// who still owes money cannot be deleted (→ 409). Past sales keep their <c>CustomerId</c> — the name lookup
-/// simply returns nothing, which the frontend renders as "Silinmiş müştəri".
+/// Deletes a customer along with their payment and opening-balance history, in one transaction — borc qalsa
+/// belə. Past sales keep their <c>CustomerId</c> — the name lookup simply returns nothing, which the frontend
+/// renders as "Silinmiş müştəri".
 /// </summary>
 public sealed class DeleteCustomerHandler(
     ICustomersDbContext db,
@@ -22,9 +22,6 @@ public sealed class DeleteCustomerHandler(
         Customer? customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
         if (customer is null)
             return Result.Failure(CustomerErrors.NotFound);
-
-        if (customer.Debt > 0m)
-            return Result.Failure(CustomerErrors.HasDebtConflict);
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 

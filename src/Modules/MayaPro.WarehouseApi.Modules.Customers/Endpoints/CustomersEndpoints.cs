@@ -1,6 +1,7 @@
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.AddCustomerPayment;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.CreateCustomer;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomer;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomerCredit;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
@@ -65,6 +66,16 @@ internal static class CustomersEndpoints
             })
             .WithName("AddCustomerPayment");
 
+        // Nisyə borclar ekranı: bir kredit satış sətirini silir (stok/borc zənciri geri sarır).
+        group.MapDelete("/{id:guid}/credits/{saleId:guid}", async (
+                Guid id,
+                Guid saleId,
+                DeleteCustomerCreditHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, saleId, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("DeleteCustomerCredit");
+
         group.MapPut("/{id:guid}", async (
                 Guid id,
                 UpdateCustomerCommand command,
@@ -74,7 +85,7 @@ internal static class CustomersEndpoints
             .RequireAuthorization(OwnerOrManager)
             .WithName("UpdateCustomer");
 
-        // A customer with outstanding debt cannot be deleted (→ 409); their history is removed with them.
+        // Deletes the customer and their payment/opening-balance history (borc qalsa belə).
         group.MapDelete("/{id:guid}", async (
                 Guid id,
                 DeleteCustomerHandler handler,

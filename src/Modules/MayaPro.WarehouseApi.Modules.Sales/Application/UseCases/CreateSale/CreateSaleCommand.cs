@@ -22,7 +22,6 @@ public sealed record CreateSaleCommand(
     Guid? ProductId,
     int Quantity,
     decimal SalePrice,
-    decimal Discount,
     string PaymentType,
     Guid? CustomerId,
     string? Note,

@@ -1,3 +1,5 @@
+using MayaPro.WarehouseApi.SharedKernel.Application;
+
 namespace MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 /// <summary>The Sales module's public surface for other modules — day totals for day-end and rows for reports.</summary>
@@ -38,6 +40,16 @@ public interface ISalesModule
     Task<IReadOnlyList<CustomerCreditSale>> GetCreditSalesByCustomerAsync(
         Guid customerId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a credit (Nisyə) sale that belongs to <paramref name="customerId"/> — the same business chain as
+    /// deleting a sale (stock returns, debt unwinds), exposed for the Customers module's debt UI. Fails if the
+    /// sale is missing, not credit, or belongs to another customer.
+    /// </summary>
+    Task<Result> DeleteCreditSaleAsync(
+        Guid saleId,
+        Guid customerId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>A day's net sales split by payment type.</summary>
@@ -65,7 +77,7 @@ public sealed record RecentSaleInfo(
 public sealed record CustomerLastPurchase(Guid CustomerId, DateTime Date);
 
 /// <summary>A single credit (Nisyə) sale for a customer's debt history: when, what, and the net amount owed.</summary>
-public sealed record CustomerCreditSale(DateTime Date, string ProductName, int Quantity, decimal TotalAmount);
+public sealed record CustomerCreditSale(Guid Id, DateTime Date, string ProductName, int Quantity, decimal TotalAmount);
 
 /// <summary>
 /// A single sale as seen by reports: date, net amount, profit, payment code and product line.
@@ -82,5 +94,4 @@ public sealed record SalesReportRow(
     string ProductName,
     int Quantity,
     decimal UnitPrice,
-    decimal Discount,
     bool IsManual);

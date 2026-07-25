@@ -41,7 +41,7 @@ public sealed class UpdateSaleHandler(
 
         // Validated above, so this always succeeds.
         PaymentTypeCode.TryParse(command.PaymentType, out PaymentType paymentType);
-        decimal net = command.SalePrice * command.Quantity - command.Discount;
+        decimal total = command.SalePrice * command.Quantity;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
@@ -61,7 +61,7 @@ public sealed class UpdateSaleHandler(
 
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -72,7 +72,6 @@ public sealed class UpdateSaleHandler(
                 stock.Value.Category,
                 command.Quantity,
                 command.SalePrice,
-                command.Discount,
                 stock.Value.RealCostPerUnit,
                 paymentType,
                 command.CustomerId);
@@ -81,7 +80,7 @@ public sealed class UpdateSaleHandler(
         {
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -95,7 +94,6 @@ public sealed class UpdateSaleHandler(
                 command.Category,
                 command.Quantity,
                 command.SalePrice,
-                command.Discount,
                 command.CostPerUnit,
                 paymentType,
                 command.CustomerId,

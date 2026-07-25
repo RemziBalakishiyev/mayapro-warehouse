@@ -33,10 +33,6 @@ public sealed class UnitOfWork(
         }
         catch
         {
-            // Something failed between opening the connection and handing back a disposable wrapper — the
-            // caller never gets a transaction to dispose, so unwind here: kill the dangling transaction and,
-            // if we were the ones who opened the connection, hand it straight back to the pool. Otherwise a
-            // transient begin/enlist failure would pin this pooled connection until the scope ends.
             if (transaction is not null)
                 await transaction.DisposeAsync();
             if (openedHere && connection.State == ConnectionState.Open)

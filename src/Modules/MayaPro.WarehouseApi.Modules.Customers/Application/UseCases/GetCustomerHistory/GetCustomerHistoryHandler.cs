@@ -30,13 +30,13 @@ public sealed class GetCustomerHistoryHandler(ICustomersDbContext db, ISalesModu
         var entries = new List<CustomerHistoryEntryDto>(adjustments.Count + payments.Count + creditSales.Count);
 
         entries.AddRange(adjustments.Select(a => new CustomerHistoryEntryDto(
-            a.Date, CustomerHistoryEntryType.InitialDebt, a.Amount, a.Note)));
+            a.Date, CustomerHistoryEntryType.InitialDebt, a.Amount, a.Note, SaleId: null)));
 
         entries.AddRange(creditSales.Select(s => new CustomerHistoryEntryDto(
-            s.Date, CustomerHistoryEntryType.Sale, s.TotalAmount, $"{s.ProductName} × {s.Quantity}")));
+            s.Date, CustomerHistoryEntryType.Sale, s.TotalAmount, $"{s.ProductName} × {s.Quantity}", s.Id)));
 
         entries.AddRange(payments.Select(p => new CustomerHistoryEntryDto(
-            p.Date, CustomerHistoryEntryType.Payment, p.Amount, p.Note)));
+            p.Date, CustomerHistoryEntryType.Payment, p.Amount, p.Note, SaleId: null)));
 
         return entries.OrderBy(e => e.Date).ToList();
     }

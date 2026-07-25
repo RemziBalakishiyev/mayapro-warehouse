@@ -109,7 +109,6 @@ export interface CreateSaleInput {
   productId: string;
   quantity: number;
   salePrice: number;
-  discount: number;
   paymentType: PaymentType;
   customerId: string | null;
   note?: string;
@@ -134,9 +133,7 @@ export const saleHandlers = {
 
     const employeeId = useAuthStore.getState().user?.id ?? "emp_1";
     const subtotal = input.salePrice * qty;
-    const discount = Math.max(0, input.discount);
-    const net = Math.max(0, subtotal - discount);
-    const profit = net - product.realCostPerUnit * qty;
+    const profit = subtotal - product.realCostPerUnit * qty;
     const isCredit = input.paymentType === "Nisyə";
 
     const sale: Sale = {
@@ -147,8 +144,7 @@ export const saleHandlers = {
       quantity: qty,
       salePrice: input.salePrice,
       subtotal,
-      discount,
-      totalAmount: net,
+      totalAmount: subtotal,
       paymentType: input.paymentType,
       customerId: isCredit ? input.customerId : null,
       costPerUnit: product.realCostPerUnit,
@@ -164,13 +160,13 @@ export const saleHandlers = {
       updatedAt: todayISO(),
     });
 
-    // 3) Nisyə → müştəri borcu yekun (endirimdən sonrakı) məbləğ qədər artır
+    // 3) Nisyə → müştəri borcu yekun məbləğ qədər artır
     if (isCredit && sale.customerId) {
       const c = await db.customers.get(sale.customerId);
       if (c) {
         await db.customers.update(c.id, {
-          totalDebt: c.totalDebt + net,
-          remainingDebt: c.remainingDebt + net,
+          totalDebt: c.totalDebt + subtotal,
+          remainingDebt: c.remainingDebt + subtotal,
           lastPurchaseDate: todayISO(),
         });
       }
@@ -179,17 +175,11 @@ export const saleHandlers = {
     // 4) Satış yazılır
     await db.sales.create(sale);
 
-    // 5) Activity log (endirim varsa ayrıca qeyd)
+    // 5) Activity log
     await logActivity(
       isCredit ? "Nisyə satış etdi" : "Satış etdi",
-      `${product.name} × ${qty} — ${fmtMoney(net)}`,
+      `${product.name} × ${qty} — ${fmtMoney(subtotal)}`,
     );
-    if (discount > 0) {
-      await logActivity(
-        "Endirim etdi",
-        `${product.name} — ${fmtMoney(discount)} endirim`,
-      );
-    }
 
     return sale;
   },

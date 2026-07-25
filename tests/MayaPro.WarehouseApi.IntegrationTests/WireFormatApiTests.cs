@@ -180,7 +180,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             productName = "Sərbəst mal",
             quantity = 2,
             salePrice = 12.5m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -211,7 +210,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             productName = "Sərbəst maya bilinən",
             quantity = 2,
             salePrice = 20m,
-            discount = 0m,
             costPerUnit = 12m,   // cost known → profit computes: (20-12)*2 = 16
             paymentType = "Nağd",
             customerId = (Guid?)null
@@ -242,7 +240,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             productName = "Paged wire",
             quantity = 1,
             salePrice = 5m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -274,7 +271,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 1,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -316,7 +312,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             category = "Aksesuar",
             quantity = 1,
             salePrice = 8m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -341,7 +336,6 @@ public sealed class WireFormatApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 1,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });

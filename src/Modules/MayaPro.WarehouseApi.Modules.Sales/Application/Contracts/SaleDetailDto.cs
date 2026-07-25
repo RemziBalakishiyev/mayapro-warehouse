@@ -19,7 +19,6 @@ public sealed record SaleDetailDto(
     int Quantity,
     decimal SalePrice,
     decimal Subtotal,
-    decimal Discount,
     decimal TotalAmount,
     decimal? CostPerUnit,
     decimal? Profit,

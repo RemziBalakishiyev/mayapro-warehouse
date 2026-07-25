@@ -66,10 +66,9 @@ export interface Sale {
   category: string | null;
   quantity: number;
   salePrice: number;
-  /** Endirimdən əvvəlki cəm (salePrice × quantity) */
+  /** Cəm (salePrice × quantity) */
   subtotal: number;
-  discount: number;
-  /** Endirimdən sonrakı yekun məbləğ (subtotal − discount) */
+  /** Yekun məbləğ (salePrice × quantity) */
   totalAmount: number;
   paymentType: PaymentType;
   customerId: string | null;
@@ -127,6 +126,8 @@ export interface Customer {
  * - CustomerDto cavabına `initialDebt` sahəsi əlavə olundu.
  * - Yeni GET /api/customers/{id}/history — müştərinin TAM borc tarixçəsi (xronoloji):
  *   ilkin borc + nisyə satışlar + ödənişlər. Köhnə GET /api/customers/{id}/payments toxunulmadı.
+ * - History-də type === "sale" sətirlərində `saleId` var — nisyə borc sətirini silmək üçün
+ *   DELETE /api/customers/{customerId}/credits/{saleId} (Owner/Manager).
  */
 export interface CustomerHistoryEntry {
   date: string;
@@ -134,6 +135,8 @@ export interface CustomerHistoryEntry {
   amount: number;
   /** Satışda mal adı (× miqdar); ilkin borc / ödənişdə qeyd mətni */
   note: string | null;
+  /** Yalnız type === "sale" olduqda; nisyə sətirini silmək üçün DELETE /api/customers/{customerId}/credits/{saleId} */
+  saleId: string | null;
 }
 
 export interface Supplier {

@@ -10,7 +10,7 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 /// <summary>
 /// The sales chain — the heart of the system — in one transaction across modules:
 /// ① validate ② begin transaction ③ decrease stock (Products contract) ④ if credit, increase the
-/// customer's debt by the net amount (Customers contract) ⑤ write the sale with a cost snapshot
+/// customer's debt by the total amount (Customers contract) ⑤ write the sale with a cost snapshot
 /// ⑥ log the activity ⑦ save every context and commit. Any failure returns before the commit, so the
 /// shared transaction rolls back and stock/debt stay untouched.
 /// </summary>
@@ -32,7 +32,7 @@ public sealed class CreateSaleHandler(
         // Validated above, so this always succeeds.
         PaymentTypeCode.TryParse(command.PaymentType, out PaymentType paymentType);
 
-        decimal net = command.SalePrice * command.Quantity - command.Discount;
+        decimal total = command.SalePrice * command.Quantity;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
@@ -46,10 +46,10 @@ public sealed class CreateSaleHandler(
             if (stock.IsFailure)
                 return Result.Failure<SaleDto>(stock.Error);
 
-            // ④ Credit sale → increase the customer's debt by the net (post-discount) amount.
+            // ④ Credit sale → increase the customer's debt by the sale total.
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -60,7 +60,6 @@ public sealed class CreateSaleHandler(
                 stock.Value.Category,
                 command.Quantity,
                 command.SalePrice,
-                command.Discount,
                 stock.Value.RealCostPerUnit,
                 paymentType,
                 command.CustomerId,
@@ -72,7 +71,7 @@ public sealed class CreateSaleHandler(
             // ④ Credit still increases the customer's debt — the money is just as real as a catalogued sale.
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, net, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -87,7 +86,6 @@ public sealed class CreateSaleHandler(
                 command.Category,
                 command.Quantity,
                 command.SalePrice,
-                command.Discount,
                 command.CostPerUnit,
                 paymentType,
                 command.CustomerId,
@@ -99,12 +97,11 @@ public sealed class CreateSaleHandler(
         // ⑤ Record the sale.
         db.Sales.Add(sale);
 
-        // ⑥ Activity log (note the discount if any, and flag free-form sales).
-        string discountNote = command.Discount > 0 ? $" (endirim {command.Discount:0.00})" : string.Empty;
+        // ⑥ Activity log (flag free-form sales).
         string manualNote = sale.IsManual ? " (sərbəst satış)" : string.Empty;
         await activityLogger.LogAsync(
             "Satış etdi",
-            $"{sale.ProductName} × {sale.Quantity} — {sale.TotalAmount:0.00} AZN{discountNote}{manualNote}",
+            $"{sale.ProductName} × {sale.Quantity} — {sale.TotalAmount:0.00} AZN{manualNote}",
             currentUser.UserId,
             ct);
 

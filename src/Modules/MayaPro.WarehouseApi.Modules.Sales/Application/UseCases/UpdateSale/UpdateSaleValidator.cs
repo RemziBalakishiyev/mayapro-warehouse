@@ -18,13 +18,6 @@ public sealed class UpdateSaleValidator : AbstractValidator<UpdateSaleCommand>
         RuleFor(x => x.SalePrice)
             .GreaterThanOrEqualTo(0).WithMessage("Qiymət mənfi ola bilməz");
 
-        RuleFor(x => x.Discount)
-            .GreaterThanOrEqualTo(0).WithMessage("Endirim mənfi ola bilməz");
-
-        RuleFor(x => x)
-            .Must(x => x.Discount <= x.SalePrice * x.Quantity)
-            .WithMessage("Endirim satış məbləğindən çox ola bilməz");
-
         RuleFor(x => x.PaymentType)
             .Must(code => PaymentTypeCode.TryParse(code, out _))
             .WithMessage("Ödəniş növü yanlışdır");

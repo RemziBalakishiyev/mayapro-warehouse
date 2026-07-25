@@ -31,7 +31,6 @@ public sealed class CustomersApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 3,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nisyə",
             customerId = customer.Id
         });
@@ -119,11 +118,11 @@ public sealed class CustomersApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 3,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nisyə",
             customerId = customer.Id
         });
         sale.EnsureSuccessStatusCode();
+        var createdSale = (await sale.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
 
         // Payment → reduces debt by 40.
         HttpResponseMessage payment = await client.PostAsJsonAsync(
@@ -139,18 +138,85 @@ public sealed class CustomersApiTests : IAsyncLifetime
         // Chronological: opening balance, then the credit sale, then the payment.
         Assert.Equal("initialDebt", history[0].Type);
         Assert.Equal(100m, history[0].Amount);
+        Assert.Null(history[0].SaleId);
 
         Assert.Equal("sale", history[1].Type);
         Assert.Equal(30m, history[1].Amount);
         Assert.Contains(product.Name, history[1].Note);
+        Assert.Equal(createdSale.Id, history[1].SaleId);
 
         Assert.Equal("payment", history[2].Type);
         Assert.Equal(40m, history[2].Amount);
         Assert.Equal("Hissəvi ödəniş", history[2].Note);
+        Assert.Null(history[2].SaleId);
 
         // And the timestamps are actually non-decreasing.
         Assert.True(history[0].Date <= history[1].Date);
         Assert.True(history[1].Date <= history[2].Date);
+    }
+
+    [Fact]
+    public async Task Delete_Customer_Credit_From_History_Unwinds_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("HIST-DEL", quantity: 10, salePrice: 15m);
+        var customer = await client.CreateCustomerAsync("Nisyə, borc silinir", debt: 0m);
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 2,
+            salePrice = 15m,
+            paymentType = "Nisyə",
+            customerId = customer.Id
+        });
+        sale.EnsureSuccessStatusCode();
+        var createdSale = (await sale.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        List<IntegrationTestHelpers.CustomerHistoryEntryDto> history =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.CustomerHistoryEntryDto>>(
+                $"/api/customers/{customer.Id}/history"))!;
+        Guid saleId = history.Single(h => h.Type == "sale").SaleId!.Value;
+        Assert.Equal(createdSale.Id, saleId);
+
+        HttpResponseMessage delete = await client.DeleteAsync(
+            $"/api/customers/{customer.Id}/credits/{saleId}");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
+        history = (await client.GetFromJsonAsync<List<IntegrationTestHelpers.CustomerHistoryEntryDto>>(
+            $"/api/customers/{customer.Id}/history"))!;
+        Assert.DoesNotContain(history, h => h.Type == "sale");
+    }
+
+    [Fact]
+    public async Task Delete_Customer_Credit_With_Partial_Payment_Still_Succeeds()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("HIST-DEL-PART", quantity: 10, salePrice: 20m);
+        var customer = await client.CreateCustomerAsync("Qismən ödənilmiş nisyə", debt: 0m);
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 2,
+            salePrice = 20m,
+            paymentType = "Nisyə",
+            customerId = customer.Id
+        });
+        sale.EnsureSuccessStatusCode();
+        var createdSale = (await sale.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        HttpResponseMessage payment = await client.PostAsJsonAsync(
+            $"/api/customers/{customer.Id}/payments", new { amount = 20m, note = "Hissəvi ödəniş" });
+        payment.EnsureSuccessStatusCode();
+        Assert.Equal(createdSale.TotalAmount - 20m, (await client.GetCustomerAsync(customer.Id)).Debt);
+
+        HttpResponseMessage delete = await client.DeleteAsync(
+            $"/api/customers/{customer.Id}/credits/{createdSale.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
     }
 
     [Fact]
@@ -170,21 +236,18 @@ public sealed class CustomersApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Delete_Customer_With_Debt_Returns_409_And_Keeps_The_Customer()
+    public async Task Delete_Customer_With_Debt_Removes_The_Customer()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
-        var customer = await client.CreateCustomerAsync("Borclu, silinməz", debt: 75m);
+        var customer = await client.CreateCustomerAsync("Borclu, silinən", debt: 75m);
 
         HttpResponseMessage delete = await client.DeleteAsync($"/api/customers/{customer.Id}");
 
-        Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
-        var error = (await delete.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
-        Assert.Equal("Customers.HasDebtConflict", error.Code);
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
 
-        // Still there.
         List<IntegrationTestHelpers.CustomerDto> all =
             (await client.GetFromJsonAsync<List<IntegrationTestHelpers.CustomerDto>>("/api/customers"))!;
-        Assert.Contains(all, c => c.Id == customer.Id);
+        Assert.DoesNotContain(all, c => c.Id == customer.Id);
     }
 
     [Fact]

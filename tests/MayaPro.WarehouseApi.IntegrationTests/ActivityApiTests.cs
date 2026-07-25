@@ -28,7 +28,6 @@ public sealed class ActivityApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 2,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });

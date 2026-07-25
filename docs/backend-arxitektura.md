@@ -67,7 +67,7 @@ Sederek.Modules.Sales/
 │   │   └── ISalesDbContext.cs     # yalnız bu modulun DbSet-ləri
 │   └── UseCases/
 │       ├── CreateSale/
-│       │   ├── CreateSaleCommand.cs      # record: məhsul, say, qiymət, endirim, ödəniş növü...
+│       │   ├── CreateSaleCommand.cs      # record: məhsul, say, qiymət, ödəniş növü...
 │       │   ├── CreateSaleHandler.cs      # ⭐ biznes zənciri burada
 │       │   └── CreateSaleValidator.cs    # FluentValidation
 │       ├── GetSales/
@@ -110,7 +110,7 @@ public async Task<Result<SaleDto>> Handle(CreateSaleCommand cmd, CancellationTok
     if (stock.IsFailure)
         return Result.Failure<SaleDto>(SaleErrors.InsufficientStock); // "Stokda kifayət qədər mal yoxdur"
 
-    // 2. Nisyədirsə müştəri borcunu artır (net məbləğ — endirimdən sonra!)
+    // 2. Nisyədirsə müştəri borcunu artır (yekun məbləğ)
     if (cmd.PaymentType == PaymentType.Nisye)
         await _customers.IncreaseDebtAsync(cmd.CustomerId!.Value, sale.TotalAmount, ct);
 

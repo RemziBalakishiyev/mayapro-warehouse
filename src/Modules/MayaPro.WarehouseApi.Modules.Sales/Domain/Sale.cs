@@ -23,7 +23,6 @@ public sealed class Sale : Entity
         int quantity,
         decimal unitPrice,
         decimal subtotal,
-        decimal discount,
         decimal totalAmount,
         decimal? costPerUnit,
         decimal? profit,
@@ -41,7 +40,6 @@ public sealed class Sale : Entity
         Quantity = quantity;
         UnitPrice = unitPrice;
         Subtotal = subtotal;
-        Discount = discount;
         TotalAmount = totalAmount;
         CostPerUnit = costPerUnit;
         Profit = profit;
@@ -71,19 +69,17 @@ public sealed class Sale : Entity
 
     public decimal UnitPrice { get; private set; }
 
-    /// <summary>Before discount: <see cref="UnitPrice"/> × <see cref="Quantity"/>.</summary>
+    /// <summary><see cref="UnitPrice"/> × <see cref="Quantity"/>.</summary>
     public decimal Subtotal { get; private set; }
 
-    public decimal Discount { get; private set; }
-
-    /// <summary>Net after discount: <see cref="Subtotal"/> − <see cref="Discount"/>.</summary>
+    /// <summary>Sold total: same as <see cref="Subtotal"/> (<see cref="UnitPrice"/> is the sale price).</summary>
     public decimal TotalAmount { get; private set; }
 
     /// <summary>Real cost per unit at sale time (snapshot). Null on a manual sale whose cost is unknown.</summary>
     public decimal? CostPerUnit { get; private set; }
 
     /// <summary>
-    /// (<see cref="UnitPrice"/> − <see cref="CostPerUnit"/>) × <see cref="Quantity"/> − <see cref="Discount"/>.
+    /// (<see cref="UnitPrice"/> − <see cref="CostPerUnit"/>) × <see cref="Quantity"/>.
     /// Null when the cost is unknown (a manual sale with no cost) — the gain is genuinely unknown, so reports
     /// exclude it rather than counting it as zero profit.
     /// </summary>
@@ -113,7 +109,6 @@ public sealed class Sale : Entity
         string? category,
         int quantity,
         decimal unitPrice,
-        decimal discount,
         decimal costPerUnit,
         PaymentType paymentType,
         Guid? customerId,
@@ -121,8 +116,7 @@ public sealed class Sale : Entity
         string soldByName)
     {
         decimal subtotal = unitPrice * quantity;
-        decimal totalAmount = subtotal - discount;
-        decimal profit = (unitPrice - costPerUnit) * quantity - discount;
+        decimal profit = (unitPrice - costPerUnit) * quantity;
 
         return new Sale(
             productId,
@@ -132,8 +126,7 @@ public sealed class Sale : Entity
             quantity,
             unitPrice,
             subtotal,
-            discount,
-            totalAmount,
+            subtotal,
             costPerUnit,
             profit,
             paymentType,
@@ -158,7 +151,6 @@ public sealed class Sale : Entity
         string? category,
         int quantity,
         decimal unitPrice,
-        decimal discount,
         decimal? costPerUnit,
         PaymentType paymentType,
         Guid? customerId,
@@ -167,9 +159,8 @@ public sealed class Sale : Entity
         IReadOnlyList<SaleExpenseItem>? expenseItems = null)
     {
         decimal subtotal = unitPrice * quantity;
-        decimal totalAmount = subtotal - discount;
         decimal? profit = costPerUnit is { } cost
-            ? (unitPrice - cost) * quantity - discount
+            ? (unitPrice - cost) * quantity
             : null;
 
         return new Sale(
@@ -180,8 +171,7 @@ public sealed class Sale : Entity
             quantity,
             unitPrice,
             subtotal,
-            discount,
-            totalAmount,
+            subtotal,
             costPerUnit,
             profit,
             paymentType,
@@ -203,7 +193,6 @@ public sealed class Sale : Entity
         string? category,
         int quantity,
         decimal unitPrice,
-        decimal discount,
         decimal costPerUnit,
         PaymentType paymentType,
         Guid? customerId)
@@ -215,10 +204,9 @@ public sealed class Sale : Entity
         Quantity = quantity;
         UnitPrice = unitPrice;
         Subtotal = unitPrice * quantity;
-        Discount = discount;
-        TotalAmount = Subtotal - discount;
+        TotalAmount = Subtotal;
         CostPerUnit = costPerUnit;
-        Profit = (unitPrice - costPerUnit) * quantity - discount;
+        Profit = (unitPrice - costPerUnit) * quantity;
         PaymentType = paymentType;
         CustomerId = paymentType == PaymentType.Credit ? customerId : null;
         ExpenseItems = Array.Empty<SaleExpenseItem>();
@@ -234,7 +222,6 @@ public sealed class Sale : Entity
         string? category,
         int quantity,
         decimal unitPrice,
-        decimal discount,
         decimal? costPerUnit,
         PaymentType paymentType,
         Guid? customerId,
@@ -247,10 +234,9 @@ public sealed class Sale : Entity
         Quantity = quantity;
         UnitPrice = unitPrice;
         Subtotal = unitPrice * quantity;
-        Discount = discount;
-        TotalAmount = Subtotal - discount;
+        TotalAmount = Subtotal;
         CostPerUnit = costPerUnit;
-        Profit = costPerUnit is { } cost ? (unitPrice - cost) * quantity - discount : null;
+        Profit = costPerUnit is { } cost ? (unitPrice - cost) * quantity : null;
         PaymentType = paymentType;
         CustomerId = paymentType == PaymentType.Credit ? customerId : null;
         ExpenseItems = expenseItems;

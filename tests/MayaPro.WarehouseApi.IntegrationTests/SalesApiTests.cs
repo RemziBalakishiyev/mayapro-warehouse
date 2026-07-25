@@ -29,7 +29,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 3,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -59,17 +58,16 @@ public sealed class SalesApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 2,
             salePrice = 20m,
-            discount = 5m,
             paymentType = "Nisyə",
             customerId = customer.Id
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var sale = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
-        Assert.Equal(35m, sale.TotalAmount); // 20*2 - 5 discount
+        Assert.Equal(40m, sale.TotalAmount); // 20*2
 
         var afterSale = await client.GetCustomerAsync(customer.Id);
-        Assert.Equal(35m, afterSale.Debt);
+        Assert.Equal(40m, afterSale.Debt);
     }
 
     [Fact]
@@ -85,7 +83,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productName = "Əl ilə mal",
             quantity = 2,
             salePrice = 15m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -119,7 +116,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productName = "Əl ilə nisyə mal",
             quantity = 3,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nisyə",
             customerId = customer.Id
         });
@@ -145,7 +141,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productName = "",   // blank → invalid free-form sale
             quantity = 1,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -166,7 +161,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 10,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nağd",
             customerId = (Guid?)null
         });
@@ -193,7 +187,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 2,
             salePrice = 10m,
-            discount = 0m,
             paymentType = "Nisyə",
             customerId = Guid.NewGuid()
         });
@@ -218,7 +211,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productName = "Əl ilə mal (xərcli)",
             quantity = 2,
             salePrice = 20m,
-            discount = 0m,
             costPerUnit = 12m,             // frontend-supplied; expense lines are documentation only
             paymentType = "Nağd",
             customerId = (Guid?)null,
@@ -253,7 +245,6 @@ public sealed class SalesApiTests : IAsyncLifetime
             productId = product.Id,
             quantity = 1,
             salePrice = 20m,
-            discount = 0m,
             paymentType = "Nisyə",
             customerId = customer.Id
         });
@@ -300,7 +291,6 @@ public sealed class SalesApiTests : IAsyncLifetime
                 productName = $"Səhifə malı {i}",
                 quantity = 1,
                 salePrice = 1m,
-                discount = 0m,
                 paymentType = "Nağd",
                 customerId = (Guid?)null
             });
@@ -354,26 +344,15 @@ public sealed class SalesApiTests : IAsyncLifetime
 
         var sale = await CreateSaleAsync(client, new
         {
-            productId = product.Id, quantity = 3, salePrice = 10m, discount = 0m,
+            productId = product.Id, quantity = 3, salePrice = 10m,
             paymentType = "Nağd", customerId = (Guid?)null
         });
         Assert.Equal(17, (await client.GetProductAsync(product.Id)).Quantity);
 
         HttpResponseMessage delete = await client.DeleteAsync($"/api/sales/{sale.Id}");
 
-        // The shared day may already be closed by the day-end tests — assert the right outcome either way.
-        var afterQty = (await client.GetProductAsync(product.Id)).Quantity;
-        if (delete.StatusCode == HttpStatusCode.OK)
-        {
-            Assert.Equal(20, afterQty); // reserved stock returned
-        }
-        else
-        {
-            Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
-            var error = (await delete.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
-            Assert.Equal("Sales.DayClosedConflict", error.Code);
-            Assert.Equal(17, afterQty); // guard held — nothing changed
-        }
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(20, (await client.GetProductAsync(product.Id)).Quantity); // reserved stock returned
     }
 
     [Fact]
@@ -385,21 +364,41 @@ public sealed class SalesApiTests : IAsyncLifetime
 
         var sale = await CreateSaleAsync(client, new
         {
-            productId = product.Id, quantity = 2, salePrice = 20m, discount = 5m,
+            productId = product.Id, quantity = 2, salePrice = 20m,
             paymentType = "Nisyə", customerId = customer.Id
         });
-        Assert.Equal(35m, (await client.GetCustomerAsync(customer.Id)).Debt); // 20*2 - 5
+        Assert.Equal(40m, (await client.GetCustomerAsync(customer.Id)).Debt); // 20*2
 
         HttpResponseMessage delete = await client.DeleteAsync($"/api/sales/{sale.Id}");
 
-        decimal afterDebt = (await client.GetCustomerAsync(customer.Id)).Debt;
-        if (delete.StatusCode == HttpStatusCode.OK)
-            Assert.Equal(0m, afterDebt); // the credit was unwound
-        else
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt); // the credit was unwound
+    }
+
+    [Fact]
+    public async Task Delete_Credit_Sale_With_Partial_Payment_Still_Succeeds()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("SALE-DEL-PARTIAL", quantity: 10, salePrice: 20m);
+        var customer = await client.CreateCustomerAsync("Qismən ödənilmiş nisyə", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
         {
-            Assert.Equal(HttpStatusCode.Conflict, delete.StatusCode);
-            Assert.Equal(35m, afterDebt); // guard held
-        }
+            productId = product.Id, quantity = 2, salePrice = 20m,
+            paymentType = "Nisyə", customerId = customer.Id
+        });
+        Assert.Equal(40m, (await client.GetCustomerAsync(customer.Id)).Debt);
+
+        HttpResponseMessage payment = await client.PostAsJsonAsync(
+            $"/api/customers/{customer.Id}/payments", new { amount = 20m, note = "Hissəvi ödəniş" });
+        payment.EnsureSuccessStatusCode();
+        Assert.Equal(20m, (await client.GetCustomerAsync(customer.Id)).Debt);
+
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/sales/{sale.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt); // floors at zero, never negative
+        Assert.Equal(10, (await client.GetProductAsync(product.Id)).Quantity); // stock restored
     }
 
     [Fact]
@@ -410,7 +409,7 @@ public sealed class SalesApiTests : IAsyncLifetime
         var product = await owner.CreateProductAsync("SALE-DEL-403", quantity: 5, salePrice: 10m);
         var sale = await CreateSaleAsync(owner, new
         {
-            productId = product.Id, quantity = 1, salePrice = 10m, discount = 0m,
+            productId = product.Id, quantity = 1, salePrice = 10m,
             paymentType = "Nağd", customerId = (Guid?)null
         });
 
@@ -429,7 +428,7 @@ public sealed class SalesApiTests : IAsyncLifetime
 
         var sale = await CreateSaleAsync(client, new
         {
-            productId = product.Id, quantity = 3, salePrice = 10m, discount = 0m,
+            productId = product.Id, quantity = 3, salePrice = 10m,
             paymentType = "Nağd", customerId = (Guid?)null
         });
         Assert.Equal(17, (await client.GetProductAsync(product.Id)).Quantity);
@@ -437,7 +436,7 @@ public sealed class SalesApiTests : IAsyncLifetime
         // Raise the quantity 3 → 5: reverse (+3) then reapply (−5) nets one more unit off stock.
         HttpResponseMessage update = await client.PutAsJsonAsync($"/api/sales/{sale.Id}", new
         {
-            productId = product.Id, quantity = 5, salePrice = 10m, discount = 0m,
+            productId = product.Id, quantity = 5, salePrice = 10m,
             paymentType = "Nağd", customerId = (Guid?)null
         });
 
@@ -467,7 +466,7 @@ public sealed class SalesApiTests : IAsyncLifetime
 
         var sale = await CreateSaleAsync(client, new
         {
-            productId = product.Id, quantity = 2, salePrice = 10m, discount = 0m,
+            productId = product.Id, quantity = 2, salePrice = 10m,
             paymentType = "Nağd", customerId = (Guid?)null
         });
         Assert.Equal(3, (await client.GetProductAsync(product.Id)).Quantity);
@@ -475,7 +474,7 @@ public sealed class SalesApiTests : IAsyncLifetime
         // Reversing returns 2 (→5 available), so 6 is still one beyond what exists → fail + rollback.
         HttpResponseMessage update = await client.PutAsJsonAsync($"/api/sales/{sale.Id}", new
         {
-            productId = product.Id, quantity = 6, salePrice = 10m, discount = 0m,
+            productId = product.Id, quantity = 6, salePrice = 10m,
             paymentType = "Nağd", customerId = (Guid?)null
         });
 
