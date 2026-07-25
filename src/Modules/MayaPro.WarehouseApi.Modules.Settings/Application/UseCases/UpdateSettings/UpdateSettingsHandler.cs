@@ -31,6 +31,8 @@ public sealed class UpdateSettingsHandler(
         settings.Update(
             command.StoreName,
             command.OwnerName,
+            command.Address,
+            command.Phone,
             command.WhatsappTemplate,
             command.Currency,
             command.DefaultMinStock,

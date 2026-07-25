@@ -14,8 +14,10 @@ public sealed class AppDateProvider(TimeZoneInfo timeZone, Func<DateTime> utcNow
 
     public DateOnly Today => ToLocalDate(utcNowProvider());
 
-    public DateOnly ToLocalDate(DateTime utc) =>
-        DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), timeZone));
+    public DateOnly ToLocalDate(DateTime utc) => DateOnly.FromDateTime(ToLocalDateTime(utc));
+
+    public DateTime ToLocalDateTime(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), timeZone);
 
     public (DateTime StartUtc, DateTime EndUtc) LocalDayRangeUtc(DateOnly localDate)
     {

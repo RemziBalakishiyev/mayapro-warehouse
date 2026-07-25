@@ -50,7 +50,29 @@ public interface ISalesModule
         Guid saleId,
         Guid customerId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns one sale with everything the printed invoice needs, or null when it does not exist.
+    /// Used by the Exports module to render the sale's invoice PDF.
+    /// </summary>
+    Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid saleId, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// A sale as printed on its invoice. <see cref="Date"/> is the UTC sale instant (callers localise it);
+/// <see cref="PaymentType"/> is the wire code; <see cref="CustomerId"/> is set only for credit sales.
+/// </summary>
+public sealed record SaleInvoiceInfo(
+    Guid Id,
+    DateTime Date,
+    string ProductName,
+    string? Category,
+    int Quantity,
+    decimal UnitPrice,
+    decimal Subtotal,
+    decimal TotalAmount,
+    string PaymentType,
+    Guid? CustomerId);
 
 /// <summary>A day's net sales split by payment type.</summary>
 public sealed record SalesDayTotals(decimal Cash, decimal Card, decimal Credit);

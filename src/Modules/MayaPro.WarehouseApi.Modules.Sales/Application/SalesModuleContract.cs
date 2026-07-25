@@ -141,4 +141,28 @@ internal sealed class SalesModuleContract(
 
         return await deleteSale.Handle(saleId, cancellationToken);
     }
+
+    public async Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(
+        Guid saleId,
+        CancellationToken cancellationToken = default)
+    {
+        Sale? sale = await db.Sales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == saleId, cancellationToken);
+
+        if (sale is null)
+            return null;
+
+        return new SaleInvoiceInfo(
+            sale.Id,
+            sale.Date,
+            sale.ProductName,
+            sale.Category,
+            sale.Quantity,
+            sale.UnitPrice,
+            sale.Subtotal,
+            sale.TotalAmount,
+            sale.PaymentType.ToCode(),
+            sale.CustomerId);
+    }
 }

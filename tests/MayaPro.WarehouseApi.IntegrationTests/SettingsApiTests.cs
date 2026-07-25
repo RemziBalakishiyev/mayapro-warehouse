@@ -29,6 +29,8 @@ public sealed class SettingsApiTests : IAsyncLifetime
         Assert.Equal("AZN", defaults.Currency);
         Assert.Equal(10, defaults.DefaultMinStock);
         Assert.Equal("az", defaults.Language);
+        Assert.Null(defaults.Address);
+        Assert.Null(defaults.Phone);
         // Must match the frontend's own default template exactly (single {debt} placeholder).
         Assert.Equal(
             "Salam, sizdə {debt} AZN qalıq borc görünür. Zəhmət olmasa ödənişi tamamlayın.",
@@ -40,6 +42,8 @@ public sealed class SettingsApiTests : IAsyncLifetime
         {
             storeName = "Yeni Mağaza",
             ownerName = "Rəşad",
+            address = "Sədərək TM, sıra 12, mağaza 34",
+            phone = "0501234567",
             whatsappTemplate = "Salam {ad}, borcunuz {borc} AZN.",
             currency = "USD",
             defaultMinStock = 25,
@@ -49,6 +53,8 @@ public sealed class SettingsApiTests : IAsyncLifetime
         var updated = (await put.Content.ReadFromJsonAsync<IntegrationTestHelpers.SettingsDto>())!;
         Assert.Equal("Yeni Mağaza", updated.StoreName);
         Assert.Equal("Rəşad", updated.OwnerName);
+        Assert.Equal("Sədərək TM, sıra 12, mağaza 34", updated.Address);
+        Assert.Equal("0501234567", updated.Phone);
         Assert.Equal(25, updated.DefaultMinStock);
 
         // The change is persisted (still a single row — read reflects the update).
@@ -56,6 +62,8 @@ public sealed class SettingsApiTests : IAsyncLifetime
         Assert.Equal("Yeni Mağaza", reread.StoreName);
         Assert.Equal("USD", reread.Currency);
         Assert.Equal("en", reread.Language);
+        Assert.Equal("Sədərək TM, sıra 12, mağaza 34", reread.Address);
+        Assert.Equal("0501234567", reread.Phone);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsExcel;
+using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSaleInvoicePdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSalesPdf;
 using MayaPro.WarehouseApi.Modules.Exports.Endpoints;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
@@ -24,6 +25,7 @@ public sealed class ExportsModule : IModule
 
         services.AddScoped<ExportProductsExcelHandler>();
         services.AddScoped<ExportSalesPdfHandler>();
+        services.AddScoped<ExportSaleInvoicePdfHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

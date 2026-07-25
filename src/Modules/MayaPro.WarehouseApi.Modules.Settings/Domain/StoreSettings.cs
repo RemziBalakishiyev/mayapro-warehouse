@@ -49,6 +49,12 @@ public sealed class StoreSettings : Entity
 
     public string? OwnerName { get; private set; }
 
+    /// <summary>Store address printed on invoice headers; null hides the line.</summary>
+    public string? Address { get; private set; }
+
+    /// <summary>Store contact phone printed on invoice headers; null hides the line.</summary>
+    public string? Phone { get; private set; }
+
     public string WhatsappTemplate { get; private set; } = DefaultWhatsappTemplate;
 
     public string Currency { get; private set; } = DefaultCurrency;
@@ -65,6 +71,8 @@ public sealed class StoreSettings : Entity
     public void Update(
         string storeName,
         string? ownerName,
+        string? address,
+        string? phone,
         string whatsappTemplate,
         string currency,
         int defaultMinStock,
@@ -72,6 +80,8 @@ public sealed class StoreSettings : Entity
     {
         StoreName = storeName;
         OwnerName = ownerName;
+        Address = address;
+        Phone = phone;
         WhatsappTemplate = whatsappTemplate;
         Currency = currency;
         DefaultMinStock = defaultMinStock;

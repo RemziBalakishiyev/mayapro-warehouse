@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Exports.Application;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsExcel;
+using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSaleInvoicePdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSalesPdf;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
@@ -42,6 +43,20 @@ internal static class ExportsEndpoints
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
             .WithName("ExportSalesPdf");
+
+        group.MapGet("/sales/{id:guid}/invoice.pdf", async (
+                Guid id,
+                ExportSaleInvoicePdfHandler handler,
+                CancellationToken ct) =>
+            {
+                Result<ExportFileResult> result = await handler.Handle(id, ct);
+                if (result.IsFailure)
+                    return result.ToHttpResult();
+
+                ExportFileResult file = result.Value;
+                return Results.File(file.Content, file.ContentType, file.FileName);
+            })
+            .WithName("ExportSaleInvoicePdf");
     }
 
     private static bool TryParseOptionalDate(string? raw, out DateOnly? date, out string? error)

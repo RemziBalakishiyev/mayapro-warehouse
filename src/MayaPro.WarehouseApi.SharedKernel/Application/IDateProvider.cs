@@ -17,6 +17,9 @@ public interface IDateProvider
     /// <summary>Converts a UTC instant to its date in the business time zone.</summary>
     DateOnly ToLocalDate(DateTime utc);
 
+    /// <summary>Converts a UTC instant to the full local date-time in the business time zone.</summary>
+    DateTime ToLocalDateTime(DateTime utc);
+
     /// <summary>
     /// The half-open UTC window <c>[start, end)</c> that corresponds to a whole day in the business time
     /// zone. Use it to filter UTC-stored timestamps for "that local day".

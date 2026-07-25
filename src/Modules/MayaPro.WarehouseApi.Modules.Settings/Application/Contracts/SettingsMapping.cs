@@ -9,6 +9,8 @@ public static class SettingsMapping
         new(
             settings.StoreName,
             settings.OwnerName,
+            settings.Address,
+            settings.Phone,
             settings.WhatsappTemplate,
             settings.Currency,
             settings.DefaultMinStock,

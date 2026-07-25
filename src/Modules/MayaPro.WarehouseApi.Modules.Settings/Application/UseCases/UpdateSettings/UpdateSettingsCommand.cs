@@ -4,6 +4,8 @@ namespace MayaPro.WarehouseApi.Modules.Settings.Application.UseCases.UpdateSetti
 public sealed record UpdateSettingsCommand(
     string StoreName,
     string? OwnerName,
+    string? Address,
+    string? Phone,
     string WhatsappTemplate,
     string Currency,
     int DefaultMinStock,

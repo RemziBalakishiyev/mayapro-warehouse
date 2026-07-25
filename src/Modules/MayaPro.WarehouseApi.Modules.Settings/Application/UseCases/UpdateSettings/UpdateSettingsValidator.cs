@@ -13,6 +13,12 @@ public sealed class UpdateSettingsValidator : AbstractValidator<UpdateSettingsCo
         RuleFor(x => x.OwnerName)
             .MaximumLength(200).WithMessage("Sahib adı 200 simvoldan çox ola bilməz");
 
+        RuleFor(x => x.Address)
+            .MaximumLength(300).WithMessage("Ünvan 300 simvoldan çox ola bilməz");
+
+        RuleFor(x => x.Phone)
+            .MaximumLength(30).WithMessage("Telefon 30 simvoldan çox ola bilməz");
+
         RuleFor(x => x.WhatsappTemplate)
             .NotEmpty().WithMessage("WhatsApp şablonu boş ola bilməz")
             .MaximumLength(1000).WithMessage("WhatsApp şablonu 1000 simvoldan çox ola bilməz");

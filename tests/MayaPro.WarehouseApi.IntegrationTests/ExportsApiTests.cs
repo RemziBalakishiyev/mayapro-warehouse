@@ -73,6 +73,94 @@ public sealed class ExportsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Sale_Invoice_Pdf_Returns_Pdf_For_Cash_Sale()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-INV-1", quantity: 10, salePrice: 25m);
+        HttpResponseMessage saleResponse = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 2,
+            salePrice = 25m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+        saleResponse.EnsureSuccessStatusCode();
+        var sale = (await saleResponse.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        HttpResponseMessage response = await client.GetAsync($"/api/exports/sales/{sale.Id}/invoice.pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        string? fileName = response.Content.Headers.ContentDisposition?.FileName?.Trim('"');
+        Assert.StartsWith("faktura-SF-", fileName);
+        Assert.EndsWith(".pdf", fileName);
+
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.True(bytes.Length > 5120, $"PDF should be > 5KB, was {bytes.Length}");
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task Sale_Invoice_Pdf_Returns_Pdf_For_Credit_Sale_With_Customer()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-INV-2", quantity: 10, salePrice: 40m);
+        var customer = await client.CreateCustomerAsync("Faktura Müştərisi", debt: 15m);
+        HttpResponseMessage saleResponse = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 40m,
+            paymentType = "Nisyə",
+            customerId = customer.Id
+        });
+        saleResponse.EnsureSuccessStatusCode();
+        var sale = (await saleResponse.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        HttpResponseMessage response = await client.GetAsync($"/api/exports/sales/{sale.Id}/invoice.pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task Sale_Invoice_Pdf_Returns_404_For_Unknown_Sale()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.GetAsync($"/api/exports/sales/{Guid.NewGuid()}/invoice.pdf");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Seller_Can_Export_Sale_Invoice_Pdf()
+    {
+        HttpClient owner = await _factory.AuthenticatedClientAsync();
+        var product = await owner.CreateProductAsync("EXP-INV-3", quantity: 5, salePrice: 12m);
+
+        HttpClient seller = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.SellerPhone);
+        HttpResponseMessage saleResponse = await seller.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 12m,
+            paymentType = "Kart",
+            customerId = (Guid?)null
+        });
+        saleResponse.EnsureSuccessStatusCode();
+        var sale = (await saleResponse.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        HttpResponseMessage response = await seller.GetAsync($"/api/exports/sales/{sale.Id}/invoice.pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Seller_Can_Export_Products_Excel()
     {
         HttpClient owner = await _factory.AuthenticatedClientAsync();

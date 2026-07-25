@@ -45,7 +45,16 @@ public interface ICustomersModule
     Task<Dictionary<Guid, string>> GetNamesAsync(
         IEnumerable<Guid> ids,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns one customer's printable details (name, phone, current outstanding debt) or null when the
+    /// customer does not exist. Used by the Exports module for the invoice's customer block.
+    /// </summary>
+    Task<CustomerInfo?> GetCustomerInfoAsync(Guid customerId, CancellationToken cancellationToken = default);
 }
+
+/// <summary>A customer's printable details for documents: name, optional phone, current debt.</summary>
+public sealed record CustomerInfo(string Name, string? Phone, decimal Debt);
 
 /// <summary>A recent customer payment for the dashboard feed. Date is the business-zone (local) date.</summary>
 public sealed record RecentPaymentInfo(Guid Id, DateOnly Date, string CustomerName, decimal Amount);

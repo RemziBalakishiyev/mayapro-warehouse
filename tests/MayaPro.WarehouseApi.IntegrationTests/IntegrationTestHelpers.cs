@@ -153,6 +153,8 @@ internal static class IntegrationTestHelpers
     internal sealed record SettingsDto(
         string StoreName,
         string? OwnerName,
+        string? Address,
+        string? Phone,
         string WhatsappTemplate,
         string Currency,
         int DefaultMinStock,

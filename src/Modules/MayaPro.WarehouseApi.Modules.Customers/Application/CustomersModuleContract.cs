@@ -69,4 +69,15 @@ internal sealed class CustomersModuleContract(ICustomersDbContext db, IDateProvi
             .Where(c => idSet.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
     }
+
+    public async Task<CustomerInfo?> GetCustomerInfoAsync(
+        Guid customerId,
+        CancellationToken cancellationToken = default)
+    {
+        Customer? customer = await db.Customers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken);
+
+        return customer is null ? null : new CustomerInfo(customer.Name, customer.Phone, customer.Debt);
+    }
 }

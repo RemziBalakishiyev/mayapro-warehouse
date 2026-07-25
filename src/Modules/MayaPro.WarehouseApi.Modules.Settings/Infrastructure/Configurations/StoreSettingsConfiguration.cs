@@ -14,6 +14,8 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
 
         builder.Property(s => s.StoreName).IsRequired().HasMaxLength(200);
         builder.Property(s => s.OwnerName).HasMaxLength(200);
+        builder.Property(s => s.Address).HasMaxLength(300);
+        builder.Property(s => s.Phone).HasMaxLength(30);
         builder.Property(s => s.WhatsappTemplate).IsRequired().HasMaxLength(1000);
         builder.Property(s => s.Currency).IsRequired().HasMaxLength(10);
         builder.Property(s => s.Language).IsRequired().HasMaxLength(10);
