@@ -96,7 +96,10 @@ public sealed class Sale : Entity
 
     public PaymentType PaymentType { get; private set; }
 
-    /// <summary>Set for credit (Nisyə) sales; otherwise null.</summary>
+    /// <summary>
+    /// The buying customer, optional on every payment type (mandatory only on credit — validator's rule).
+    /// Only a credit sale touches the customer's debt; on cash/card this is purchase-history bookkeeping.
+    /// </summary>
     public Guid? CustomerId { get; private set; }
 
     public Guid? SoldByUserId { get; private set; }
@@ -139,8 +142,8 @@ public sealed class Sale : Entity
             costPerUnit,
             profit,
             paymentType,
-            // Only credit sales carry a customer, matching the frontend rule.
-            paymentType == PaymentType.Credit ? customerId : null,
+            // Any payment type may carry a customer; only credit affects their debt (handler's rule).
+            customerId,
             soldByUserId,
             soldByName,
             DateTime.UtcNow,
@@ -184,7 +187,7 @@ public sealed class Sale : Entity
             costPerUnit,
             profit,
             paymentType,
-            paymentType == PaymentType.Credit ? customerId : null,
+            customerId,
             soldByUserId,
             soldByName,
             DateTime.UtcNow,
@@ -217,7 +220,7 @@ public sealed class Sale : Entity
         CostPerUnit = costPerUnit;
         Profit = (unitPrice - costPerUnit) * quantity;
         PaymentType = paymentType;
-        CustomerId = paymentType == PaymentType.Credit ? customerId : null;
+        CustomerId = customerId;
         ExpenseItems = Array.Empty<SaleExpenseItem>();
     }
 
@@ -247,7 +250,7 @@ public sealed class Sale : Entity
         CostPerUnit = costPerUnit;
         Profit = costPerUnit is { } cost ? (unitPrice - cost) * quantity : null;
         PaymentType = paymentType;
-        CustomerId = paymentType == PaymentType.Credit ? customerId : null;
+        CustomerId = customerId;
         ExpenseItems = expenseItems;
     }
 }

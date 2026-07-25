@@ -19,7 +19,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - `Profit = (UnitPrice − CostPerUnit) × Quantity`; maya bilinməyəndə `null` (0 sayılmır, hesabatlarda ayrıca "naməlum" göstərilir).
 - Satış anında ad/kateqoriya/maya snapshot olunur (ADR-0004).
 - Stok satışdan böyükdürsə `Sales.InsufficientStock`; stok heç vaxt 0-dan aşağı düşmür.
-- Nisyə satışda `customerId` mütləqdir; satış cəmi müştəri borcuna əlavə olunur.
+- `customerId` HƏR ödəniş növündə göndərilə bilər (nağd/kartda istəyə bağlı, nisyədə MƏCBURİ). Borca təsir yalnız nisyədə: satış cəmi müştəri borcuna əlavə olunur; nağd/kartda müştəri yalnız alış tarixçəsi üçündür.
 - Satış düzəlişi = köhnə effektlər geri sarılır + yeni dəyərlərlə yenidən tətbiq (eyni Id/tarix/satıcı qalır). Günü bağlanmış satış redaktə oluna bilməz (`Sales.DayClosedConflict`, 409). Silmədə bağlı gün qoruması YOXDUR.
 - Silinmə/düzəliş geri sarılması best-effort-dur: məhsul/müştəri artıq silinibsə zəncir yenə işləyir.
 
@@ -37,7 +37,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Ödəniş borcdan böyükdürsə imtina: `Customers.PaymentExceedsDebt`.
 - Nisyə satış silinəndə borc azalır, amma 0-da floor (borc artıq ödənilibsə mənfiyə düşmür).
 - İlkin borc `CustomerDebtAdjustment` sətri kimi tarixçəyə düşür.
-- Borc tarixçəsi = ilkin borc + nisyə satışlar (Sales kontraktından) + ödənişlər, xronoloji birləşdirilir.
+- Müştəri tarixçəsi = ilkin borc + BÜTÜN satışlar (hər ödəniş növü, Sales kontraktından; `paymentType` sahəsi fərqləndirir — borcu yalnız Nisyə sətirləri artırıb) + ödənişlər, xronoloji birləşdirilir.
+- Müştəri statistikaları bütün satış növlərini əhatə edir: `lastPurchaseDate` son İSTƏNİLƏN satış, `totalPurchases`/`purchaseCount` ömürlük cəm/say (qruplaşdırılmış tək sorğu).
 - Müştəri silinəndə ödəniş/ilkin borc tarixçəsi də silinir (borc qalsa belə); köhnə satışlar `CustomerId` saxlayır — frontend "Silinmiş müştəri" göstərir.
 
 ## Gün sonu qaydaları

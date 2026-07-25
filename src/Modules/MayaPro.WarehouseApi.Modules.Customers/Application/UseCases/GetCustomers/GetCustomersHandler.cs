@@ -8,8 +8,8 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustome
 
 /// <summary>
 /// Returns every customer, newest first, enriched with paid-amount and last-payment (from this module's
-/// payments) and last-purchase (last credit sale, via the Sales contract). Both aggregates are one
-/// grouped query each — never a query per customer.
+/// payments) and purchase stats over ALL sale types — total, count, last purchase (via the Sales
+/// contract). Every aggregate is one grouped query — never a query per customer.
 /// </summary>
 public sealed class GetCustomersHandler(ICustomersDbContext db, ISalesModule sales)
 {
@@ -34,9 +34,9 @@ public sealed class GetCustomersHandler(ICustomersDbContext db, ISalesModule sal
             .Select(g => new { CustomerId = g.Key, Total = g.Sum(a => a.Amount) })
             .ToDictionaryAsync(x => x.CustomerId, x => x.Total, ct);
 
-        // One cross-module query for the last credit-sale date per customer.
-        Dictionary<Guid, DateTime> lastPurchase = (await sales.GetLastCreditSaleDatesByCustomerAsync(ct))
-            .ToDictionary(x => x.CustomerId, x => x.Date);
+        // One cross-module grouped query for each customer's purchase stats over every sale type.
+        Dictionary<Guid, CustomerPurchaseStats> purchaseStats = (await sales.GetPurchaseStatsByCustomerAsync(ct))
+            .ToDictionary(x => x.CustomerId);
 
         return customers
             .Select(c =>
@@ -44,9 +44,15 @@ public sealed class GetCustomersHandler(ICustomersDbContext db, ISalesModule sal
                 (decimal paid, DateTime? lastPayment) = paymentStats.TryGetValue(c.Id, out var stat)
                     ? (stat.Paid, stat.Last)
                     : (0m, (DateTime?)null);
-                DateTime? lastPurchaseDate = lastPurchase.TryGetValue(c.Id, out DateTime lp) ? lp : null;
+                CustomerPurchaseStats? purchases = purchaseStats.GetValueOrDefault(c.Id);
                 decimal initialDebt = initialDebts.TryGetValue(c.Id, out decimal init) ? init : 0m;
-                return c.ToDto(initialDebt, paid, lastPurchaseDate, lastPayment);
+                return c.ToDto(
+                    initialDebt,
+                    paid,
+                    purchases?.TotalPurchases ?? 0m,
+                    purchases?.PurchaseCount ?? 0,
+                    purchases?.LastPurchase,
+                    lastPayment);
             })
             .ToList();
     }

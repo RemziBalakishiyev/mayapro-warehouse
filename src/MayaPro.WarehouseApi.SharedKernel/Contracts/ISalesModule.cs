@@ -27,17 +27,19 @@ public interface ISalesModule
     Task<IReadOnlyList<RecentSaleInfo>> GetRecentSalesAsync(int take, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns the last credit (Nisyə) sale date per customer. Used by the Customers module to show each
-    /// customer's last purchase date without joining across module tables.
+    /// Returns per-customer purchase aggregates over ALL sales that carry a customer (any payment type):
+    /// last purchase timestamp (UTC), lifetime purchase total and count — one grouped query. Used by the
+    /// Customers module to enrich the customer list without joining across module tables.
     /// </summary>
-    Task<IReadOnlyList<CustomerLastPurchase>> GetLastCreditSaleDatesByCustomerAsync(
+    Task<IReadOnlyList<CustomerPurchaseStats>> GetPurchaseStatsByCustomerAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns one customer's credit (Nisyə) sales, oldest first. Used by the Customers module to weave the
-    /// customer's purchases into their full debt history without querying the sales table directly.
+    /// Returns one customer's sales of every payment type, oldest first. Used by the Customers module to
+    /// weave the customer's purchases into their history without querying the sales table directly —
+    /// only the Nisyə entries affected the debt; the wire payment code lets the caller tell them apart.
     /// </summary>
-    Task<IReadOnlyList<CustomerCreditSale>> GetCreditSalesByCustomerAsync(
+    Task<IReadOnlyList<CustomerSaleEntry>> GetSalesByCustomerAsync(
         Guid customerId,
         CancellationToken cancellationToken = default);
 
@@ -88,7 +90,7 @@ public sealed record ProductLastSale(Guid ProductId, DateOnly LastSale);
 
 /// <summary>
 /// A recent sale for the dashboard feed. Date is the business-zone (local) date. <see cref="CustomerId"/>
-/// is set only for credit (Nisyə) sales; null for cash and card sales. <see cref="Category"/> is the
+/// is set whenever the sale selected a customer — any payment type. <see cref="Category"/> is the
 /// sale-time snapshot (null on older rows or when a manual sale omitted it).
 /// </summary>
 public sealed record RecentSaleInfo(
@@ -101,11 +103,24 @@ public sealed record RecentSaleInfo(
     string PaymentType,
     Guid? CustomerId);
 
-/// <summary>A customer's most recent credit-purchase timestamp (UTC).</summary>
-public sealed record CustomerLastPurchase(Guid CustomerId, DateTime Date);
+/// <summary>A customer's lifetime purchase aggregates across every payment type (Date is UTC).</summary>
+public sealed record CustomerPurchaseStats(
+    Guid CustomerId,
+    DateTime LastPurchase,
+    decimal TotalPurchases,
+    int PurchaseCount);
 
-/// <summary>A single credit (Nisyə) sale for a customer's debt history: when, what, and the net amount owed.</summary>
-public sealed record CustomerCreditSale(Guid Id, DateTime Date, string ProductName, int Quantity, decimal TotalAmount);
+/// <summary>
+/// A single sale in a customer's history: when, what, the amount and the wire payment code — only
+/// Nisyə entries raised the customer's debt.
+/// </summary>
+public sealed record CustomerSaleEntry(
+    Guid Id,
+    DateTime Date,
+    string ProductName,
+    int Quantity,
+    decimal TotalAmount,
+    string PaymentType);
 
 /// <summary>
 /// A single sale as seen by reports: date, net amount, profit, payment code and product line.

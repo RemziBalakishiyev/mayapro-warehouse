@@ -7,9 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 
 /// <summary>
-/// Returns a customer's complete debt history in chronological order (oldest first): the opening balance,
-/// every credit sale (from the Sales module via its contract), and every payment. Each source is one query;
-/// they are merged and sorted by timestamp in memory.
+/// Returns a customer's complete history in chronological order (oldest first): the opening balance,
+/// every sale of ANY payment type (from the Sales module via its contract — only Nisyə ones raised the
+/// debt; the paymentType field lets the frontend tell them apart), and every payment. Each source is one
+/// query; they are merged and sorted by timestamp in memory.
 /// </summary>
 public sealed class GetCustomerHistoryHandler(ICustomersDbContext db, ISalesModule sales)
 {
@@ -25,18 +26,18 @@ public sealed class GetCustomerHistoryHandler(ICustomersDbContext db, ISalesModu
             .Where(p => p.CustomerId == customerId)
             .ToListAsync(ct);
 
-        IReadOnlyList<CustomerCreditSale> creditSales = await sales.GetCreditSalesByCustomerAsync(customerId, ct);
+        IReadOnlyList<CustomerSaleEntry> customerSales = await sales.GetSalesByCustomerAsync(customerId, ct);
 
-        var entries = new List<CustomerHistoryEntryDto>(adjustments.Count + payments.Count + creditSales.Count);
+        var entries = new List<CustomerHistoryEntryDto>(adjustments.Count + payments.Count + customerSales.Count);
 
         entries.AddRange(adjustments.Select(a => new CustomerHistoryEntryDto(
-            a.Date, CustomerHistoryEntryType.InitialDebt, a.Amount, a.Note, SaleId: null)));
+            a.Date, CustomerHistoryEntryType.InitialDebt, a.Amount, a.Note, SaleId: null, PaymentType: null)));
 
-        entries.AddRange(creditSales.Select(s => new CustomerHistoryEntryDto(
-            s.Date, CustomerHistoryEntryType.Sale, s.TotalAmount, $"{s.ProductName} × {s.Quantity}", s.Id)));
+        entries.AddRange(customerSales.Select(s => new CustomerHistoryEntryDto(
+            s.Date, CustomerHistoryEntryType.Sale, s.TotalAmount, $"{s.ProductName} × {s.Quantity}", s.Id, s.PaymentType)));
 
         entries.AddRange(payments.Select(p => new CustomerHistoryEntryDto(
-            p.Date, CustomerHistoryEntryType.Payment, p.Amount, p.Note, SaleId: null)));
+            p.Date, CustomerHistoryEntryType.Payment, p.Amount, p.Note, SaleId: null, PaymentType: null)));
 
         return entries.OrderBy(e => e.Date).ToList();
     }

@@ -9,10 +9,13 @@ public static class CustomerMapping
         this Customer customer,
         decimal initialDebt = 0m,
         decimal paidAmount = 0m,
+        decimal totalPurchases = 0m,
+        int purchaseCount = 0,
         DateTime? lastPurchaseDate = null,
         DateTime? lastPaymentDate = null) =>
         new(customer.Id, customer.Name, customer.Phone, customer.Note, customer.Debt, initialDebt,
-            paidAmount, lastPurchaseDate, lastPaymentDate, customer.CreatedAt, customer.UpdatedAt);
+            paidAmount, totalPurchases, purchaseCount, lastPurchaseDate, lastPaymentDate,
+            customer.CreatedAt, customer.UpdatedAt);
 
     public static CustomerPaymentDto ToDto(this CustomerPayment payment) =>
         new(payment.Id, payment.CustomerId, payment.Amount, payment.Note,

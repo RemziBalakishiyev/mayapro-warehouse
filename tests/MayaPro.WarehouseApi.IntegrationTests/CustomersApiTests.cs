@@ -280,4 +280,61 @@ public sealed class CustomersApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
+
+    [Fact]
+    public async Task Cash_Sale_With_Customer_Leaves_Debt_But_Counts_In_Stats_And_History()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("Nağd alıcı", debt: 25m);
+        var product = await client.CreateProductAsync("CUST-CASH-1", quantity: 10, salePrice: 15m);
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 2,
+            salePrice = 15m,
+            paymentType = "Nağd",
+            customerId = customer.Id
+        });
+        sale.EnsureSuccessStatusCode();
+        var createdSale = (await sale.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+
+        // Debt is untouched — only credit sales raise it.
+        var reread = await client.GetCustomerAsync(customer.Id);
+        Assert.Equal(25m, reread.Debt);
+
+        // But the purchase stats cover every payment type.
+        Assert.Equal(30m, reread.TotalPurchases);
+        Assert.Equal(1, reread.PurchaseCount);
+        Assert.NotNull(reread.LastPurchaseDate);
+
+        // And the sale shows in the history, flagged with its payment type.
+        List<IntegrationTestHelpers.CustomerHistoryEntryDto> history =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.CustomerHistoryEntryDto>>(
+                $"/api/customers/{customer.Id}/history"))!;
+        var saleEntry = Assert.Single(history, h => h.Type == "sale");
+        Assert.Equal(createdSale.Id, saleEntry.SaleId);
+        Assert.Equal("Nağd", saleEntry.PaymentType);
+        Assert.Equal(30m, saleEntry.Amount);
+    }
+
+    [Fact]
+    public async Task Credit_Sale_Still_Requires_Customer()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("CUST-CRED-REQ", quantity: 5, salePrice: 10m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 10m,
+            paymentType = "Nisyə",
+            customerId = (Guid?)null
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Nisyə satış üçün müştəri seçilməlidir", error.Message);
+    }
 }

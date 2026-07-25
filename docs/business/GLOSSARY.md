@@ -6,7 +6,7 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 |---|---|
 | **Nağd** | Nağd ödənişli satış (wire: `paymentType = "Nağd"`) |
 | **Kart** | Kartla ödənişli satış (wire: `"Kart"`) |
-| **Nisyə** | Kredit satış — pul sonra ödənilir, müştərinin borcu artır (wire: `"Nisyə"`). Yalnız nisyə satışda `customerId` olur |
+| **Nisyə** | Kredit satış — pul sonra ödənilir, müştərinin borcu artır (wire: `"Nisyə"`). `customerId` nisyədə məcburidir; nağd/kartda da istəyə bağlı göndərilə bilər (borca təsirsiz) |
 | **Borc (Debt)** | Müştərinin ödənilməmiş qalığı. Yalnız domain metodları ilə dəyişir, 0-dan aşağı düşmür |
 | **İlkin borc (InitialDebt)** | Müştəri yaradılarkən köçürülən başlanğıc borc |
 | **Real maya (RealCostPerUnit)** | Bir vahidin həqiqi maya dəyəri = alış qiyməti + (partiya xərcləri ÷ ilkin say). `Product.CalculateRealCost` |

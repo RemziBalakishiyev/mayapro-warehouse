@@ -54,8 +54,8 @@ public sealed record DailyPointDto(DateOnly Date, decimal Sales, decimal Profit)
 public sealed record MonthlyPointDto(string Month, decimal Profit);
 
 /// <summary>
-/// A recent sale for the activity feed. <see cref="CustomerName"/> is set only for credit (Nisyə) sales;
-/// null for cash and card sales. <see cref="Category"/> is the sale-time snapshot.
+/// A recent sale for the activity feed. <see cref="CustomerName"/> is set whenever the sale selected a
+/// customer — any payment type. <see cref="Category"/> is the sale-time snapshot.
 /// </summary>
 public sealed record RecentSaleDto(
     Guid Id,

@@ -99,32 +99,44 @@ internal sealed class SalesModuleContract(
             .ToList();
     }
 
-    public async Task<IReadOnlyList<CustomerLastPurchase>> GetLastCreditSaleDatesByCustomerAsync(
+    public async Task<IReadOnlyList<CustomerPurchaseStats>> GetPurchaseStatsByCustomerAsync(
         CancellationToken cancellationToken = default)
     {
+        // One grouped query over every sale that carries a customer, whatever the payment type.
         var rows = await db.Sales
             .AsNoTracking()
             .Where(s => s.CustomerId != null)
             .GroupBy(s => s.CustomerId!.Value)
-            .Select(g => new { CustomerId = g.Key, Last = g.Max(s => s.Date) })
+            .Select(g => new
+            {
+                CustomerId = g.Key,
+                Last = g.Max(s => s.Date),
+                Total = g.Sum(s => s.TotalAmount),
+                Count = g.Count()
+            })
             .ToListAsync(cancellationToken);
 
         return rows
-            .Select(r => new CustomerLastPurchase(r.CustomerId, r.Last))
+            .Select(r => new CustomerPurchaseStats(r.CustomerId, r.Last, r.Total, r.Count))
             .ToList();
     }
 
-    public async Task<IReadOnlyList<CustomerCreditSale>> GetCreditSalesByCustomerAsync(
+    public async Task<IReadOnlyList<CustomerSaleEntry>> GetSalesByCustomerAsync(
         Guid customerId,
         CancellationToken cancellationToken = default)
     {
-        // Only credit sales carry a customer id, so filtering by it already excludes cash/card sales.
-        return await db.Sales
+        // ToCode() cannot translate to SQL, so project the raw enum and map in memory.
+        var rows = await db.Sales
             .AsNoTracking()
             .Where(s => s.CustomerId == customerId)
             .OrderBy(s => s.Date)
-            .Select(s => new CustomerCreditSale(s.Id, s.Date, s.ProductName, s.Quantity, s.TotalAmount))
+            .Select(s => new { s.Id, s.Date, s.ProductName, s.Quantity, s.TotalAmount, s.PaymentType })
             .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new CustomerSaleEntry(
+                r.Id, r.Date, r.ProductName, r.Quantity, r.TotalAmount, r.PaymentType.ToCode()))
+            .ToList();
     }
 
     public async Task<Result> DeleteCreditSaleAsync(

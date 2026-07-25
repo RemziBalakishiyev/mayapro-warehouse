@@ -7,7 +7,7 @@ Modullararası referanslar **FK DEYİL** — sadəcə saxlanan Id-dir (navigatio
 | Sahə | Hədəf | Qeyd |
 |---|---|---|
 | `Sale.ProductId` (Guid?) | products.Products | null = sərbəst satış |
-| `Sale.CustomerId` (Guid?) | customers.Customers | yalnız nisyədə dolu |
+| `Sale.CustomerId` (Guid?) | customers.Customers | hər ödəniş növündə ola bilər (nisyədə məcburi); borca təsir yalnız nisyədə |
 | `Sale.SoldByUserId` (Guid?) | identity.Users | + `SoldByName` snapshot |
 | `Expense.ProductId` (Guid?) | products.Products | + `ProductName` snapshot |
 | `Product.SupplierId` (**string**) | suppliers.Suppliers | tarixi səbəbdən string (frontend `sup_1` formatı) |

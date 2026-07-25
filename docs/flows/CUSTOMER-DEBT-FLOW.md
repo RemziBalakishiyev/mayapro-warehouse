@@ -10,12 +10,16 @@
 - **Ödəniş** (`POST /api/customers/{id}/payments`, hər rol): `Customer.DecreaseDebt` — məbləğ borcdan böyükdürsə `Customers.PaymentExceedsDebt` (400). `CustomerPayment` sətri yazılır, activity log.
 - **Nisyə satışın silinməsi/düzəlişi**: `ReverseDebt` — 0-da floor, heç vaxt imtina etmir.
 
-## Borc tarixçəsi (`GET /api/customers/{id}/history`)
+## Müştəri tarixçəsi (`GET /api/customers/{id}/history`)
 
 Üç mənbə birləşdirilir, xronoloji sıralanır:
-1. `CustomerDebtAdjustments` (ilkin borc) — type `InitialDebt`
-2. Nisyə satışlar — Sales kontraktından (`GetCreditSalesByCustomerAsync`), type `Sale`, `saleId` ilə
-3. `CustomerPayments` — type `Payment`
+1. `CustomerDebtAdjustments` (ilkin borc) — type `initialDebt`
+2. BÜTÜN satışlar (hər ödəniş növü) — Sales kontraktından (`GetSalesByCustomerAsync`), type `sale`, `saleId` + `paymentType` ilə. Borcu yalnız Nisyə sətirləri artırıb; frontend `paymentType` ilə fərqləndirir
+3. `CustomerPayments` — type `payment`
+
+## Müştəri statistikaları (`GET /api/customers`)
+
+`ISalesModule.GetPurchaseStatsByCustomerAsync` — bütün satış növləri üzərində qruplaşdırılmış tək sorğu: `lastPurchaseDate` (son istənilən satış), `totalPurchases`, `purchaseCount`.
 
 ## Nisyə sətrinin silinməsi (`DELETE /api/customers/{id}/credits/{saleId}`, Owner+Manager)
 

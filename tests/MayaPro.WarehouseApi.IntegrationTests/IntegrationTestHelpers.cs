@@ -96,7 +96,14 @@ internal static class IntegrationTestHelpers
 
     internal sealed record ProductDto(Guid Id, string Name, int Quantity, int InitialQuantity, decimal RealCostPerUnit);
 
-    internal sealed record CustomerDto(Guid Id, string Name, decimal Debt, decimal InitialDebt);
+    internal sealed record CustomerDto(
+        Guid Id,
+        string Name,
+        decimal Debt,
+        decimal InitialDebt,
+        decimal TotalPurchases,
+        int PurchaseCount,
+        DateTime? LastPurchaseDate);
 
     internal sealed record SupplierDto(Guid Id, string Name, decimal Debt, int ItemCount);
 
@@ -134,7 +141,7 @@ internal static class IntegrationTestHelpers
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
 
     internal sealed record CustomerHistoryEntryDto(
-        DateTime Date, string Type, decimal Amount, string? Note, Guid? SaleId);
+        DateTime Date, string Type, decimal Amount, string? Note, Guid? SaleId, string? PaymentType);
 
     internal sealed record SupplierPaymentDto(Guid Id, Guid SupplierId, decimal Amount);
 

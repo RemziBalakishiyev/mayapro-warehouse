@@ -29,8 +29,10 @@ public sealed class SaleTests
     }
 
     [Fact]
-    public void Create_Drops_Customer_For_Non_Credit_Sale()
+    public void Create_Keeps_Customer_For_Non_Credit_Sale()
     {
+        Guid customerId = Guid.NewGuid();
+
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(),
             productName: "Mal",
@@ -39,11 +41,11 @@ public sealed class SaleTests
             unitPrice: 10m,
             costPerUnit: 5m,
             paymentType: PaymentType.Cash,
-            customerId: Guid.NewGuid(), // provided, but a cash sale keeps no customer
+            customerId: customerId, // optional on cash/card — kept for purchase history, debt untouched
             soldByUserId: null,
             soldByName: "Satıcı");
 
-        Assert.Null(sale.CustomerId);
+        Assert.Equal(customerId, sale.CustomerId);
     }
 
     [Fact]
@@ -94,7 +96,7 @@ public sealed class SaleTests
     }
 
     [Fact]
-    public void CreateManual_Keeps_Customer_Only_For_Credit()
+    public void CreateManual_Keeps_Customer_For_Every_Payment_Type()
     {
         Guid customerId = Guid.NewGuid();
 
@@ -106,7 +108,7 @@ public sealed class SaleTests
             paymentType: PaymentType.Cash, customerId: customerId, soldByUserId: null, soldByName: "Satıcı");
 
         Assert.Equal(customerId, credit.CustomerId);
-        Assert.Null(cash.CustomerId);
+        Assert.Equal(customerId, cash.CustomerId);
     }
 
     [Fact]
@@ -141,22 +143,23 @@ public sealed class SaleTests
     }
 
     [Fact]
-    public void ReviseManual_Recomputes_And_Drops_Customer_For_Non_Credit()
+    public void ReviseManual_Recomputes_And_Keeps_Customer_For_Non_Credit()
     {
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(), productName: "Köhnə", category: "K", quantity: 1,
             unitPrice: 10m, costPerUnit: 5m, paymentType: PaymentType.Credit,
             customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı");
 
+        Guid newCustomerId = Guid.NewGuid();
         var items = new List<SaleExpenseItem> { new("Yol", 5m) };
-        // Cash → the supplied customer is dropped; no cost → profit stays unknown.
+        // Cash keeps the supplied customer too (debt untouched); no cost → profit stays unknown.
         sale.ReviseManual(
             "Əl ilə", category: null, quantity: 2, unitPrice: 15m, costPerUnit: null,
-            paymentType: PaymentType.Cash, customerId: Guid.NewGuid(), expenseItems: items);
+            paymentType: PaymentType.Cash, customerId: newCustomerId, expenseItems: items);
 
         Assert.True(sale.IsManual);
         Assert.Null(sale.ProductId);
-        Assert.Null(sale.CustomerId);
+        Assert.Equal(newCustomerId, sale.CustomerId);
         Assert.Null(sale.Profit);
         Assert.Equal(30m, sale.TotalAmount);
         Assert.Equal(new SaleExpenseItem("Yol", 5m), Assert.Single(sale.ExpenseItems));

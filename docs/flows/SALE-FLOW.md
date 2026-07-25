@@ -4,7 +4,7 @@
 
 Tək transaction-da (`IUnitOfWork`):
 
-1. Validation (FluentValidation; nisyədə `customerId` mütləq).
+1. Validation (FluentValidation; nisyədə `customerId` mütləq — nağd/kartda istəyə bağlıdır və satırda saxlanır, borca toxunmur).
 2. Transaction açılır.
 3. **Kataloq satışı** (`productId` var): `IProductsModule.TryDecreaseStockAsync` — stok çatmırsa `InsufficientStock`, hər şey geri sarılır. Qaytarılan snapshot-dan ad/kateqoriya/real maya götürülür.
    **Sərbəst satış** (`productId` yox): stok addımı yoxdur; ad/kateqoriya/maya (optional) command-dan; xərc sətirləri (`expenseItems`) yalnız sənədləşmə üçün saxlanır — maya hesabına girmir.
