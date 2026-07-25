@@ -1,8 +1,10 @@
+using System.Threading.RateLimiting;
 using MayaPro.WarehouseApi.Api.Extensions;
 using MayaPro.WarehouseApi.Api.Middleware;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
@@ -29,6 +31,20 @@ builder.Services.AddCors(options => options.AddPolicy(FrontendCors, policy => po
 
 // --- JWT bearer authentication, role policies and ICurrentUser ---
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// --- Rate limiting: the anonymous invoice link is public, so cap it per IP (30/min) ---
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("PublicInvoice", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+});
 
 // --- Global exception handling ---
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -89,6 +105,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(FrontendCors);
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

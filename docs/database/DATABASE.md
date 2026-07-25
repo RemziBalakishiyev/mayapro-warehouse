@@ -34,6 +34,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 - `identity.Users.Phone` — unique
 - `dayend.Closings.Date` — unique (bir günə bir bağlanış, race qoruması)
 - `activity.ActivityLogs.CreatedAt` — descending index (feed sorğusu üçün)
+- `sales.Sales.InvoiceToken` — unique filtered (`IS NOT NULL`) — açıq faktura linki tokeni
 
 ## Seed (yalnız Development)
 

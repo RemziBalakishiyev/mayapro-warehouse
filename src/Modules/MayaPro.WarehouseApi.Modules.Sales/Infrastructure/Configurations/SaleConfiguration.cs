@@ -51,7 +51,11 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        // Public invoice-link token: Base64Url of 32 random bytes (43 chars); 64 leaves headroom.
+        builder.Property(s => s.InvoiceToken).HasMaxLength(64);
+
         builder.HasIndex(s => s.Date);
         builder.HasIndex(s => s.CustomerId);
+        builder.HasIndex(s => s.InvoiceToken).IsUnique().HasFilter("[InvoiceToken] IS NOT NULL");
     }
 }

@@ -11,6 +11,9 @@ namespace MayaPro.WarehouseApi.Modules.Exports.Endpoints;
 
 internal static class ExportsEndpoints
 {
+    // Matches the host's rate-limit policy: the anonymous invoice endpoint is capped per IP.
+    private const string PublicInvoiceRateLimit = "PublicInvoice";
+
     public static void MapExportsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/exports")
@@ -57,6 +60,29 @@ internal static class ExportsEndpoints
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
             .WithName("ExportSaleInvoicePdf");
+
+        // The one anonymous surface: tokenised invoice links shared over WhatsApp. Same pattern as the
+        // Auth module's login — no group-level auth, explicit AllowAnonymous; rate-limited per IP instead.
+        endpoints.MapGroup("/api/public/invoices")
+            .WithTags("Public")
+            .MapGet("/{token}", async (
+                string token,
+                HttpContext http,
+                PublicInvoicePdfHandler handler,
+                CancellationToken ct) =>
+            {
+                Result<ExportFileResult> result = await handler.Handle(token, ct);
+                if (result.IsFailure)
+                    return result.ToHttpResult();
+
+                // Inline, not attachment — the phone browser should render the PDF, not download it.
+                ExportFileResult file = result.Value;
+                http.Response.Headers.ContentDisposition = $"inline; filename=\"{file.FileName}\"";
+                return Results.File(file.Content, file.ContentType);
+            })
+            .AllowAnonymous()
+            .RequireRateLimiting(PublicInvoiceRateLimit)
+            .WithName("GetPublicInvoicePdf");
     }
 
     private static bool TryParseOptionalDate(string? raw, out DateOnly? date, out string? error)

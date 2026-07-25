@@ -27,7 +27,7 @@ Hədəf silinəndə referans qalır ("Silinmiş müştəri" davranışı) — z�
 - **User**: FullName, Phone (unique), Email, PasswordHash (BCrypt), Role (string), IsActive
 - **Product**: ad/kateqoriya(string snapshot)/barcode/qiymətlər/Quantity/InitialQuantity(sabit)/MinStock/yerləşmə sahələri/Attributes(JSON)/Expenses(JSON)/RealCostPerUnit(hesablanan)
 - **Category**: sadə ad siyahısı (məhsul kateqoriyaya FK ilə bağlanmır)
-- **Sale**: snapshot sahələri (ProductName, Category, CostPerUnit), Quantity, UnitPrice, Subtotal, TotalAmount(=Subtotal), Profit(null ola bilər), PaymentType, IsManual, ExpenseItems(JSON), Date(UTC)
+- **Sale**: snapshot sahələri (ProductName, Category, CostPerUnit), Quantity, UnitPrice, Subtotal, TotalAmount(=Subtotal), Profit(null ola bilər), PaymentType, IsManual, ExpenseItems(JSON), Date(UTC), InvoiceToken(nullable, unique — açıq link, bir dəfə yaranır)
 - **Customer**: Name, Phone, Note, Debt (0-dan aşağı düşmür)
 - **CustomerPayment / CustomerDebtAdjustment**: məbləğ + tarix + qeyd
 - **Supplier**: Name, ContactName, Phone, Note, Debt, ItemCount

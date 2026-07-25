@@ -26,6 +26,7 @@ public sealed class ExportsModule : IModule
         services.AddScoped<ExportProductsExcelHandler>();
         services.AddScoped<ExportSalesPdfHandler>();
         services.AddScoped<ExportSaleInvoicePdfHandler>();
+        services.AddScoped<PublicInvoicePdfHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

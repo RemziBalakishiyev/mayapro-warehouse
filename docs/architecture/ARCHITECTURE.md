@@ -6,7 +6,9 @@
 
 ## Host pipeline (Program.cs)
 
-`UseExceptionHandler` → `UseSerilogRequestLogging` → (dev-də Swagger) → `UseCors("Frontend")` → `UseAuthentication` → `UseAuthorization` → `/health` → modul endpoint-ləri → startup-da modul migration-ları (3 cəhd, artan gecikmə).
+`UseExceptionHandler` → `UseSerilogRequestLogging` → (dev-də Swagger) → `UseCors("Frontend")` → `UseRateLimiter` → `UseAuthentication` → `UseAuthorization` → `/health` → modul endpoint-ləri → startup-da modul migration-ları (3 cəhd, artan gecikmə).
+
+Rate limiting: host-da `PublicInvoice` policy (IP başına 30/dəq, fixed window, 429) — auth-suz açıq faktura endpoint-i üçün; modullar policy adını lokal const kimi təkrar bəyan edir (OwnerOnly pattern-i ilə eyni decoupling).
 
 ## Modul mexanizmi
 
@@ -29,7 +31,7 @@ MediatR YOXDUR. Hər use case bir qovluq: `Command` (record) + `Handler` (DI il�
 
 ## Konfiqurasiya açarları
 
-`ConnectionStrings:Default` (tək DB), `App:TimeZone` (Asia/Baku), `Jwt:*` (Issuer/Audience/Secret ≥32 simvol/ExpiryHours=24), `Cors:FrontendOrigin` (default `http://localhost:5173`).
+`ConnectionStrings:Default` (tək DB), `App:TimeZone` (Asia/Baku), `App:PublicBaseUrl` (açıq faktura linklərinin bazası; dev `http://localhost:5208`), `Jwt:*` (Issuer/Audience/Secret ≥32 simvol/ExpiryHours=24), `Cors:FrontendOrigin` (default `http://localhost:5173`).
 
 ## Test strategiyası
 

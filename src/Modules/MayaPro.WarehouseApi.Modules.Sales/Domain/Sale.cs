@@ -51,6 +51,15 @@ public sealed class Sale : Entity
         ExpenseItems = expenseItems;
     }
 
+    /// <summary>
+    /// Opaque token behind the public (auth-suz) invoice link. Created lazily on the first link request
+    /// and never regenerated, so a shared WhatsApp link stays valid for the sale's lifetime.
+    /// </summary>
+    public string? InvoiceToken { get; private set; }
+
+    /// <summary>Assigns the public-link token once; later calls keep the original (link stability).</summary>
+    public void AssignInvoiceToken(string token) => InvoiceToken ??= token;
+
     /// <summary>The catalogued product sold; null for a free-form (manual) sale.</summary>
     public Guid? ProductId { get; private set; }
 

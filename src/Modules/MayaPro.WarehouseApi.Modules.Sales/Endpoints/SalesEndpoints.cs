@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateInvoiceLink;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSaleById;
@@ -50,6 +51,14 @@ internal static class SalesEndpoints
                 return result.ToCreatedResult(location);
             })
             .WithName("CreateSale");
+
+        // Mints (first call) or returns the sale's stable public invoice URL — WhatsApp sharing.
+        group.MapPost("/{id:guid}/invoice-link", async (
+                Guid id,
+                CreateInvoiceLinkHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .WithName("CreateSaleInvoiceLink");
 
         // Reverse-and-reapply edit: old effects unwound, new values applied on the same row (date preserved).
         group.MapPut("/{id:guid}", async (

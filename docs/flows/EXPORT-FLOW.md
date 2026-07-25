@@ -20,6 +20,12 @@ A5 format. Satış yoxdursa `Exports.SaleNotFound` (404).
 - Cədvəl çoxsətirli struktura hazırdır (hazırda hər satış bir mal).
 - Cəm + YEKUN (valyuta Settings-dən); nisyədə əlavə: "Ödəniş: Nisyə" + "Ümumi qalıq borc: X" (müştərinin CARİ borcu).
 
+## Açıq faktura linki (WhatsApp paylaşımı)
+
+1. `POST /api/sales/{id}/invoice-link` (auth, Sales modulu) → `{url}`. Token İLK çağırışda yaranır (32 kriptoqrafik random bayt → Base64Url, 43 simvol) və `Sale.InvoiceToken`-da saxlanır; sonrakı çağırışlar EYNİ linki qaytarır. URL bazası: `App:PublicBaseUrl` (dev: `http://localhost:5208`).
+2. `GET /api/public/invoices/{token}` — **auth-suz** (modulda yeganə anonim səth; login pattern-i kimi `AllowAnonymous`). Token Sales kontraktı ilə satışa çevrilir (`GetSaleIdByInvoiceTokenAsync`), mövcud faktura generatoru çağırılır, PDF **inline** qaytarılır (telefonda brauzerdə açılır). Hər cür uğursuzluq eyni 404-ə yığılır (`Exports.InvoiceNotFound`) — token mövcudluğu sızdırılmır.
+3. Qoruma: IP başına **30 sorğu/dəq** rate limit (host-da `PublicInvoice` policy, aşımda 429).
+
 ## Last Updated
 
 2026-07-25 — sistem qurulanda yaradıldı.

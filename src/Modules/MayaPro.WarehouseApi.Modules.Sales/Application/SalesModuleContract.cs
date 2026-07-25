@@ -165,4 +165,15 @@ internal sealed class SalesModuleContract(
             sale.PaymentType.ToCode(),
             sale.CustomerId);
     }
+
+    public async Task<Guid?> GetSaleIdByInvoiceTokenAsync(
+        string token,
+        CancellationToken cancellationToken = default)
+    {
+        return await db.Sales
+            .AsNoTracking()
+            .Where(s => s.InvoiceToken == token)
+            .Select(s => (Guid?)s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }

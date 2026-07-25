@@ -22,6 +22,7 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 | **Menecer** | Wire formatda mövcud rol dəyəri (`"menecer"`) |
 | **Xərc kateqoriyaları** | Yol, Fəhlə, Anbar/Yer, Paket/Qutu, Mağaza, Digər (wire dəyərləri) |
 | **WhatsApp şablonu** | Settings-də borc xatırlatma mesajı şablonu; `{debt}` placeholder-ini frontend əvəz edir. Backend mesaj göndərmir |
+| **Açıq faktura linki** | Satışın sabit tokenli auth-suz PDF linki (`/api/public/invoices/{token}`) — WhatsApp-la paylaşmaq üçün; IP başına 30/dəq limit |
 
 ## Last Updated
 

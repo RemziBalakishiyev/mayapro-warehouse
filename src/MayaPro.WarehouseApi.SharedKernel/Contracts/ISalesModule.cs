@@ -56,6 +56,12 @@ public interface ISalesModule
     /// Used by the Exports module to render the sale's invoice PDF.
     /// </summary>
     Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid saleId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resolves a public invoice-link token to its sale id, or null when no sale carries the token.
+    /// Used by the Exports module's anonymous invoice endpoint (WhatsApp sharing).
+    /// </summary>
+    Task<Guid?> GetSaleIdByInvoiceTokenAsync(string token, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

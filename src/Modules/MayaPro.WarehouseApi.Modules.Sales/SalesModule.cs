@@ -2,6 +2,7 @@ using FluentValidation;
 using MayaPro.WarehouseApi.Modules.Sales.Application;
 using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
+using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateInvoiceLink;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.GetSaleById;
@@ -46,11 +47,16 @@ public sealed class SalesModule : IModule
         services.AddScoped<IValidator<CreateSaleCommand>, CreateSaleValidator>();
         services.AddScoped<IValidator<UpdateSaleCommand>, UpdateSaleValidator>();
 
+        // Public invoice links are composed against this base URL (dev: the local http endpoint).
+        services.AddSingleton(new PublicLinkOptions(
+            configuration["App:PublicBaseUrl"] ?? "http://localhost:5208"));
+
         services.AddScoped<GetSalesHandler>();
         services.AddScoped<GetSaleByIdHandler>();
         services.AddScoped<CreateSaleHandler>();
         services.AddScoped<UpdateSaleHandler>();
         services.AddScoped<DeleteSaleHandler>();
+        services.AddScoped<CreateInvoiceLinkHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

@@ -4,7 +4,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
-## Endpoint-lər (40)
+## Endpoint-lər (42)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
@@ -28,6 +28,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 | GET | `/api/sales?date&from&to&take&skip` (PagedResult) | auth |
 | GET | `/api/sales/{id}` (detal + müştəri adı + cari məhsul adı) | auth |
 | POST | `/api/sales` | auth |
+| POST | `/api/sales/{id}/invoice-link` → `{url}` (token ilk çağırışda yaranır, sonra sabit) | auth |
 | PUT / DELETE | `/api/sales/{id}` | O+M |
 
 ### Customers (`/api/customers`)
@@ -75,6 +76,9 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 ### Exports (`/api/exports`) — hamısı auth
 `GET /products.xlsx` · `GET /sales.pdf?from&to` · `GET /sales/{id}/invoice.pdf`
+
+### Public (`/api/public`) — AUTH-SUZ
+`GET /api/public/invoices/{token}` — token ilə qaimə PDF, inline (WhatsApp paylaşımı). Rate limit: IP başına 30/dəq (429). Yanlış token → 404.
 
 ### Activity, Health
 `GET /api/activity?take&skip` (auth) · `GET /health` (anon)

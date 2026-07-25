@@ -52,6 +52,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Settings singleton sətirdir (sabit Id), ilk oxunuşda default-larla yaranır.
 - Təchizatçı borcu qalıbsa silinə bilməz (409).
 - WhatsApp: backend mesaj GÖNDƏRMİR — yalnız şablon saxlayır, `{debt}`-i frontend əvəz edir.
+- Açıq faktura linki: hər satışın bir dəfə yaranan sabit tokeni var (`Sale.InvoiceToken`); token linki bilən HƏR KƏSƏ auth-suz PDF verir — link paylaşımı müştəri ilə bölüşməyə bərabərdir. IP başına 30/dəq limit.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
