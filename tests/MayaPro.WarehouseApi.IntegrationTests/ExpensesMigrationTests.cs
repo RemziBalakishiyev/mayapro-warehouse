@@ -96,6 +96,54 @@ public sealed class ExpensesMigrationTests
         Assert.Equal(expected, row.Category);
     }
 
+    [Fact]
+    public async Task Migration_Leaves_Source_Required_And_Without_A_Lingering_Default_Constraint()
+    {
+        // The backfill fills both branches explicitly instead of adding the column with a SQL default:
+        // a default constraint would survive on the table without existing in the EF model (schema drift),
+        // and would silently paper over a future NULL.
+        var options = new DbContextOptionsBuilder<ExpensesDbContext>()
+            .UseSqlServer(ConnectionString, sql => sql
+                .MigrationsHistoryTable("__EFMigrationsHistory", ExpensesDbContext.Schema)
+                .CommandTimeout(120))
+            .Options;
+
+        await using var db = new ExpensesDbContext(options);
+        await db.Database.EnsureDeletedAsync();
+        await db.Database.MigrateAsync();
+
+        object? nullable = await ScalarAsync(db,
+            """
+            SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'expenses' AND TABLE_NAME = 'Expenses' AND COLUMN_NAME = 'Source'
+            """);
+        Assert.Equal("NO", nullable);
+
+        object? defaults = await ScalarAsync(db,
+            """
+            SELECT COUNT(*) FROM sys.default_constraints dc
+            JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id
+            WHERE dc.parent_object_id = OBJECT_ID('[expenses].[Expenses]') AND c.name = 'Source'
+            """);
+        Assert.Equal(0, defaults);
+    }
+
+    private static async Task<object?> ScalarAsync(ExpensesDbContext db, string sql)
+    {
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = sql;
+
+        await db.Database.OpenConnectionAsync();
+        try
+        {
+            return await command.ExecuteScalarAsync();
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
     private static Task InsertLegacyRowAsync(
         ExpensesDbContext db, Guid id, string name, string category, decimal amount, string? note, Guid? productId) =>
         db.Database.ExecuteSqlRawAsync(
@@ -107,7 +155,8 @@ public sealed class ExpensesMigrationTests
                 ({0},{1},{2},{3},SYSUTCDATETIME(),{4},NULL,{5},
                  NULL,SYSUTCDATETIME(),SYSUTCDATETIME());
             """,
-            id, name, category, amount, productId, note);
+            // The two optional columns go through DBNull — a plain null is not a legal params object[] entry.
+            id, name, category, amount, (object?)productId ?? DBNull.Value, (object?)note ?? DBNull.Value);
 
     private static async Task<int> CountExpensesAsync(ExpensesDbContext db)
     {

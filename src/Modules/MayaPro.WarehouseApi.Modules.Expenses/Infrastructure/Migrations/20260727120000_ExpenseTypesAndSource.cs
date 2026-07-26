@@ -44,18 +44,35 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Infrastructure.Migrations
             migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Category] = N'Mağaza xərci' WHERE [Category] = N'Store';");
             migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Category] = N'Digər' WHERE [Category] = N'Other';");
 
-            // 3. New Source column, defaulting to "general" so existing rows stay valid while the backfill runs.
+            // 3. New Source column — added nullable so the backfill decides every row explicitly. It is NOT
+            //    added with a SQL default: that would leave a permanent DEFAULT constraint on the table which
+            //    the EF model knows nothing about (schema drift on the next scaffolded migration).
             migrationBuilder.AddColumn<string>(
                 name: "Source",
                 schema: "expenses",
                 table: "Expenses",
                 type: "nvarchar(20)",
                 maxLength: 20,
-                nullable: false,
-                defaultValue: "general");
+                nullable: true);
 
-            // 4. Backfill: a row already linked to a product was always product-sourced.
+            // 4. Backfill, both branches spelled out so no row can be left NULL: a row already linked to a
+            //    product was always product-sourced, everything else is a general store expense. Both
+            //    statements are re-runnable (idempotent) and together cover every row exactly once.
             migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Source] = N'product' WHERE [ProductId] IS NOT NULL;");
+            migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Source] = N'general' WHERE [ProductId] IS NULL;");
+
+            // Every row now carries a value → make the column required, matching the entity model.
+            migrationBuilder.AlterColumn<string>(
+                name: "Source",
+                schema: "expenses",
+                table: "Expenses",
+                type: "nvarchar(20)",
+                maxLength: 20,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "nvarchar(20)",
+                oldMaxLength: 20,
+                oldNullable: true);
 
             // 5. Managed expense type list (seeded separately by ExpenseTypeSeeder, Development only).
             migrationBuilder.CreateTable(
@@ -99,6 +116,14 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Infrastructure.Migrations
             migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Category] = N'Packaging' WHERE [Category] = N'Paket/Qutu';");
             migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Category] = N'Store' WHERE [Category] = N'Mağaza xərci';");
             migrationBuilder.Sql("UPDATE [expenses].[Expenses] SET [Category] = N'Other' WHERE [Category] = N'Digər';");
+
+            // Rows recorded after this migration can carry any managed type's name (e.g. "Sığorta", or one
+            // longer than the old 20-char column). Fold anything that is not a legacy enum member into
+            // 'Other' so shrinking the column cannot fail on truncation and the old enum-backed code can
+            // still read every row. Down is lossy by nature — this makes it at least safe.
+            migrationBuilder.Sql(
+                "UPDATE [expenses].[Expenses] SET [Category] = N'Other' " +
+                "WHERE [Category] NOT IN (N'Transport', N'Labor', N'Storage', N'Packaging', N'Store', N'Other');");
 
             migrationBuilder.AlterColumn<string>(
                 name: "Category",
