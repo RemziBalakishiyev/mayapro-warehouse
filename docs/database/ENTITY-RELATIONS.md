@@ -16,11 +16,14 @@ Modullararası referanslar **FK DEYİL** — sadəcə saxlanan Id-dir (navigatio
 
 Hədəf silinəndə referans qalır ("Silinmiş müştəri" davranışı) — zəncir geri sarmaları best-effort.
 
-## Modul daxili münasibətlər (həqiqi FK-lar)
+## Modul daxili münasibətlər
+
+Eyni schema daxilində, sahib entity-nin Id-si ilə. Konfiqurasiyalarda navigation/`HasOne` YOXDUR — DB-də FK constraint də yaranmır, yalnız sorğu üçün sahib Id-si üzərində non-unique index var. Ona görə uşaq sətirləri silmək handler-in işidir (cascade yoxdur): `DeleteCustomerHandler` / `DeleteSupplierHandler` ödəniş + ilkin borc sətirlərini özü silir.
 
 - `CustomerPayment.CustomerId` → Customer (eyni modul)
 - `CustomerDebtAdjustment.CustomerId` → Customer (ilkin borc tarixçəsi)
 - `SupplierPayment.SupplierId` → Supplier
+- `SupplierDebtAdjustment.SupplierId` → Supplier (ilkin borc tarixçəsi)
 
 ## Entity-lərin qısa xəritəsi
 
@@ -31,6 +34,7 @@ Hədəf silinəndə referans qalır ("Silinmiş müştəri" davranışı) — z�
 - **Customer**: Name, Phone, Note, Debt (0-dan aşağı düşmür)
 - **CustomerPayment / CustomerDebtAdjustment**: məbləğ + tarix + qeyd
 - **Supplier**: Name, ContactName, Phone, Note, Debt, ItemCount
+- **SupplierPayment / SupplierDebtAdjustment**: məbləğ + tarix + qeyd
 - **Expense**: Title, Category(enum), Amount, Date, ProductId?, ProductName?, Note
 - **Closing**: gün totalları + ExpectedCash/Difference (constructor-da hesablanır), Date unique
 - **ActivityLog**: Type(≤50), Message(≤1000), UserId?, UserName snapshot
@@ -38,7 +42,7 @@ Hədəf silinəndə referans qalır ("Silinmiş müştəri" davranışı) — z�
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-27 — `SupplierDebtAdjustment` əlavə olundu; modul daxili münasibətlərin FK-sızlığı dəqiqləşdirildi.
 
 ## Related Code
 

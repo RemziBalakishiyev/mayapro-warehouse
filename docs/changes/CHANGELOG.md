@@ -2,6 +2,10 @@
 
 Əhəmiyyətli dəyişikliklərin qısa qeydiyyatı — yeni girişlər yuxarıya. Tam tarixçə üçün `git log`.
 
+## 2026-07-27
+
+- **Təchizatçı ilkin borcu + tarixçə** (BE#3): yeni `SupplierDebtAdjustment` entity (`suppliers.SupplierDebtAdjustments`, migration `AddSupplierDebtAdjustments`, `SupplierId` üzərində index) — müştəri tərəfindəki `CustomerDebtAdjustment` pattern-inin güzgüsü. `POST /api/suppliers` `debt > 0` göndəriləndə təchizatçı + ilkin borc sətri + `"{ad} — ilkin borc {məbləğ} AZN"` activity log-u TƏK `IUnitOfWork` transaction-ında yazılır; `debt = 0`-da köhnə davranış olduğu kimi qalır, mənfi `debt` yenə 400. Yeni `GET /api/suppliers/{id}/history` — ilkin borc (`initialDebt`) + ödənişlər (`payment`) xronoloji artan sırada. Köhnə `GET /api/suppliers/{id}/payments` kontraktı dəyişməyib. Təchizatçı silinəndə ilkin borc sətirləri də təmizlənir (FK cascade yoxdur). Bilinən boşluq: `POST /{id}/debts` (kreditlə alış) hələ tarixçə sətri yaratmır.
+
 ## 2026-07-26
 
 - **Satışda maya və alış qiymətinin ayrılması** (BE#1): `Sale.PurchasePricePerUnit` (nullable, migration `AddSalePurchasePricePerUnit`) — kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur (kontrakta `ProductStockSnapshot.PurchasePrice` əlavə edildi), sərbəst satışda command-dan olduğu kimi yazılır. `CostPerUnit`/`Profit` formulları toxunulmadı. Wire: `purchasePricePerUnit` (POST/PUT `/api/sales` optional giriş; `SaleDto`/`SaleDetailDto` çıxışı), mənfi dəyər 400. Migration mövcud sərbəst satışların alış qiymətini mayadan bərpa edir (xərc payı çıxılır), kataloq satışlarında NULL qalır.
@@ -38,7 +42,7 @@
 
 ## Last Updated
 
-2026-07-26 — BE#1 (satışda alış qiyməti snapshot-u).
+2026-07-27 — BE#3 (təchizatçı ilkin borcu + tarixçə endpoint-i).
 
 ## Related Code
 

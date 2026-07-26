@@ -4,7 +4,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
-## Endpoint-lər (42)
+## Endpoint-lər (43)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
@@ -46,10 +46,12 @@ POST/PUT `/api/sales` optional `purchasePricePerUnit` (nullable decimal) qəbul 
 ### Suppliers (`/api/suppliers`)
 | Verb | Route | Auth |
 |---|---|---|
-| GET | `/api/suppliers` · `/{id}/payments` | auth |
+| GET | `/api/suppliers` · `/{id}/payments` · `/{id}/history` | auth |
 | POST | `/api/suppliers` · `/{id}/debts` · `/{id}/payments` | O+M |
 | PUT | `/api/suppliers/{id}` | O+M |
 | DELETE | `/api/suppliers/{id}` (borc qalıbsa 409) | O |
+
+POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənfi → 400 «Borc mənfi ola bilməz». `debt > 0` olduqda `SupplierDebtAdjustment` tarixçə sətri də yazılır. `GET /{id}/history` = ilkin borc + ödənişlər, xronoloji ARTAN sırada (`{date, type, amount, note}`, `type` = `initialDebt` | `payment`). Köhnə `GET /{id}/payments` dəyişməz qalıb — YALNIZ ödənişləri, tarix üzrə AZALAN sırada qaytarır.
 
 ### Expenses (`/api/expenses`)
 | Verb | Route | Auth |
@@ -91,7 +93,7 @@ Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları
 
 ## Last Updated
 
-2026-07-26 — satış request/response-una `purchasePricePerUnit`.
+2026-07-27 — təchizatçı ilkin borcu + `GET /api/suppliers/{id}/history`.
 
 ## Related Code
 
