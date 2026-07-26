@@ -6,6 +6,8 @@
 
 `Expense.Category` bu adın sərbəst-string SNAPSHOT-udur (FK yoxdur) — `Product.Category`-nin eyni prinsipi: növ sonradan silinsə/adı dəyişsə köhnə xərclər pozulmur.
 
+Ad qaydaları: boşluqlar kəsilir (trim), dublikat yoxlaması **case-insensitive**-dir (handler adları kiçildərək müqayisə edir — DB collation-undan asılı deyil, `"Yol pulu"` == `"yol pulu"` → 400), ad ≤ 100 simvol (`ExpenseTypes.Name`/`Expenses.Category` sütun ölçüsü; uzun ad DB-yə çatmadan 400 qaytarır).
+
 ## Xərc mənbəyi (Source)
 
 `Expense.Source` — daxildə enum (`ExpenseSource`), wire-da string: `"general"` | `"product"`.
@@ -46,12 +48,13 @@ Tək transaction-da:
 ## Migration qeydi (`ExpenseTypesAndSource`)
 
 - Köhnə `ExpenseCategory` enum-u (Transport/Labor/Storage/Packaging/Store/Other) ləğv edildi — `Category` indi sərbəst string (`nvarchar(100)`, əvvəl `nvarchar(20)`). Mövcud sətirlər Azərbaycanca adlara çevrildi: Transport→Yol pulu, Labor→Fəhlə pulu, Storage→Yer/Anbar xərci, Packaging→Paket/Qutu, Store→Mağaza xərci, Other→Digər.
-- Yeni `Source` sütunu backfill: `ProductId` dolu sətirlərdə `product`, boş sətirlərdə `general`.
+- Yeni `Source` sütunu əvvəlcə nullable əlavə olunur, hər iki budaq açıq şəkildə backfill edilir (`ProductId` dolu → `product`, boş → `general`), sonra NOT NULL-a çevrilir. SQL default constraint-i QƏSDƏN istifadə olunmur: o, EF modelində olmayan bir constraint kimi cədvəldə qalar və gələcək migration-larda schema drift yaradardı. Backfill UPDATE-ləri təkrar icraya davamlıdır (idempotent).
+- `Down()` geri qaytarır, lakin təbiətcə itkilidir: Azərbaycanca adlar köhnə enum adlarına çevrilir, bu migration-dan sonra yaradılmış (idarə olunan növ) adlar isə `Other`-ə yığılır ki, sütun `nvarchar(20)`-ə kiçilərkən truncation xətası verməsin və köhnə enum-əsaslı kod hər sətri oxuya bilsin.
 - Testi: `tests/MayaPro.WarehouseApi.IntegrationTests/ExpensesMigrationTests.cs`.
 
 ## Last Updated
 
-2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source), migration qeydi.
+2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source), migration qeydi; review-dan sonra: ad qaydaları (case-insensitive dublikat, ≤100 simvol) və migration backfill/Down detalları.
 
 ## Related Code
 
