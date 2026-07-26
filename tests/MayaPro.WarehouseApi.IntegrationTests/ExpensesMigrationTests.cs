@@ -1,4 +1,6 @@
+using System.Data;
 using MayaPro.WarehouseApi.Modules.Expenses.Infrastructure;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -155,8 +157,14 @@ public sealed class ExpensesMigrationTests
                 ({0},{1},{2},{3},SYSUTCDATETIME(),{4},NULL,{5},
                  NULL,SYSUTCDATETIME(),SYSUTCDATETIME());
             """,
-            // The two optional columns go through DBNull — a plain null is not a legal params object[] entry.
-            id, name, category, amount, (object?)productId ?? DBNull.Value, (object?)note ?? DBNull.Value);
+            // The two optional columns must round-trip a genuine SQL NULL. A plain (object?)value ?? DBNull.Value
+            // entry in the params object[] makes EF Core look up a store type mapping for the CLR type of the
+            // *value itself* — and there is no mapping for System.DBNull, so that throws at runtime even though
+            // it compiles. Passing them as fully-formed SqlParameter objects instead makes EF Core use them
+            // verbatim (see RawSqlCommandBuilder.Build), bypassing that lookup entirely.
+            id, name, category, amount,
+            new SqlParameter("productId", SqlDbType.UniqueIdentifier) { Value = (object?)productId ?? DBNull.Value },
+            new SqlParameter("note", SqlDbType.NVarChar, 500) { Value = (object?)note ?? DBNull.Value });
 
     private static async Task<int> CountExpensesAsync(ExpensesDbContext db)
     {
