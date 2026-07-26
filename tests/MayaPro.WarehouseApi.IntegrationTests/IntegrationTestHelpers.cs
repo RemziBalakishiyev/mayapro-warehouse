@@ -25,34 +25,54 @@ internal static class IntegrationTestHelpers
     }
 
     public static async Task<ProductDto> CreateProductAsync(
-        this HttpClient client, string barcode, int quantity, decimal salePrice = 10m, string supplierId = "sup_1")
+        this HttpClient client, string barcode, int quantity, decimal salePrice = 10m, string supplierId = "sup_1",
+        decimal purchasePrice = 5m, IEnumerable<(string Name, decimal Amount)>? expenses = null)
     {
-        object body = new
-        {
-            name = "Satış test malı",
-            category = "Test",
-            attributes = new[] { new { name = "Ölçü", value = "M" }, new { name = "Rəng", value = "Qara" } },
-            barcode,
-            image = "",
-            note = "",
-            purchasePrice = 5m,
-            salePrice,
-            quantity,
-            minStock = 1,
-            currency = "AZN",
-            supplierId,
-            location = "Anbar A / Rəf 1 / Qutu 1",
-            store = "Anbar A",
-            warehouse = "Anbar A",
-            shelf = "1",
-            box = "1",
-            expenses = Array.Empty<object>()
-        };
-
-        HttpResponseMessage response = await client.PostAsJsonAsync("/api/products", body);
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/products",
+            ProductBody(barcode, quantity, salePrice, supplierId, purchasePrice, expenses));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<ProductDto>())!;
     }
+
+    /// <summary>Edits a product in place; only the fields a test cares about differ from the create body.</summary>
+    public static async Task<HttpResponseMessage> UpdateProductAsync(
+        this HttpClient client, Guid id, string barcode, int quantity, decimal salePrice = 10m,
+        string supplierId = "sup_1", decimal purchasePrice = 5m,
+        IEnumerable<(string Name, decimal Amount)>? expenses = null)
+    {
+        HttpResponseMessage response = await client.PutAsJsonAsync(
+            $"/api/products/{id}",
+            ProductBody(barcode, quantity, salePrice, supplierId, purchasePrice, expenses));
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
+    private static object ProductBody(
+        string barcode, int quantity, decimal salePrice, string supplierId, decimal purchasePrice,
+        IEnumerable<(string Name, decimal Amount)>? expenses) => new
+    {
+        name = "Satış test malı",
+        category = "Test",
+        attributes = new[] { new { name = "Ölçü", value = "M" }, new { name = "Rəng", value = "Qara" } },
+        barcode,
+        image = "",
+        note = "",
+        purchasePrice,
+        salePrice,
+        quantity,
+        minStock = 1,
+        currency = "AZN",
+        supplierId,
+        location = "Anbar A / Rəf 1 / Qutu 1",
+        store = "Anbar A",
+        warehouse = "Anbar A",
+        shelf = "1",
+        box = "1",
+        expenses = (expenses ?? Array.Empty<(string, decimal)>())
+            .Select(e => new { name = e.Name, amount = e.Amount })
+            .ToArray()
+    };
 
     public static async Task<CustomerDto> CreateCustomerAsync(
         this HttpClient client, string name, decimal debt = 0m)
@@ -115,6 +135,7 @@ internal static class IntegrationTestHelpers
         int Quantity,
         decimal TotalAmount,
         decimal? CostPerUnit,
+        decimal? PurchasePricePerUnit,
         decimal? Profit,
         string PaymentType,
         Guid? CustomerId,
@@ -133,6 +154,9 @@ internal static class IntegrationTestHelpers
         string? CurrentProductName,
         int Quantity,
         decimal TotalAmount,
+        decimal? CostPerUnit,
+        decimal? PurchasePricePerUnit,
+        decimal? Profit,
         Guid? CustomerId,
         string? CustomerName,
         bool IsManual,

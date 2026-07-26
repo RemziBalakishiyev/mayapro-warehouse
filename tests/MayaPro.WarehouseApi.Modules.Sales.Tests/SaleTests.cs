@@ -157,14 +157,18 @@ public sealed class SaleTests
         Guid newCustomerId = Guid.NewGuid();
         var items = new List<SaleExpenseItem> { new("Yol", 5m) };
         // Cash keeps the supplied customer too (debt untouched); no cost → profit stays unknown.
+        // Turning a catalogued sale into a free-form one drops the product's purchase-price snapshot: the
+        // sale no longer points at a product, so nothing vouches for that figure any more.
         sale.ReviseManual(
             "Əl ilə", category: null, quantity: 2, unitPrice: 15m, costPerUnit: null,
-            paymentType: PaymentType.Cash, customerId: newCustomerId, expenseItems: items);
+            paymentType: PaymentType.Cash, customerId: newCustomerId, expenseItems: items,
+            purchasePricePerUnit: null);
 
         Assert.True(sale.IsManual);
         Assert.Null(sale.ProductId);
         Assert.Equal(newCustomerId, sale.CustomerId);
         Assert.Null(sale.Profit);
+        Assert.Null(sale.PurchasePricePerUnit); // the old catalogued snapshot is not left behind
         Assert.Equal(30m, sale.TotalAmount);
         Assert.Equal(new SaleExpenseItem("Yol", 5m), Assert.Single(sale.ExpenseItems));
     }
@@ -260,6 +264,34 @@ public sealed class SaleTests
             costPerUnit: 85m, purchasePricePerUnit: 90m, paymentType: PaymentType.Cash, customerId: null);
 
         Assert.Equal(90m, sale.PurchasePricePerUnit);
+    }
+
+    [Fact]
+    public void ReviseManual_Rewrites_PurchasePrice_And_Leaves_Cost_Independent()
+    {
+        // AC-6, free-form half: the edited command's value replaces the stored one outright — and clearing it
+        // (null) is a legitimate edit, not a reason to keep the previous figure.
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 125m,
+            paymentType: PaymentType.Cash, customerId: null, soldByUserId: null, soldByName: "Satıcı",
+            expenseItems: null, purchasePricePerUnit: 100m);
+
+        sale.ReviseManual(
+            "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 130m,
+            paymentType: PaymentType.Cash, customerId: null,
+            expenseItems: Array.Empty<SaleExpenseItem>(), purchasePricePerUnit: 120m);
+
+        Assert.Equal(120m, sale.PurchasePricePerUnit);
+        Assert.Equal(130m, sale.CostPerUnit);        // the two figures move independently
+        Assert.Equal(140m, sale.Profit);             // (200 − 130) × 2 — still driven by CostPerUnit only
+
+        sale.ReviseManual(
+            "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 130m,
+            paymentType: PaymentType.Cash, customerId: null,
+            expenseItems: Array.Empty<SaleExpenseItem>(), purchasePricePerUnit: null);
+
+        Assert.Null(sale.PurchasePricePerUnit);
+        Assert.Equal(130m, sale.CostPerUnit);        // clearing the purchase price never touches the cost
     }
 
     [Fact]
