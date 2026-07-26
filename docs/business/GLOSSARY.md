@@ -12,7 +12,8 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 | **Real maya (RealCostPerUnit)** | Bir vahidin həqiqi maya dəyəri = alış qiyməti + (partiya xərcləri ÷ ilkin say). `Product.CalculateRealCost` |
 | **İlkin say (InitialQuantity)** | Məhsul yaradılarkən alınan partiya sayı; ömürlük sabit — xərc bölgüsünün məxrəci |
 | **Sərbəst satış (manual sale)** | Kataloqda olmayan malın əl ilə yazılmış satışı: `productId = null`, stok hərəkəti yoxdur, maya bilinməyə bilər (`IsManual`) |
-| **Snapshot** | Satış anında məhsul adı/kateqoriya/maya kopyalanır — məhsul sonradan dəyişsə tarixi qazanc pozulmur |
+| **Alış qiyməti (PurchasePricePerUnit)** | Satış anında 1 vahidin TƏMİZ alış qiyməti (xərcsiz) — mayadan ayrıca saxlanılan snapshot. Qazanc hesabına girmir; bilinmirsə `null`. `Sale.PurchasePricePerUnit` |
+| **Snapshot** | Satış anında məhsul adı/kateqoriya/maya/alış qiyməti kopyalanır — məhsul sonradan dəyişsə tarixi qazanc pozulmur |
 | **Qazanc (Profit)** | (satış qiyməti − maya) × say. Maya bilinməyəndə `null` — hesabatlar 0 kimi yox, "naməlum" sayır |
 | **Qaimə-faktura** | Satış üçün A5 PDF sənəd, № formatı `SF-yyyyMMdd-XXXXXX` (Exports modulu) |
 | **Bağlanış (Closing)** | Gün sonu kassa üzləşdirməsi. `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash` |
@@ -26,7 +27,7 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-26 — «Alış qiyməti (PurchasePricePerUnit)» termini əlavə olundu.
 
 ## Related Code
 

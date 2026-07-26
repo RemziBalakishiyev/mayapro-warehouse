@@ -73,6 +73,7 @@ public sealed class UpdateSaleHandler(
                 command.Quantity,
                 command.SalePrice,
                 stock.Value.RealCostPerUnit,
+                stock.Value.PurchasePrice,
                 paymentType,
                 command.CustomerId);
         }
@@ -97,7 +98,8 @@ public sealed class UpdateSaleHandler(
                 command.CostPerUnit,
                 paymentType,
                 command.CustomerId,
-                expenseItems);
+                expenseItems,
+                command.PurchasePricePerUnit);
         }
 
         await activityLogger.LogAsync(

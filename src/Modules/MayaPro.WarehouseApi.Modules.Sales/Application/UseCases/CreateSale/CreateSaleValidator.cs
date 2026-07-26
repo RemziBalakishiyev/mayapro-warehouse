@@ -25,5 +25,9 @@ public sealed class CreateSaleValidator : AbstractValidator<CreateSaleCommand>
         RuleFor(x => x.CustomerId)
             .NotNull().When(x => x.PaymentType == PaymentTypeCode.Credit)
             .WithMessage("Nisyə satış üçün müştəri seçilməlidir");
+
+        RuleFor(x => x.PurchasePricePerUnit)
+            .GreaterThanOrEqualTo(0m).When(x => x.PurchasePricePerUnit is not null)
+            .WithMessage("Alış qiyməti mənfi ola bilməz");
     }
 }

@@ -61,6 +61,7 @@ public sealed class CreateSaleHandler(
                 command.Quantity,
                 command.SalePrice,
                 stock.Value.RealCostPerUnit,
+                stock.Value.PurchasePrice,
                 paymentType,
                 command.CustomerId,
                 currentUser.UserId,
@@ -91,7 +92,8 @@ public sealed class CreateSaleHandler(
                 command.CustomerId,
                 currentUser.UserId,
                 currentUser.Name ?? string.Empty,
-                expenseItems);
+                expenseItems,
+                command.PurchasePricePerUnit);
         }
 
         // ⑤ Record the sale.

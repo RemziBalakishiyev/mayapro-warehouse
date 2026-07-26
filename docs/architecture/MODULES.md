@@ -31,9 +31,11 @@
 
 Yeni kontrakt metodu əlavə edəndə: interfeys `SharedKernel/Contracts/`-da, implementasiya provider modulun `Application/<Modul>ModuleContract.cs`-ində. Kontrakt metodları dəyişikliyi **save etmir** — caller öz UnitOfWork-ündə commit edir (bax ADR-0003).
 
+Kontrakt record-una sahə əlavə etmək də kontrakt dəyişikliyidir: satışın alış qiyməti snapshot-u üçün `ProductStockSnapshot`-a `PurchasePrice` əlavə olundu (provider: Products, istehlakçı: Sales create/update) — modul sərhədini keçən yeganə yol budur, Sales heç vaxt `products` cədvəlini oxumur.
+
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-26 — `ProductStockSnapshot.PurchasePrice` kontrakt genişlənməsi.
 
 ## Related Code
 

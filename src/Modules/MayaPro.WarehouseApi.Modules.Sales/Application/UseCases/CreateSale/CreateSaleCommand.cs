@@ -17,6 +17,12 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 /// seller-supplied <see cref="CostPerUnit"/> was worked out. It is stored as-is and never recomputes the
 /// cost/profit; it is ignored for catalogued sales.
 /// </para>
+/// <para>
+/// <see cref="PurchasePricePerUnit"/> is only meaningful for a free-form sale — the seller already knows
+/// the buy price separately from the computed <see cref="CostPerUnit"/> — and is stored as-is (never
+/// negative; enforced by the validator). Ignored for catalogued sales, whose value is snapshotted from
+/// the product instead.
+/// </para>
 /// </summary>
 public sealed record CreateSaleCommand(
     Guid? ProductId,
@@ -28,4 +34,5 @@ public sealed record CreateSaleCommand(
     string? ProductName = null,
     decimal? CostPerUnit = null,
     string? Category = null,
-    IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null);
+    IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null,
+    decimal? PurchasePricePerUnit = null);

@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
 using MayaPro.WarehouseApi.Modules.Sales.Domain;
 
 namespace MayaPro.WarehouseApi.Modules.Sales.Tests;
@@ -16,6 +17,7 @@ public sealed class SaleTests
             quantity: 3,
             unitPrice: 20m,
             costPerUnit: 12m,
+            purchasePricePerUnit: 8m,
             paymentType: PaymentType.Cash,
             customerId: null,
             soldByUserId: Guid.NewGuid(),
@@ -40,6 +42,7 @@ public sealed class SaleTests
             quantity: 1,
             unitPrice: 10m,
             costPerUnit: 5m,
+            purchasePricePerUnit: 3m,
             paymentType: PaymentType.Cash,
             customerId: customerId, // optional on cash/card — kept for purchase history, debt untouched
             soldByUserId: null,
@@ -117,7 +120,7 @@ public sealed class SaleTests
         Guid seller = Guid.NewGuid();
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(), productName: "Köhnə", category: "Köhnə kateqoriya", quantity: 1,
-            unitPrice: 10m, costPerUnit: 5m, paymentType: PaymentType.Cash,
+            unitPrice: 10m, costPerUnit: 5m, purchasePricePerUnit: 4m, paymentType: PaymentType.Cash,
             customerId: null, soldByUserId: seller, soldByName: "Satıcı");
 
         Guid originalId = sale.Id;
@@ -127,7 +130,7 @@ public sealed class SaleTests
         // New values: (20 − 12) × 3 = 24; subtotal/total 60.
         sale.ReviseCatalogued(
             newProductId, "Yeni", "Yeni kateqoriya", quantity: 3, unitPrice: 20m,
-            costPerUnit: 12m, paymentType: PaymentType.Cash, customerId: null);
+            costPerUnit: 12m, purchasePricePerUnit: 9m, paymentType: PaymentType.Cash, customerId: null);
 
         Assert.Equal(newProductId, sale.ProductId);
         Assert.Equal("Yeni", sale.ProductName);
@@ -135,6 +138,7 @@ public sealed class SaleTests
         Assert.Equal(60m, sale.Subtotal);
         Assert.Equal(60m, sale.TotalAmount);
         Assert.Equal(24m, sale.Profit);
+        Assert.Equal(9m, sale.PurchasePricePerUnit);
         Assert.False(sale.IsManual);
         // Identity, sale date and seller are never rewritten by an update.
         Assert.Equal(originalId, sale.Id);
@@ -147,21 +151,162 @@ public sealed class SaleTests
     {
         Sale sale = Sale.Create(
             productId: Guid.NewGuid(), productName: "Köhnə", category: "K", quantity: 1,
-            unitPrice: 10m, costPerUnit: 5m, paymentType: PaymentType.Credit,
+            unitPrice: 10m, costPerUnit: 5m, purchasePricePerUnit: 4m, paymentType: PaymentType.Credit,
             customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı");
 
         Guid newCustomerId = Guid.NewGuid();
         var items = new List<SaleExpenseItem> { new("Yol", 5m) };
         // Cash keeps the supplied customer too (debt untouched); no cost → profit stays unknown.
+        // Turning a catalogued sale into a free-form one drops the product's purchase-price snapshot: the
+        // sale no longer points at a product, so nothing vouches for that figure any more.
         sale.ReviseManual(
             "Əl ilə", category: null, quantity: 2, unitPrice: 15m, costPerUnit: null,
-            paymentType: PaymentType.Cash, customerId: newCustomerId, expenseItems: items);
+            paymentType: PaymentType.Cash, customerId: newCustomerId, expenseItems: items,
+            purchasePricePerUnit: null);
 
         Assert.True(sale.IsManual);
         Assert.Null(sale.ProductId);
         Assert.Equal(newCustomerId, sale.CustomerId);
         Assert.Null(sale.Profit);
+        Assert.Null(sale.PurchasePricePerUnit); // the old catalogued snapshot is not left behind
         Assert.Equal(30m, sale.TotalAmount);
         Assert.Equal(new SaleExpenseItem("Yol", 5m), Assert.Single(sale.ExpenseItems));
+    }
+
+    // ── PurchasePricePerUnit (BE#1) ─────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CreateManual_Separates_PurchasePrice_From_ComputedCost()
+    {
+        // TC-1: purchase price 100 + Σexpenses 50 over 2 units → costPerUnit 125 (caller-computed);
+        // purchasePricePerUnit stays 100 — the two figures are stored side by side, one never overwrites
+        // the other. Profit uses CostPerUnit, unaffected by the presence of PurchasePricePerUnit.
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal",
+            category: null,
+            quantity: 2,
+            unitPrice: 200m,
+            costPerUnit: 125m,
+            paymentType: PaymentType.Cash,
+            customerId: null,
+            soldByUserId: null,
+            soldByName: "Satıcı",
+            expenseItems: new List<SaleExpenseItem> { new("Xərc", 50m) },
+            purchasePricePerUnit: 100m);
+
+        Assert.Equal(100m, sale.PurchasePricePerUnit);
+        Assert.Equal(125m, sale.CostPerUnit);
+        Assert.Equal(150m, sale.Profit); // (200 − 125) × 2
+        Assert.Equal(400m, sale.Subtotal);
+        Assert.Equal(400m, sale.TotalAmount);
+    }
+
+    [Fact]
+    public void Create_Snapshots_PurchasePrice_Separately_From_RealCost()
+    {
+        // TC-2: product PurchasePrice=80, RealCostPerUnit=95 (purchase price + spread expenses); the sale
+        // snapshots both — PurchasePricePerUnit from the product's purchase price, CostPerUnit unchanged
+        // from the product's real cost.
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(),
+            productName: "Mal",
+            category: "Kateqoriya",
+            quantity: 3,
+            unitPrice: 150m,
+            costPerUnit: 95m,
+            purchasePricePerUnit: 80m,
+            paymentType: PaymentType.Cash,
+            customerId: null,
+            soldByUserId: null,
+            soldByName: "Satıcı");
+
+        Assert.Equal(80m, sale.PurchasePricePerUnit);
+        Assert.Equal(95m, sale.CostPerUnit);
+        Assert.Equal(165m, sale.Profit); // (150 − 95) × 3
+    }
+
+    [Fact]
+    public void CreateManual_Without_PurchasePrice_Is_Null_Safe()
+    {
+        // TC-3: neither cost nor purchase price supplied — no exception, both null, profit stays unknown.
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal",
+            category: null,
+            quantity: 1,
+            unitPrice: 50m,
+            costPerUnit: null,
+            paymentType: PaymentType.Cash,
+            customerId: null,
+            soldByUserId: null,
+            soldByName: "Satıcı",
+            purchasePricePerUnit: null);
+
+        Assert.Null(sale.PurchasePricePerUnit);
+        Assert.Null(sale.CostPerUnit);
+        Assert.Null(sale.Profit);
+    }
+
+    [Fact]
+    public void ReviseCatalogued_Resnapshots_PurchasePrice()
+    {
+        // TC-9: an update re-snapshots the product's *current* purchase price, independent of the value the
+        // sale was originally created with.
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Mal", category: "K", quantity: 1,
+            unitPrice: 100m, costPerUnit: 80m, purchasePricePerUnit: 80m, paymentType: PaymentType.Cash,
+            customerId: null, soldByUserId: null, soldByName: "Satıcı");
+
+        Assert.Equal(80m, sale.PurchasePricePerUnit);
+
+        // Product's purchase price changed to 90 since the sale was made; the update snapshots it afresh.
+        sale.ReviseCatalogued(
+            sale.ProductId!.Value, "Mal", "K", quantity: 1, unitPrice: 100m,
+            costPerUnit: 85m, purchasePricePerUnit: 90m, paymentType: PaymentType.Cash, customerId: null);
+
+        Assert.Equal(90m, sale.PurchasePricePerUnit);
+    }
+
+    [Fact]
+    public void ReviseManual_Rewrites_PurchasePrice_And_Leaves_Cost_Independent()
+    {
+        // AC-6, free-form half: the edited command's value replaces the stored one outright — and clearing it
+        // (null) is a legitimate edit, not a reason to keep the previous figure.
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 125m,
+            paymentType: PaymentType.Cash, customerId: null, soldByUserId: null, soldByName: "Satıcı",
+            expenseItems: null, purchasePricePerUnit: 100m);
+
+        sale.ReviseManual(
+            "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 130m,
+            paymentType: PaymentType.Cash, customerId: null,
+            expenseItems: Array.Empty<SaleExpenseItem>(), purchasePricePerUnit: 120m);
+
+        Assert.Equal(120m, sale.PurchasePricePerUnit);
+        Assert.Equal(130m, sale.CostPerUnit);        // the two figures move independently
+        Assert.Equal(140m, sale.Profit);             // (200 − 130) × 2 — still driven by CostPerUnit only
+
+        sale.ReviseManual(
+            "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 130m,
+            paymentType: PaymentType.Cash, customerId: null,
+            expenseItems: Array.Empty<SaleExpenseItem>(), purchasePricePerUnit: null);
+
+        Assert.Null(sale.PurchasePricePerUnit);
+        Assert.Equal(130m, sale.CostPerUnit);        // clearing the purchase price never touches the cost
+    }
+
+    [Fact]
+    public void ToDto_Carries_PurchasePricePerUnit()
+    {
+        // TC-8: the wire DTO exposes purchasePricePerUnit for both the summary and detail shapes.
+        Sale sale = Sale.CreateManual(
+            productName: "Əl ilə mal", category: null, quantity: 2, unitPrice: 200m, costPerUnit: 125m,
+            paymentType: PaymentType.Cash, customerId: null, soldByUserId: null, soldByName: "Satıcı",
+            purchasePricePerUnit: 100m);
+
+        SaleDto dto = sale.ToDto();
+        SaleDetailDto detail = sale.ToDetailDto(customerName: null, currentProductName: null);
+
+        Assert.Equal(100m, dto.PurchasePricePerUnit);
+        Assert.Equal(100m, detail.PurchasePricePerUnit);
     }
 }

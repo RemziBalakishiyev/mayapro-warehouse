@@ -18,6 +18,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - `TotalAmount = UnitPrice × Quantity` (endirim sahəsi YOXDUR — ADR-0007).
 - `Profit = (UnitPrice − CostPerUnit) × Quantity`; maya bilinməyəndə `null` (0 sayılmır, hesabatlarda ayrıca "naməlum" göstərilir).
 - Satış anında ad/kateqoriya/maya snapshot olunur (ADR-0004).
+- **Maya ≠ alış qiyməti**: `CostPerUnit` (real maya) ilə yanaşı `PurchasePricePerUnit` (təmiz alış qiyməti) ayrıca saxlanılır. Kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur; sərbəst satışda command-dan olduğu kimi yazılır (yenidən hesablanmır, mənfi ola bilməz). Qazanc HƏMİŞƏ yalnız `CostPerUnit`-dən hesablanır — alış qiyməti hesablamaya girmir. Bilinmirsə `null` (0 yazılmır).
 - Stok satışdan böyükdürsə `Sales.InsufficientStock`; stok heç vaxt 0-dan aşağı düşmür.
 - `customerId` HƏR ödəniş növündə göndərilə bilər (nağd/kartda istəyə bağlı, nisyədə MƏCBURİ). Borca təsir yalnız nisyədə: satış cəmi müştəri borcuna əlavə olunur; nağd/kartda müştəri yalnız alış tarixçəsi üçündür.
 - Satış düzəlişi = köhnə effektlər geri sarılır + yeni dəyərlərlə yenidən tətbiq (eyni Id/tarix/satıcı qalır). Günü bağlanmış satış redaktə oluna bilməz (`Sales.DayClosedConflict`, 409). Silmədə bağlı gün qoruması YOXDUR.
@@ -58,7 +59,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-26 — satışda maya/alış qiyməti ayrılması (`PurchasePricePerUnit`).
 
 ## Related Code
 

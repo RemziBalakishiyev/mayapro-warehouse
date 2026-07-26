@@ -19,4 +19,5 @@ public sealed record UpdateSaleCommand(
     string? ProductName = null,
     decimal? CostPerUnit = null,
     string? Category = null,
-    IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null);
+    IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null,
+    decimal? PurchasePricePerUnit = null);

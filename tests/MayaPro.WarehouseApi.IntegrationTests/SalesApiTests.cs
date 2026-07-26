@@ -486,6 +486,147 @@ public sealed class SalesApiTests : IAsyncLifetime
         Assert.Equal(2, still.Quantity); // the sale kept its original quantity
     }
 
+    // ── PurchasePricePerUnit (BE#1): the buy price travels the whole chain, apart from the real cost ──────
+
+    [Fact]
+    public async Task Catalogued_Sale_Snapshots_Product_Purchase_Price_Beside_Its_Real_Cost()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        // Purchase price 8, plus 20 AZN of batch expenses over 10 units → real cost 10 per unit. The two
+        // figures are deliberately different, so a sale that confused them would show up here.
+        var product = await client.CreateProductAsync(
+            "SALE-PPU-CAT", quantity: 10, salePrice: 15m, purchasePrice: 8m,
+            expenses: new[] { ("Yol pulu", 20m) });
+        Assert.Equal(10m, product.RealCostPerUnit);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id, quantity = 2, salePrice = 15m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+
+        Assert.Equal(8m, sale.PurchasePricePerUnit); // snapshot of the product's buy price
+        Assert.Equal(10m, sale.CostPerUnit);         // unchanged: still the real cost
+        Assert.Equal(10m, sale.Profit);              // (15 − 10) × 2 — profit still follows the cost
+
+        // Same pair survives the read models (list + detail), so the frontend sees both figures.
+        var detail = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+            $"/api/sales/{sale.Id}"))!;
+        Assert.Equal(8m, detail.PurchasePricePerUnit);
+        Assert.Equal(10m, detail.CostPerUnit);
+    }
+
+    [Fact]
+    public async Task Manual_Sale_Round_Trips_Supplied_Purchase_Price()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "Əl ilə mal (alış qiyməti)",
+            quantity = 2,
+            salePrice = 200m,
+            costPerUnit = 125m,           // seller's computed cost (purchase price + spread expenses)
+            purchasePricePerUnit = 100m,  // the buy price itself — stored as-is, never recomputed
+            paymentType = "Nağd",
+            customerId = (Guid?)null,
+            expenseItems = new[] { new { name = "Yol pulu", amount = 50m } }
+        });
+
+        Assert.Equal(100m, sale.PurchasePricePerUnit);
+        Assert.Equal(125m, sale.CostPerUnit);
+        Assert.Equal(150m, sale.Profit);   // (200 − 125) × 2 — the buy price never enters the profit formula
+
+        var detail = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+            $"/api/sales/{sale.Id}"))!;
+        Assert.Equal(100m, detail.PurchasePricePerUnit);
+    }
+
+    [Fact]
+    public async Task Manual_Sale_Without_Purchase_Price_Stores_Null()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "Əl ilə mal (alış qiyməti bilinmir)",
+            quantity = 1,
+            salePrice = 50m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+
+        // Omitting the field is not an error and invents no zero — unknown stays unknown, like the cost.
+        Assert.Null(sale.PurchasePricePerUnit);
+        Assert.Null(sale.CostPerUnit);
+        Assert.Null(sale.Profit);
+    }
+
+    [Fact]
+    public async Task Negative_Purchase_Price_Returns_400_And_Writes_No_Sale()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        int before = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>("/api/sales?take=1"))!.Total;
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "Əl ilə mal (mənfi alış)",
+            quantity = 1,
+            salePrice = 10m,
+            purchasePricePerUnit = -10m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Alış qiyməti mənfi ola bilməz", error.Message);
+
+        int after = (await client.GetFromJsonAsync<IntegrationTestHelpers.PagedSalesDto>("/api/sales?take=1"))!.Total;
+        Assert.Equal(before, after); // rejected before anything was written
+    }
+
+    [Fact]
+    public async Task Update_Catalogued_Sale_Resnapshots_The_Products_Current_Purchase_Price()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync(
+            "SALE-PPU-UPD", quantity: 10, salePrice: 15m, purchasePrice: 8m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id, quantity = 1, salePrice = 15m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+        Assert.Equal(8m, sale.PurchasePricePerUnit);
+
+        // The product is re-bought dearer; only an edited sale picks the new figure up.
+        await client.UpdateProductAsync(
+            product.Id, "SALE-PPU-UPD", quantity: 9, salePrice: 15m, purchasePrice: 12m);
+
+        HttpResponseMessage update = await client.PutAsJsonAsync($"/api/sales/{sale.Id}", new
+        {
+            productId = product.Id, quantity = 1, salePrice = 15m,
+            paymentType = "Nağd", customerId = (Guid?)null
+        });
+
+        var detail = (await client.GetFromJsonAsync<IntegrationTestHelpers.SaleDetailDto>(
+            $"/api/sales/{sale.Id}"))!;
+        if (update.StatusCode == HttpStatusCode.OK)
+        {
+            Assert.Equal(12m, detail.PurchasePricePerUnit); // re-snapshotted from the product
+        }
+        else
+        {
+            // The day was already closed — edits are refused and the original snapshot stands.
+            Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
+            Assert.Equal(8m, detail.PurchasePricePerUnit);
+        }
+    }
+
     private static async Task<IntegrationTestHelpers.SaleDto> CreateSaleAsync(HttpClient client, object body)
     {
         HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", body);
