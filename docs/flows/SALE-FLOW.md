@@ -6,8 +6,8 @@ Tək transaction-da (`IUnitOfWork`):
 
 1. Validation (FluentValidation; nisyədə `customerId` mütləq — nağd/kartda istəyə bağlıdır və satırda saxlanır, borca toxunmur).
 2. Transaction açılır.
-3. **Kataloq satışı** (`productId` var): `IProductsModule.TryDecreaseStockAsync` — stok çatmırsa `InsufficientStock`, hər şey geri sarılır. Qaytarılan snapshot-dan ad/kateqoriya/real maya götürülür.
-   **Sərbəst satış** (`productId` yox): stok addımı yoxdur; ad/kateqoriya/maya (optional) command-dan; xərc sətirləri (`expenseItems`) yalnız sənədləşmə üçün saxlanır — maya hesabına girmir.
+3. **Kataloq satışı** (`productId` var): `IProductsModule.TryDecreaseStockAsync` — stok çatmırsa `InsufficientStock`, hər şey geri sarılır. Qaytarılan snapshot-dan ad/kateqoriya/real maya və alış qiyməti (`ProductStockSnapshot.PurchasePrice`) götürülür.
+   **Sərbəst satış** (`productId` yox): stok addımı yoxdur; ad/kateqoriya/maya/alış qiyməti (hamısı optional) command-dan; xərc sətirləri (`expenseItems`) yalnız sənədləşmə üçün saxlanır — maya hesabına girmir.
 4. Nisyədirsə: `ICustomersModule.IncreaseDebtAsync(customerId, total)`.
 5. `Sale.Create/CreateManual` — snapshot-larla; satıcı adı `ICurrentUser`-dan.
 6. Activity log ("Satış etdi").
@@ -23,6 +23,7 @@ Reverse-and-reapply, tək transaction:
 2. Köhnə effektlər geri: stok qaytarılır (`IncreaseStockAsync`), nisyə idisə borc azalır (`DecreaseDebtAsync`, 0-da floor) — best-effort.
 3. Yeni dəyərlərlə CreateSale zənciri təkrar tətbiq olunur (stok çatmırsa bütün update uğursuz → rollback, köhnə vəziyyət qalır).
 4. Id, tarix, satıcı dəyişmir (`ReviseCatalogued`/`ReviseManual`).
+5. Snapshot-lar (maya, alış qiyməti, ad, kateqoriya) yenidən müəyyən olunur: kataloq satışında məhsulun CARİ dəyərlərindən, sərbəst satışda command-dan — command-da göndərilməyən alış qiyməti `null` yazılır (köhnə dəyər saxlanmır).
 
 ## Delete (`DELETE /api/sales/{id}`, Owner+Manager)
 
@@ -37,7 +38,7 @@ Nisyə sətrini müştəri borc UI-dan silmək: `DELETE /api/customers/{id}/cred
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-26 — alış qiyməti snapshot-u (create + update).
 
 ## Related Code
 

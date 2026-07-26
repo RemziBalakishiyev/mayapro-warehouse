@@ -74,6 +74,12 @@ export interface Sale {
   customerId: string | null;
   /** Satış anındakı real maya snapshot-u (1 ədəd). Sərbəst satışda maya bilinmirsə null */
   costPerUnit: number | null;
+  /**
+   * Satış anındakı TƏMİZ alış qiyməti (1 ədəd) — mayadan ayrı sahə, xərc payı daxil deyil.
+   * Kataloq satışında məhsulun `purchasePrice`-ından snapshot; sərbəst satışda göndərilən dəyər olduğu kimi.
+   * Bilinmirsə (köhnə sətirlər, sərbəst satışda göndərilməyib) null. Qazanc hesabına GİRMİR.
+   */
+  purchasePricePerUnit: number | null;
   /** Qazanc. Sərbəst satışda maya bilinmirsə null — yalançı qazanc yazılmır */
   profit: number | null;
   /** Sərbəst satış: mal əl ilə yazılıb, stok dəyişməyib */
@@ -98,6 +104,10 @@ export interface SaleExpenseItem {
  * - Yeni GET /api/sales/{id} — tək satışın tam detalı: bütün Sale sahələri + `customerName` (nisyədirsə) +
  *   `currentProductName` (kataloq satışında məhsulun cari adı; snapshot `productName` yerində qalır).
  *   Mövcud olmayan id → 404.
+ * - POST/PUT /api/sales optional `purchasePricePerUnit` (number|null) qəbul edir — YALNIZ sərbəst satışda
+ *   nəzərə alınır (kataloq satışında məhsulun cari alış qiyməti snapshot olunur, göndərilən dəyər atılır).
+ *   Mənfi dəyər → 400 «Alış qiyməti mənfi ola bilməz». `costPerUnit` ilə paralel sahədir, biri digərini əvəz
+ *   etmir və qazanc yenə yalnız `costPerUnit`-dən hesablanır.
  */
 export interface SaleDetail extends Sale {
   /** Nisyə satışda müştərinin adı; əks halda null */

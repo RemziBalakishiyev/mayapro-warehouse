@@ -2,6 +2,10 @@
 
 Əhəmiyyətli dəyişikliklərin qısa qeydiyyatı — yeni girişlər yuxarıya. Tam tarixçə üçün `git log`.
 
+## 2026-07-26
+
+- **Satışda maya və alış qiymətinin ayrılması** (BE#1): `Sale.PurchasePricePerUnit` (nullable, migration `AddSalePurchasePricePerUnit`) — kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur (kontrakta `ProductStockSnapshot.PurchasePrice` əlavə edildi), sərbəst satışda command-dan olduğu kimi yazılır. `CostPerUnit`/`Profit` formulları toxunulmadı. Wire: `purchasePricePerUnit` (POST/PUT `/api/sales` optional giriş; `SaleDto`/`SaleDetailDto` çıxışı), mənfi dəyər 400. Migration mövcud sərbəst satışların alış qiymətini mayadan bərpa edir (xərc payı çıxılır), kataloq satışlarında NULL qalır.
+
 ## 2026-07-25
 
 - **Müştəri bütün satış növlərində**: `customerId` artıq nağd/kartda da göndərilə bilər (nisyədə məcburi qalır); borc təsiri yalnız nisyədə. Müştəri statistikaları bütün satışları əhatə edir: `lastPurchaseDate` son istənilən satış, yeni `totalPurchases`/`purchaseCount` sahələri (`GetPurchaseStatsByCustomerAsync` — tək qruplaşdırılmış sorğu). Tarixçəyə nağd/kart satışlar da düşür (`paymentType` sahəsi ilə). Kontrakt: `GetLastCreditSaleDatesByCustomerAsync`→`GetPurchaseStatsByCustomerAsync`, `GetCreditSalesByCustomerAsync`→`GetSalesByCustomerAsync`.
@@ -34,7 +38,7 @@
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-26 — BE#1 (satışda alış qiyməti snapshot-u).
 
 ## Related Code
 

@@ -31,6 +31,8 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 | POST | `/api/sales/{id}/invoice-link` → `{url}` (token ilk çağırışda yaranır, sonra sabit) | auth |
 | PUT / DELETE | `/api/sales/{id}` | O+M |
 
+POST/PUT `/api/sales` optional `purchasePricePerUnit` (nullable decimal) qəbul edir — yalnız sərbəst satışda oxunur (kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur, göndərilən dəyər nəzərə alınmır). Mənfi → 400 «Alış qiyməti mənfi ola bilməz». Cavab DTO-larında (`SaleDto`, `SaleDetailDto`) `purchasePricePerUnit` sahəsi var; açıq faktura PDF-i bu sahəni GÖSTƏRMİR (`SaleInvoiceInfo`-da maya/alış sahələri yoxdur).
+
 ### Customers (`/api/customers`)
 | Verb | Route | Auth |
 |---|---|---|
@@ -89,7 +91,7 @@ Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-26 — satış request/response-una `purchasePricePerUnit`.
 
 ## Related Code
 
