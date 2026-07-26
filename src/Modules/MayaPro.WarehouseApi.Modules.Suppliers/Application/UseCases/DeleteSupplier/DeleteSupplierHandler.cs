@@ -7,8 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.DeleteSupplier;
 
 /// <summary>
-/// Deletes a supplier along with their payment history, in one transaction. A supplier we still owe money
-/// cannot be deleted (→ 409). Products keep their loose <c>SupplierId</c> reference — no cross-module FK.
+/// Deletes a supplier along with their payment and opening-balance history, in one transaction. A supplier
+/// we still owe money cannot be deleted (→ 409). Products keep their loose <c>SupplierId</c> reference —
+/// no cross-module FK.
 /// </summary>
 public sealed class DeleteSupplierHandler(
     ISuppliersDbContext db,
@@ -27,6 +28,7 @@ public sealed class DeleteSupplierHandler(
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
+        // Remove the supplier's history first, then the supplier itself — no FK cascade to lean on.
         List<SupplierPayment> payments = await db.SupplierPayments
             .Where(p => p.SupplierId == id)
             .ToListAsync(ct);
