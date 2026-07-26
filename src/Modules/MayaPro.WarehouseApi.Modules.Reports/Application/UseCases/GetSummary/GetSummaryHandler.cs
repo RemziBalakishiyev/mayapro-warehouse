@@ -23,6 +23,11 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
         // as zero, and reported separately so the frontend can flag "N sales with unknown profit".
         decimal profit = salesRows.Sum(s => s.Profit ?? 0m);
         decimal expensesTotal = expenseRows.Sum(e => e.Amount);
+        // Same total, split by source — general expenses never touched a product's cost.
+        decimal generalExpenses = expenseRows
+            .Where(e => e.Source == WireFormat.ExpenseSources.General).Sum(e => e.Amount);
+        decimal productExpenses = expenseRows
+            .Where(e => e.Source == WireFormat.ExpenseSources.Product).Sum(e => e.Amount);
 
         return Result.Success(new SummaryDto(
             Period: window.Code,
@@ -37,6 +42,8 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
             CardSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Card).Sum(s => s.TotalAmount),
             CreditSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Credit).Sum(s => s.TotalAmount),
             UnknownProfitSalesCount: salesRows.Count(s => s.Profit is null),
-            UnknownProfitAmount: salesRows.Where(s => s.Profit is null).Sum(s => s.TotalAmount)));
+            UnknownProfitAmount: salesRows.Where(s => s.Profit is null).Sum(s => s.TotalAmount),
+            GeneralExpenses: generalExpenses,
+            ProductExpenses: productExpenses));
     }
 }

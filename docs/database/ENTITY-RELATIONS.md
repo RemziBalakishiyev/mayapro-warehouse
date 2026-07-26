@@ -27,18 +27,19 @@ Hədəf silinəndə referans qalır ("Silinmiş müştəri" davranışı) — z�
 - **User**: FullName, Phone (unique), Email, PasswordHash (BCrypt), Role (string), IsActive
 - **Product**: ad/kateqoriya(string snapshot)/barcode/qiymətlər/Quantity/InitialQuantity(sabit)/MinStock/yerləşmə sahələri/Attributes(JSON)/Expenses(JSON)/RealCostPerUnit(hesablanan)
 - **Category**: sadə ad siyahısı (məhsul kateqoriyaya FK ilə bağlanmır)
+- **ExpenseType**: sadə ad siyahısı, unique (xərc `Category`-yə FK ilə bağlanmır — Category ilə eyni pattern)
 - **Sale**: snapshot sahələri (ProductName, Category, CostPerUnit), Quantity, UnitPrice, Subtotal, TotalAmount(=Subtotal), Profit(null ola bilər), PaymentType, IsManual, ExpenseItems(JSON), Date(UTC), InvoiceToken(nullable, unique — açıq link, bir dəfə yaranır)
 - **Customer**: Name, Phone, Note, Debt (0-dan aşağı düşmür)
 - **CustomerPayment / CustomerDebtAdjustment**: məbləğ + tarix + qeyd
 - **Supplier**: Name, ContactName, Phone, Note, Debt, ItemCount
-- **Expense**: Title, Category(enum), Amount, Date, ProductId?, ProductName?, Note
+- **Expense**: Title, Category(string snapshot, ExpenseType-a FK-sız), Source(enum: general/product), Amount, Date, ProductId?, ProductName?, Note
 - **Closing**: gün totalları + ExpectedCash/Difference (constructor-da hesablanır), Date unique
 - **ActivityLog**: Type(≤50), Message(≤1000), UserId?, UserName snapshot
 - **StoreSettings**: singleton — StoreName, OwnerName?, Address?, Phone?, WhatsappTemplate, Currency, DefaultMinStock, Language
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-27 — BE#4: `ExpenseType` əlavə olundu; `Expense.Category` enum-dan sərbəst-string snapshot-a keçdi, `Expense.Source` (general/product) sahəsi əlavə olundu.
 
 ## Related Code
 

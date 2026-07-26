@@ -10,6 +10,11 @@ namespace MayaPro.WarehouseApi.Modules.Reports.Application.Contracts;
 /// separately via <see cref="UnknownProfitSalesCount"/> and <see cref="UnknownProfitAmount"/> (their revenue sum).
 /// </para>
 /// </summary>
+/// <summary>
+/// <see cref="GeneralExpenses"/> + <see cref="ProductExpenses"/> always sums to <see cref="Expenses"/> —
+/// a split of the same total by <c>Expense.Source</c> ("general" = no product effect, "product" = raised a
+/// product's real cost), not a separate figure.
+/// </summary>
 public sealed record SummaryDto(
     string Period,
     DateOnly? From,
@@ -23,4 +28,6 @@ public sealed record SummaryDto(
     decimal CardSales,
     decimal CreditSales,
     int UnknownProfitSalesCount,
-    decimal UnknownProfitAmount);
+    decimal UnknownProfitAmount,
+    decimal GeneralExpenses,
+    decimal ProductExpenses);

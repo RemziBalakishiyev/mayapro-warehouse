@@ -127,7 +127,7 @@ internal static class IntegrationTestHelpers
 
     internal sealed record SupplierDto(Guid Id, string Name, decimal Debt, int ItemCount);
 
-    internal sealed record ExpenseDto(Guid Id, string Title, string Category, decimal Amount, Guid? ProductId);
+    internal sealed record ExpenseDto(Guid Id, string Title, string Category, string Source, decimal Amount, Guid? ProductId);
 
     internal sealed record SaleDto(
         Guid Id,
@@ -243,7 +243,9 @@ internal static class IntegrationTestHelpers
         decimal CardSales,
         decimal CreditSales,
         int UnknownProfitSalesCount,
-        decimal UnknownProfitAmount);
+        decimal UnknownProfitAmount,
+        decimal GeneralExpenses,
+        decimal ProductExpenses);
 
     internal sealed record ErrorDto(string Code, string Message);
 }

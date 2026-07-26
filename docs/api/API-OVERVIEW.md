@@ -4,7 +4,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
-## Endpoint-lər (42)
+## Endpoint-lər (44)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
@@ -51,12 +51,15 @@ POST/PUT `/api/sales` optional `purchasePricePerUnit` (nullable decimal) qəbul 
 | PUT | `/api/suppliers/{id}` | O+M |
 | DELETE | `/api/suppliers/{id}` (borc qalıbsa 409) | O |
 
-### Expenses (`/api/expenses`)
+### Expenses (`/api/expenses`, `/api/expense-types`)
 | Verb | Route | Auth |
 |---|---|---|
-| GET | `/api/expenses?month` | auth |
+| GET | `/api/expenses?month&source` | auth |
 | POST | `/api/expenses` | O+M |
 | PUT / DELETE | `/api/expenses/{id}` | O+M |
+| GET / POST | `/api/expense-types` | auth |
+
+`source` (idarə olunan xərc mənbəyi: `general` \| `product`) POST/PUT `/api/expenses`-də MƏCBURİdir və `productId` ilə uyğun olmalıdır (`product` → productId var, `general` → yoxdur); uyğunsuzluq/naməlum dəyər 400. `GET /api/expenses` üzərindəki `source` filtri optionaldır, naməlum dəyər 400 (`Expenses.InvalidSource`). `category` artıq sabit kod (EXP_CATS) deyil — idarə olunan `ExpenseType`-ın sərbəst-string ad snapshot-udur (dublikat ad → 400 `Expenses.ExpenseTypeDuplicate`). `GET /api/reports/summary` cavabına `generalExpenses`/`productExpenses` bölgüsü əlavə olundu (cəmi `expenses` sahəsinə bərabərdir).
 
 ### DayEnd (`/api/closings`)
 | Verb | Route | Auth |
@@ -91,7 +94,7 @@ Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları
 
 ## Last Updated
 
-2026-07-26 — satış request/response-una `purchasePricePerUnit`.
+2026-07-27 — BE#4: `GET/POST /api/expense-types` (idarə olunan xərc növləri), `Expense.category` sərbəst string oldu, `source` (general/product) sahəsi + `GET /api/expenses?source` filtri, summary-ə `generalExpenses`/`productExpenses`.
 
 ## Related Code
 

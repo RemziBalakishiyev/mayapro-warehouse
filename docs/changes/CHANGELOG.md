@@ -2,6 +2,10 @@
 
 Əhəmiyyətli dəyişikliklərin qısa qeydiyyatı — yeni girişlər yuxarıya. Tam tarixçə üçün `git log`.
 
+## 2026-07-27
+
+- **İdarə olunan xərc növləri + xərc mənbəyi ayrımı** (BE#4): yeni `ExpenseType` (Category-nin analoqu — unique ad, `GET/POST /api/expense-types`, hər rola açıq, seed Development-də 7 default növ). `Expense.Category` enum-dan sərbəst-string snapshot-a keçdi (`nvarchar(20)`→`nvarchar(100)`); köhnə `ExpenseCategory`/`ExpenseCategoryCode` tamamilə çıxarıldı. Yeni `Expense.Source` (daxildə enum, wire `"general"`\|`"product"`): `product` — `ProductId` məcburi, maya zənciri işə düşür; `general` — `ProductId` qadağan, mayaya təsirsiz. `CreateExpenseValidator`/`UpdateExpenseValidator`-da qarşılıqlı validasiya. `GET /api/expenses` üzərinə optional `source` filtri (mövcud `month` ilə birgə), naməlum dəyər → 400 (`Expenses.InvalidSource`). `GetSummaryHandler`/`SummaryDto`-ya `generalExpenses`/`productExpenses` bölgüsü (cəmi mövcud `expenses`-ə bərabər, `netProfit` dəyişməyib) — kontrakt: `ExpenseReportRow`-a `Source` sahəsi. Migration `ExpenseTypesAndSource`: köhnə enum dəyərləri Azərbaycanca adlara çevrilir (Transport→Yol pulu və s.), `Source` `ProductId`-dən backfill olunur (dolu→product, boş→general). **Breaking wire change**: `POST/PUT /api/expenses` indi `source` sahəsini MƏCBURİ tələb edir; `category` artıq sabit EXP_CATS kodu deyil, sərbəst string.
+
 ## 2026-07-26
 
 - **Satışda maya və alış qiymətinin ayrılması** (BE#1): `Sale.PurchasePricePerUnit` (nullable, migration `AddSalePurchasePricePerUnit`) — kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur (kontrakta `ProductStockSnapshot.PurchasePrice` əlavə edildi), sərbəst satışda command-dan olduğu kimi yazılır. `CostPerUnit`/`Profit` formulları toxunulmadı. Wire: `purchasePricePerUnit` (POST/PUT `/api/sales` optional giriş; `SaleDto`/`SaleDetailDto` çıxışı), mənfi dəyər 400. Migration mövcud sərbəst satışların alış qiymətini mayadan bərpa edir (xərc payı çıxılır), kataloq satışlarında NULL qalır.
@@ -38,7 +42,7 @@
 
 ## Last Updated
 
-2026-07-26 — BE#1 (satışda alış qiyməti snapshot-u).
+2026-07-27 — BE#4 (idarə olunan xərc növləri + xərc mənbəyi ayrımı).
 
 ## Related Code
 

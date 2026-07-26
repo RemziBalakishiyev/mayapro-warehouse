@@ -10,10 +10,11 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.UpdateExpen
 
 /// <summary>
 /// Revises an expense by reverse-and-reapply, all in one transaction: the old expense's product-cost effect
-/// is unwound (best-effort), then the <c>CreateExpense</c> chain is applied afresh with the new values on the
-/// same row — its identity and creator are preserved. A new product link is validated (must exist → else the
-/// whole update rolls back). Guarded by the closed-day rule for both the expense's current day and, when the
-/// date changes, its new day: an expense cannot be edited into or out of a closed day.
+/// is unwound (best-effort, only when it was product-sourced), then the <c>CreateExpense</c> chain is
+/// applied afresh with the new values on the same row — its identity and creator are preserved. A new
+/// product link is validated (must exist → else the whole update rolls back). Guarded by the closed-day
+/// rule for both the expense's current day and, when the date changes, its new day: an expense cannot be
+/// edited into or out of a closed day.
 /// </summary>
 public sealed class UpdateExpenseHandler(
     IExpensesDbContext db,
@@ -36,7 +37,7 @@ public sealed class UpdateExpenseHandler(
             return Result.Failure<ExpenseDto>(ExpenseErrors.NotFound);
 
         // Validated above, so this always succeeds.
-        ExpenseCategoryCode.TryParse(command.Category, out ExpenseCategory category);
+        ExpenseSourceCode.TryParse(command.Source, out ExpenseSource source);
         DateTime date = command.Date ?? expense.Date;
 
         // Neither the expense's current day nor (if it moves) its new day may be closed.
@@ -49,13 +50,15 @@ public sealed class UpdateExpenseHandler(
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         // ① Reverse the old product-cost effect (best-effort — a since-deleted product has nothing to unwind).
-        if (expense.ProductId is { } oldProductId)
-            await products.RemoveExpenseFromProductAsync(oldProductId, expense.Category.ToCode(), expense.Amount, ct);
+        if (expense.Source == ExpenseSource.Product && expense.ProductId is { } oldProductId)
+            await products.RemoveExpenseFromProductAsync(oldProductId, expense.Category, expense.Amount, ct);
 
         // ② Reapply with the new values — same chain as CreateExpense; a bad product link rolls the update back.
         string? productName = null;
-        if (command.ProductId is { } productId)
+        if (source == ExpenseSource.Product)
         {
+            Guid productId = command.ProductId!.Value;
+
             Result<ProductSnapshot> snapshot = await products.GetSnapshotAsync(productId, ct);
             if (snapshot.IsFailure)
                 return Result.Failure<ExpenseDto>(snapshot.Error);
@@ -63,12 +66,12 @@ public sealed class UpdateExpenseHandler(
             productName = snapshot.Value.Name;
 
             Result attach = await products.AddExpenseToProductAsync(
-                productId, category.ToCode(), command.Amount, ct);
+                productId, command.Category, command.Amount, ct);
             if (attach.IsFailure)
                 return Result.Failure<ExpenseDto>(attach.Error);
         }
 
-        expense.Update(command.Title, category, command.Amount, date, command.ProductId, productName, command.Note);
+        expense.Update(command.Title, command.Category, source, command.Amount, date, command.ProductId, productName, command.Note);
 
         await activityLogger.LogAsync(
             "Xərci düzəltdi",

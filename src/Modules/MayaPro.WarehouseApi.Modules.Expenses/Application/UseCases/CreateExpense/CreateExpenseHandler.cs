@@ -8,10 +8,11 @@ using MayaPro.WarehouseApi.SharedKernel.Contracts;
 namespace MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpense;
 
 /// <summary>
-/// Records an expense. Core rule: if the expense is attached to a product, add it to that product's cost
-/// bucket so its real cost is recomputed — the whole thing in one transaction. In order: begin
-/// transaction, resolve the product snapshot (fails + rolls back if it does not exist), raise the
-/// product's cost, write the expense (with a product-name snapshot), log the activity, save and commit.
+/// Records an expense. Core rule: a <c>product</c>-sourced expense is added to that product's cost bucket
+/// so its real cost is recomputed; a <c>general</c> expense (no product) never touches any product's cost
+/// — the whole thing in one transaction. In order: begin transaction, resolve the product snapshot (fails +
+/// rolls back if it does not exist), raise the product's cost, write the expense (with a product-name
+/// snapshot), log the activity, save and commit.
 /// </summary>
 public sealed class CreateExpenseHandler(
     IExpensesDbContext db,
@@ -28,14 +29,17 @@ public sealed class CreateExpenseHandler(
             return Result.Failure<ExpenseDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
         // Validated above, so this always succeeds.
-        ExpenseCategoryCode.TryParse(command.Category, out ExpenseCategory category);
+        ExpenseSourceCode.TryParse(command.Source, out ExpenseSource source);
         DateTime date = command.Date ?? DateTime.UtcNow;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         string? productName = null;
-        if (command.ProductId is { } productId)
+        if (source == ExpenseSource.Product)
         {
+            // Validated above: a product-sourced expense always carries a ProductId.
+            Guid productId = command.ProductId!.Value;
+
             // Snapshot the product name (also proves it exists → not found rolls back).
             Result<ProductSnapshot> snapshot = await products.GetSnapshotAsync(productId, ct);
             if (snapshot.IsFailure)
@@ -43,16 +47,17 @@ public sealed class CreateExpenseHandler(
 
             productName = snapshot.Value.Name;
 
-            // Core rule: raise the product's real cost — category code becomes the free-form line name.
+            // Core rule: raise the product's real cost — the expense type name becomes the free-form line name.
             Result attach = await products.AddExpenseToProductAsync(
-                productId, category.ToCode(), command.Amount, ct);
+                productId, command.Category, command.Amount, ct);
             if (attach.IsFailure)
                 return Result.Failure<ExpenseDto>(attach.Error);
         }
 
         var expense = Expense.Create(
             command.Title,
-            category,
+            command.Category,
+            source,
             command.Amount,
             date,
             command.ProductId,

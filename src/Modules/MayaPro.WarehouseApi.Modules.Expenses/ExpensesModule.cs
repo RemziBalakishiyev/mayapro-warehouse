@@ -3,14 +3,17 @@ using MayaPro.WarehouseApi.Modules.Expenses.Application;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.Abstractions;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpense;
+using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpenseType;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.DeleteExpense;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenses;
+using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenseTypes;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.UpdateExpense;
 using MayaPro.WarehouseApi.Modules.Expenses.Endpoints;
 using MayaPro.WarehouseApi.Modules.Expenses.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +22,7 @@ namespace MayaPro.WarehouseApi.Modules.Expenses;
 
 /// <summary>
 /// The Expenses module: business expenses, and the expense → product real-cost chain. Owns the
-/// <c>expenses</c> schema. Starts empty — expenses are not seeded.
+/// <c>expenses</c> schema. Expenses are not seeded; the managed expense types are (Development only).
 /// </summary>
 public sealed class ExpensesModule : IModule
 {
@@ -42,23 +45,36 @@ public sealed class ExpensesModule : IModule
         // Cross-module contract: day total for day-end.
         services.AddScoped<IExpensesModule, ExpensesModuleContract>();
 
+        services.AddScoped<ExpenseTypeSeeder>();
+
         services.AddScoped<IValidator<CreateExpenseCommand>, CreateExpenseValidator>();
         services.AddScoped<IValidator<UpdateExpenseCommand>, UpdateExpenseValidator>();
+        services.AddScoped<IValidator<CreateExpenseTypeCommand>, CreateExpenseTypeValidator>();
 
         services.AddScoped<GetExpensesHandler>();
         services.AddScoped<CreateExpenseHandler>();
         services.AddScoped<UpdateExpenseHandler>();
         services.AddScoped<DeleteExpenseHandler>();
+        services.AddScoped<GetExpenseTypesHandler>();
+        services.AddScoped<CreateExpenseTypeHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapExpensesEndpoints();
+        endpoints.MapExpenseTypesEndpoints();
     }
 
     public async Task MigrateAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<ExpensesDbContext>();
         await db.Database.MigrateAsync();
+
+        var environment = services.GetRequiredService<IHostEnvironment>();
+        if (environment.IsDevelopment())
+        {
+            var seeder = services.GetRequiredService<ExpenseTypeSeeder>();
+            await seeder.SeedAsync();
+        }
     }
 }

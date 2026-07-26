@@ -18,6 +18,8 @@ public sealed class ExpensesDbContext(DbContextOptions<ExpensesDbContext> option
 
     public DbSet<Expense> Expenses => Set<Expense>();
 
+    public DbSet<ExpenseType> ExpenseTypes => Set<ExpenseType>();
+
     public Task EnlistAsync(DbTransaction transaction, CancellationToken cancellationToken = default) =>
         Database.UseTransactionAsync(transaction, cancellationToken);
 

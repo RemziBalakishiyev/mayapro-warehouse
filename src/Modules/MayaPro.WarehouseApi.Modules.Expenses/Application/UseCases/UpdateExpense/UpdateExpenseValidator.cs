@@ -1,5 +1,6 @@
 using FluentValidation;
 using MayaPro.WarehouseApi.Modules.Expenses.Domain;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.UpdateExpense;
 
@@ -15,7 +16,18 @@ public sealed class UpdateExpenseValidator : AbstractValidator<UpdateExpenseComm
             .GreaterThan(0).WithMessage("Məbləğ sıfırdan böyük olmalıdır");
 
         RuleFor(x => x.Category)
-            .Must(code => ExpenseCategoryCode.TryParse(code, out _))
-            .WithMessage("Xərc kateqoriyası yanlışdır");
+            .NotEmpty().WithMessage("Xərc növü boş ola bilməz");
+
+        RuleFor(x => x.Source)
+            .Must(code => ExpenseSourceCode.TryParse(code, out _))
+            .WithMessage("Xərc mənbəyi yanlışdır");
+
+        RuleFor(x => x.ProductId)
+            .NotNull().WithMessage("Mala bağlı xərc üçün ProductId tələb olunur")
+            .When(x => x.Source == WireFormat.ExpenseSources.Product);
+
+        RuleFor(x => x.ProductId)
+            .Null().WithMessage("Ümumi xərc üçün ProductId göndərilməməlidir")
+            .When(x => x.Source == WireFormat.ExpenseSources.General);
     }
 }
