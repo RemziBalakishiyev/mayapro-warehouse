@@ -1,7 +1,7 @@
+using MayaPro.WarehouseApi.Modules.Expenses.Application.Contracts;
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenses;
 using MayaPro.WarehouseApi.Modules.Expenses.Domain;
 using MayaPro.WarehouseApi.Modules.Expenses.Infrastructure;
-using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Expenses.Tests;
 
@@ -12,6 +12,7 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Tests;
 public sealed class GetExpensesHandlerTests
 {
     private static readonly DateTime InMonth = new(2026, 7, 10);
+    private static readonly DateTime OtherMonth = new(2026, 6, 10);
 
     [Fact]
     public async Task Source_General_Returns_Only_General_Expenses()
@@ -83,6 +84,44 @@ public sealed class GetExpensesHandlerTests
         Assert.Equal(2, result.Value.Count);
     }
 
+    [Fact]
+    public async Task Source_And_Month_Filters_Are_Applied_Together()
+    {
+        await using ExpensesDbContext db = NewDb();
+        Seed(db,
+            (ExpenseSource.General, null, InMonth),
+            (ExpenseSource.General, null, OtherMonth),   // right source, wrong month
+            (ExpenseSource.Product, Guid.NewGuid(), InMonth));
+        await db.SaveChangesAsync();
+
+        var handler = new GetExpensesHandler(db);
+        var result = await handler.Handle(month: "2026-07", source: "general", default);
+
+        Assert.True(result.IsSuccess);
+        ExpenseDto only = Assert.Single(result.Value);
+        Assert.Equal("general", only.Source);
+        Assert.Equal(InMonth, only.Date);
+    }
+
+    [Fact]
+    public async Task Rows_Are_Newest_First_And_Carry_The_Category_Snapshot()
+    {
+        await using ExpensesDbContext db = NewDb();
+        Seed(db,
+            (ExpenseSource.General, null, InMonth),
+            (ExpenseSource.General, null, InMonth.AddDays(5)));
+        await db.SaveChangesAsync();
+
+        var handler = new GetExpensesHandler(db);
+        var result = await handler.Handle(month: null, source: "general", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(InMonth.AddDays(5), result.Value[0].Date);
+        Assert.Equal(InMonth, result.Value[1].Date);
+        // Category is a free-form snapshot now, not a code — it must round-trip untouched.
+        Assert.All(result.Value, e => Assert.Equal("Yol pulu", e.Category));
+    }
+
     private static void Seed(ExpensesDbContext db, params (ExpenseSource Source, Guid? ProductId, DateTime Date)[] rows)
     {
         foreach (var row in rows)
@@ -101,11 +140,5 @@ public sealed class GetExpensesHandlerTests
         }
     }
 
-    private static ExpensesDbContext NewDb()
-    {
-        var options = new DbContextOptionsBuilder<ExpensesDbContext>()
-            .UseInMemoryDatabase($"expenses-tests-{Guid.NewGuid()}")
-            .Options;
-        return new ExpensesDbContext(options);
-    }
+    private static ExpensesDbContext NewDb() => TestDb.New();
 }

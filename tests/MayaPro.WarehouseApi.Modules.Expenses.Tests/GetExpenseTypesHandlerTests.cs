@@ -67,11 +67,5 @@ public sealed class GetExpenseTypesHandlerTests
         Assert.Equal(1, await db.ExpenseTypes.CountAsync());
     }
 
-    private static ExpensesDbContext NewDb()
-    {
-        var options = new DbContextOptionsBuilder<ExpensesDbContext>()
-            .UseInMemoryDatabase($"expenses-tests-{Guid.NewGuid()}")
-            .Options;
-        return new ExpensesDbContext(options);
-    }
+    private static ExpensesDbContext NewDb() => TestDb.New();
 }

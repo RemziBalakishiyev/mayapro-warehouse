@@ -166,6 +166,44 @@ public sealed class ExpensesApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Switching_A_Product_Expense_To_General_Gives_The_Products_Cost_Back()
+    {
+        // The edit path is the second way an expense can reach maya. Re-pointing it at "general" must
+        // unwind the old effect and add nothing back — end-to-end proof of AC-4 on the update path.
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-SRC-SWITCH", quantity: 10, salePrice: 20m);
+        Assert.Equal(5.00m, (await client.GetProductAsync(product.Id)).RealCostPerUnit);
+
+        var expense = await CreateExpenseAsync(client, product.Id, amount: 100m); // → 15.00
+        Assert.Equal(15.00m, (await client.GetProductAsync(product.Id)).RealCostPerUnit);
+
+        HttpResponseMessage update = await client.PutAsJsonAsync($"/api/expenses/{expense.Id}", new
+        {
+            title = "Mağaza icarəsi",
+            category = "Mağaza xərci",
+            source = "general",
+            amount = 100m,
+            date = (DateTime?)null,
+            productId = (Guid?)null,
+            note = (string?)null
+        });
+
+        decimal afterCost = (await client.GetProductAsync(product.Id)).RealCostPerUnit;
+        if (update.StatusCode == HttpStatusCode.OK)
+        {
+            Assert.Equal(5.00m, afterCost); // back to the untouched cost
+            var dto = (await update.Content.ReadFromJsonAsync<IntegrationTestHelpers.ExpenseDto>())!;
+            Assert.Equal("general", dto.Source);
+            Assert.Null(dto.ProductId);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
+            Assert.Equal(15.00m, afterCost); // closed-day guard held
+        }
+    }
+
+    [Fact]
     public async Task Product_Source_Without_ProductId_Is_Rejected_With_400()
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();

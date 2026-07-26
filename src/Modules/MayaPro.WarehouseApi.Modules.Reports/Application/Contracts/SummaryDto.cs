@@ -9,11 +9,12 @@ namespace MayaPro.WarehouseApi.Modules.Reports.Application.Contracts;
 /// and the payment splits, but they are excluded from <see cref="Profit"/> (not counted as zero) and reported
 /// separately via <see cref="UnknownProfitSalesCount"/> and <see cref="UnknownProfitAmount"/> (their revenue sum).
 /// </para>
-/// </summary>
-/// <summary>
+/// <para>
 /// <see cref="GeneralExpenses"/> + <see cref="ProductExpenses"/> always sums to <see cref="Expenses"/> —
 /// a split of the same total by <c>Expense.Source</c> ("general" = no product effect, "product" = raised a
-/// product's real cost), not a separate figure.
+/// product's real cost), not a separate figure. <see cref="NetProfit"/> keeps using the single total, so
+/// the split never changes it.
+/// </para>
 /// </summary>
 public sealed record SummaryDto(
     string Period,
