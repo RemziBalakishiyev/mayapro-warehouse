@@ -7,7 +7,11 @@ using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.CreateSupplier;
 
-/// <summary>Creates a supplier with an optional opening debt, and records an activity entry.</summary>
+/// <summary>
+/// Creates a supplier with an optional opening debt. Everything commits in one transaction: the supplier,
+/// and — when an opening debt is supplied — the auditable opening-balance adjustment and an activity entry
+/// naming the amount. Without an opening debt only the supplier and a plain "created" activity are written.
+/// </summary>
 public sealed class CreateSupplierHandler(
     ISuppliersDbContext db,
     IUnitOfWork unitOfWork,
@@ -23,12 +27,27 @@ public sealed class CreateSupplierHandler(
 
         var supplier = Supplier.Create(command.Name, command.ContactName, command.Phone, command.Note, command.Debt);
 
-        // Transaction so the supplier insert and its activity log commit together.
+        // One transaction so the supplier, its opening-balance adjustment and the activity log commit together.
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         db.Suppliers.Add(supplier);
 
-        await activityLogger.LogAsync("Təchizatçı əlavə etdi", supplier.Name, currentUser.UserId, ct);
+        if (command.Debt > 0)
+        {
+            var adjustment = SupplierDebtAdjustment.Create(
+                supplier.Id, command.Debt, SupplierDebtAdjustment.InitialDebtNote, currentUser.UserId);
+            db.SupplierDebtAdjustments.Add(adjustment);
+
+            await activityLogger.LogAsync(
+                "Təchizatçı əlavə etdi",
+                $"{supplier.Name} — ilkin borc {command.Debt:0.00} AZN",
+                currentUser.UserId,
+                ct);
+        }
+        else
+        {
+            await activityLogger.LogAsync("Təchizatçı əlavə etdi", supplier.Name, currentUser.UserId, ct);
+        }
 
         await tx.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

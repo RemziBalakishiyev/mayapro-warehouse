@@ -32,6 +32,11 @@ public sealed class DeleteSupplierHandler(
             .ToListAsync(ct);
         db.SupplierPayments.RemoveRange(payments);
 
+        List<SupplierDebtAdjustment> adjustments = await db.SupplierDebtAdjustments
+            .Where(a => a.SupplierId == id)
+            .ToListAsync(ct);
+        db.SupplierDebtAdjustments.RemoveRange(adjustments);
+
         db.Suppliers.Remove(supplier);
 
         await activityLogger.LogAsync("Təchizatçı sildi", supplier.Name, currentUser.UserId, ct);

@@ -2,6 +2,7 @@ using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierDeb
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierPayment;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.CreateSupplier;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.DeleteSupplier;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSupplierHistory;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSupplierPayments;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSuppliers;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.UpdateSupplier;
@@ -58,6 +59,14 @@ internal static class SuppliersEndpoints
                 CancellationToken ct) =>
                 Results.Ok(await handler.Handle(id, ct)))
             .WithName("GetSupplierPayments");
+
+        // Full chronological debt history: opening balance and payments in one feed.
+        group.MapGet("/{id:guid}/history", async (
+                Guid id,
+                GetSupplierHistoryHandler handler,
+                CancellationToken ct) =>
+                Results.Ok(await handler.Handle(id, ct)))
+            .WithName("GetSupplierHistory");
 
         group.MapPost("/{id:guid}/payments", async (
                 Guid id,

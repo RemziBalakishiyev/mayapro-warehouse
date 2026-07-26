@@ -19,6 +19,8 @@ public sealed class SuppliersDbContext(DbContextOptions<SuppliersDbContext> opti
 
     public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
 
+    public DbSet<SupplierDebtAdjustment> SupplierDebtAdjustments => Set<SupplierDebtAdjustment>();
+
     public Task EnlistAsync(DbTransaction transaction, CancellationToken cancellationToken = default) =>
         Database.UseTransactionAsync(transaction, cancellationToken);
 

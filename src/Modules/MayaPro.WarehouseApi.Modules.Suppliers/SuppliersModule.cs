@@ -5,6 +5,7 @@ using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierDeb
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.AddSupplierPayment;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.CreateSupplier;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.DeleteSupplier;
+using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSupplierHistory;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSupplierPayments;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.GetSuppliers;
 using MayaPro.WarehouseApi.Modules.Suppliers.Application.UseCases.UpdateSupplier;
@@ -58,6 +59,7 @@ public sealed class SuppliersModule : IModule
         services.AddScoped<AddSupplierDebtHandler>();
         services.AddScoped<AddSupplierPaymentHandler>();
         services.AddScoped<GetSupplierPaymentsHandler>();
+        services.AddScoped<GetSupplierHistoryHandler>();
         services.AddScoped<UpdateSupplierHandler>();
         services.AddScoped<DeleteSupplierHandler>();
     }
