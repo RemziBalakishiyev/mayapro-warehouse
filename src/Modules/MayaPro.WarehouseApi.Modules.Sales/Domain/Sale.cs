@@ -243,7 +243,9 @@ public sealed class Sale : Entity
     /// <summary>
     /// Re-applies a free-form sale's values in place after its old effects were reversed. Mirrors
     /// <see cref="CreateManual"/> — profit stays null when the cost is unknown — while preserving this row's
-    /// identity, sale <see cref="Date"/> and seller.
+    /// identity, sale <see cref="Date"/> and seller. <paramref name="purchasePricePerUnit"/> is deliberately
+    /// required (no default): an edit rewrites the whole row, so the caller must state the purchase price
+    /// each time rather than silently dropping the stored one.
     /// </summary>
     public void ReviseManual(
         string productName,
@@ -254,7 +256,7 @@ public sealed class Sale : Entity
         PaymentType paymentType,
         Guid? customerId,
         IReadOnlyList<SaleExpenseItem> expenseItems,
-        decimal? purchasePricePerUnit = null)
+        decimal? purchasePricePerUnit)
     {
         ProductId = null;
         IsManual = true;
