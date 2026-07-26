@@ -8,9 +8,10 @@ using Microsoft.EntityFrameworkCore;
 namespace MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.CreateExpenseType;
 
 /// <summary>
-/// Creates a managed expense type. Rejects an empty name (validator) or a duplicate one
-/// (<see cref="ExpenseErrors.ExpenseTypeDuplicate"/>). The comparison is case-insensitive, matching the
-/// unique index under SQL Server's default collation.
+/// Creates a managed expense type. Rejects an empty/over-long name (validator) or a duplicate one
+/// (<see cref="ExpenseErrors.ExpenseTypeDuplicate"/>). The duplicate check is explicitly case-insensitive
+/// ("Yol pulu" == "yol pulu", AC-2) rather than relying on the database collation, so the rule holds on any
+/// server and is provable in tests. The unique index on Name remains the last-resort guard.
 /// </summary>
 public sealed class CreateExpenseTypeHandler(
     IExpensesDbContext db,
@@ -23,8 +24,11 @@ public sealed class CreateExpenseTypeHandler(
             return Result.Failure<ExpenseTypeDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
         string name = command.Name.Trim();
+        // Compared lowered on both sides — the same operation on either side keeps SQL Server and the
+        // in-memory provider in agreement. The pick-list holds a few dozen rows, so the lost index seek is free.
+        string normalized = name.ToLower();
 
-        bool exists = await db.ExpenseTypes.AnyAsync(t => t.Name == name, ct);
+        bool exists = await db.ExpenseTypes.AnyAsync(t => t.Name.ToLower() == normalized, ct);
         if (exists)
             return Result.Failure<ExpenseTypeDto>(ExpenseErrors.ExpenseTypeDuplicate);
 

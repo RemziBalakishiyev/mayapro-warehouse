@@ -44,6 +44,41 @@ public sealed class ExpenseTypesApiTests : IAsyncLifetime
         Assert.Equal("Bu xərc növü artıq mövcuddur", error.RootElement.GetProperty("message").GetString());
     }
 
+    [Fact]
+    public async Task Duplicate_Is_Rejected_Case_Insensitively()
+    {
+        // AC-2 says the duplicate check is case-insensitive; assert it end-to-end rather than trusting the
+        // database collation. (ASCII-only name so the check never depends on Turkish/Azerbaijani casing.)
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        const string name = "Kargo xerc novu";
+
+        HttpResponseMessage create = await client.PostAsJsonAsync("/api/expense-types", new { name });
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+
+        HttpResponseMessage upper = await client.PostAsJsonAsync(
+            "/api/expense-types", new { name = name.ToUpperInvariant() });
+        Assert.Equal(HttpStatusCode.BadRequest, upper.StatusCode);
+
+        HttpResponseMessage lower = await client.PostAsJsonAsync(
+            "/api/expense-types", new { name = $"  {name.ToLowerInvariant()}  " });
+        Assert.Equal(HttpStatusCode.BadRequest, lower.StatusCode);
+
+        // Exactly one row survived.
+        List<ExpenseTypeDto> all = (await client.GetFromJsonAsync<List<ExpenseTypeDto>>("/api/expense-types"))!;
+        Assert.Single(all, t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Name_Longer_Than_The_Column_Is_Rejected_With_400_Not_500()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage create = await client.PostAsJsonAsync(
+            "/api/expense-types", new { name = new string('x', 101) });
+
+        Assert.Equal(HttpStatusCode.BadRequest, create.StatusCode);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

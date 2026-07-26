@@ -16,7 +16,10 @@ public sealed class UpdateExpenseValidator : AbstractValidator<UpdateExpenseComm
             .GreaterThan(0).WithMessage("Məbləğ sıfırdan böyük olmalıdır");
 
         RuleFor(x => x.Category)
-            .NotEmpty().WithMessage("Xərc növü boş ola bilməz");
+            .NotEmpty().WithMessage("Xərc növü boş ola bilməz")
+            // Matches the Expenses.Category column (nvarchar(100)) — a longer snapshot would otherwise fail
+            // in the database (500) instead of here (400).
+            .MaximumLength(100).WithMessage("Xərc növü 100 simvoldan uzun ola bilməz");
 
         RuleFor(x => x.Source)
             .Must(code => ExpenseSourceCode.TryParse(code, out _))
