@@ -25,6 +25,7 @@ public sealed class Sale : Entity
         decimal subtotal,
         decimal totalAmount,
         decimal? costPerUnit,
+        decimal? purchasePricePerUnit,
         decimal? profit,
         PaymentType paymentType,
         Guid? customerId,
@@ -42,6 +43,7 @@ public sealed class Sale : Entity
         Subtotal = subtotal;
         TotalAmount = totalAmount;
         CostPerUnit = costPerUnit;
+        PurchasePricePerUnit = purchasePricePerUnit;
         Profit = profit;
         PaymentType = paymentType;
         CustomerId = customerId;
@@ -88,6 +90,14 @@ public sealed class Sale : Entity
     public decimal? CostPerUnit { get; private set; }
 
     /// <summary>
+    /// Purchase price per unit at sale time — separate from <see cref="CostPerUnit"/> (which also folds in
+    /// spread batch expenses). For a catalogued sale this is the product's <c>PurchasePrice</c> snapshotted
+    /// at sale time; for a manual sale it is whatever the seller supplied (already known, not recomputed).
+    /// Null when unknown (older rows predate this field, or a manual sale did not supply it).
+    /// </summary>
+    public decimal? PurchasePricePerUnit { get; private set; }
+
+    /// <summary>
     /// (<see cref="UnitPrice"/> − <see cref="CostPerUnit"/>) × <see cref="Quantity"/>.
     /// Null when the cost is unknown (a manual sale with no cost) — the gain is genuinely unknown, so reports
     /// exclude it rather than counting it as zero profit.
@@ -122,6 +132,7 @@ public sealed class Sale : Entity
         int quantity,
         decimal unitPrice,
         decimal costPerUnit,
+        decimal purchasePricePerUnit,
         PaymentType paymentType,
         Guid? customerId,
         Guid? soldByUserId,
@@ -140,6 +151,7 @@ public sealed class Sale : Entity
             subtotal,
             subtotal,
             costPerUnit,
+            purchasePricePerUnit,
             profit,
             paymentType,
             // Any payment type may carry a customer; only credit affects their debt (handler's rule).
@@ -168,7 +180,8 @@ public sealed class Sale : Entity
         Guid? customerId,
         Guid? soldByUserId,
         string soldByName,
-        IReadOnlyList<SaleExpenseItem>? expenseItems = null)
+        IReadOnlyList<SaleExpenseItem>? expenseItems = null,
+        decimal? purchasePricePerUnit = null)
     {
         decimal subtotal = unitPrice * quantity;
         decimal? profit = costPerUnit is { } cost
@@ -185,6 +198,7 @@ public sealed class Sale : Entity
             subtotal,
             subtotal,
             costPerUnit,
+            purchasePricePerUnit,
             profit,
             paymentType,
             customerId,
@@ -206,6 +220,7 @@ public sealed class Sale : Entity
         int quantity,
         decimal unitPrice,
         decimal costPerUnit,
+        decimal purchasePricePerUnit,
         PaymentType paymentType,
         Guid? customerId)
     {
@@ -218,6 +233,7 @@ public sealed class Sale : Entity
         Subtotal = unitPrice * quantity;
         TotalAmount = Subtotal;
         CostPerUnit = costPerUnit;
+        PurchasePricePerUnit = purchasePricePerUnit;
         Profit = (unitPrice - costPerUnit) * quantity;
         PaymentType = paymentType;
         CustomerId = customerId;
@@ -237,7 +253,8 @@ public sealed class Sale : Entity
         decimal? costPerUnit,
         PaymentType paymentType,
         Guid? customerId,
-        IReadOnlyList<SaleExpenseItem> expenseItems)
+        IReadOnlyList<SaleExpenseItem> expenseItems,
+        decimal? purchasePricePerUnit = null)
     {
         ProductId = null;
         IsManual = true;
@@ -248,6 +265,7 @@ public sealed class Sale : Entity
         Subtotal = unitPrice * quantity;
         TotalAmount = Subtotal;
         CostPerUnit = costPerUnit;
+        PurchasePricePerUnit = purchasePricePerUnit;
         Profit = costPerUnit is { } cost ? (unitPrice - cost) * quantity : null;
         PaymentType = paymentType;
         CustomerId = customerId;

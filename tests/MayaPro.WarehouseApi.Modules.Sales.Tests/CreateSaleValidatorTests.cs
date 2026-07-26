@@ -76,4 +76,61 @@ public sealed class CreateSaleValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void Negative_PurchasePricePerUnit_Is_Invalid()
+    {
+        // TC-10: a negative purchase price is rejected, not silently accepted.
+        var command = new CreateSaleCommand(
+            ProductId: null,
+            Quantity: 1,
+            SalePrice: 10m,
+            PaymentType: "Nağd",
+            CustomerId: null,
+            Note: null,
+            ProductName: "Əl ilə mal",
+            PurchasePricePerUnit: -10m);
+
+        var result = Validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage == "Alış qiyməti mənfi ola bilməz");
+    }
+
+    [Fact]
+    public void Null_PurchasePricePerUnit_Is_Valid()
+    {
+        // AC-8: not supplying the purchase price is fine — no exception, no validation error.
+        var command = new CreateSaleCommand(
+            ProductId: null,
+            Quantity: 1,
+            SalePrice: 10m,
+            PaymentType: "Nağd",
+            CustomerId: null,
+            Note: null,
+            ProductName: "Əl ilə mal",
+            PurchasePricePerUnit: null);
+
+        var result = Validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Zero_PurchasePricePerUnit_Is_Valid()
+    {
+        var command = new CreateSaleCommand(
+            ProductId: null,
+            Quantity: 1,
+            SalePrice: 10m,
+            PaymentType: "Nağd",
+            CustomerId: null,
+            Note: null,
+            ProductName: "Əl ilə mal",
+            PurchasePricePerUnit: 0m);
+
+        var result = Validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
 }

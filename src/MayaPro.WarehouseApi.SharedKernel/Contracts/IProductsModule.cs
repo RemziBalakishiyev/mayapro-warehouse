@@ -78,8 +78,16 @@ public interface IProductsModule
     Task<IReadOnlyList<ProductExportRow>> GetExportProductsAsync(CancellationToken cancellationToken = default);
 }
 
-/// <summary>Snapshot of a product at sale time: its name, category and current real cost per unit.</summary>
-public sealed record ProductStockSnapshot(string ProductName, string Category, decimal RealCostPerUnit);
+/// <summary>
+/// Snapshot of a product at sale time: its name, category, current real cost per unit and current
+/// purchase price (the latter is snapshotted onto the sale separately from the real cost — see
+/// <c>Sale.PurchasePricePerUnit</c>).
+/// </summary>
+public sealed record ProductStockSnapshot(
+    string ProductName,
+    string Category,
+    decimal RealCostPerUnit,
+    decimal PurchasePrice);
 
 /// <summary>
 /// A read-only product snapshot. Carries enough for the Reports module to value stock and flag low

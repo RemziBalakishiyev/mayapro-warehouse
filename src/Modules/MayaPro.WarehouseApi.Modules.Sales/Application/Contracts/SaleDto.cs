@@ -20,6 +20,7 @@ public sealed record SaleDto(
     decimal Subtotal,
     decimal TotalAmount,
     decimal? CostPerUnit,
+    decimal? PurchasePricePerUnit,
     decimal? Profit,
     string PaymentType,
     Guid? CustomerId,
