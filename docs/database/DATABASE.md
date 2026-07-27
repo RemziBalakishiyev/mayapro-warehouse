@@ -10,7 +10,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 | `products` | ProductsDbContext | Products, Categories | ✅ |
 | `sales` | SalesDbContext | Sales | ✅ |
 | `customers` | CustomersDbContext | Customers, CustomerPayments, CustomerDebtAdjustments | ✅ |
-| `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments | ✅ |
+| `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments, SupplierDebtAdjustments | ✅ |
 | `expenses` | ExpensesDbContext | Expenses | ✅ |
 | `dayend` | DayEndDbContext | Closings | ✅ |
 | `activity` | ActivityDbContext | ActivityLogs | ✅ |
@@ -36,6 +36,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 - `dayend.Closings.Date` — unique (bir günə bir bağlanış, race qoruması)
 - `activity.ActivityLogs.CreatedAt` — descending index (feed sorğusu üçün)
 - `sales.Sales.InvoiceToken` — unique filtered (`IS NOT NULL`) — açıq faktura linki tokeni
+- `customers.CustomerDebtAdjustments.CustomerId`, `suppliers.SupplierDebtAdjustments.SupplierId` — non-unique (tarixçə sorğusu üçün; ödəniş cədvəllərində də eyni)
 
 ## Seed (yalnız Development)
 
@@ -43,7 +44,7 @@ UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeed
 
 ## Last Updated
 
-2026-07-26 — backfill migration qaydası (`sales.Sales.PurchasePricePerUnit`).
+2026-07-27 — `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
 
 ## Related Code
 
