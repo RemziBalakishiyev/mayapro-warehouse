@@ -70,7 +70,7 @@ public sealed class GetSummaryHandlerTests
     [Fact]
     public async Task Expenses_Outside_The_Period_Are_Excluded_From_Both_The_Split_And_The_Total()
     {
-        // Dünənki xərc "today" sorğusuna düşməməlidir — nə generalExpenses-ə, nə productExpenses-ə, nə də expenses-ə.
+        // Yesterday's expense must reach neither side of the split nor the total of a "today" request.
         DateOnly yesterday = Today.AddDays(-1);
         var expenses = new FakeExpensesModule(
             Expense(Today, 100m, General),
@@ -101,6 +101,25 @@ public sealed class GetSummaryHandlerTests
         SummaryDto summary = result.Value;
         Assert.Equal(0m, summary.GeneralExpenses);
         Assert.Equal(100m, summary.ProductExpenses);
+        Assert.Equal(100m, summary.Expenses);
+        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses);
+    }
+
+    [Fact]
+    public async Task A_Source_Outside_The_Known_Vocabulary_Still_Keeps_The_Split_Equal_To_The_Total()
+    {
+        // The split must never lose money: a row whose source is not "product" counts as general, so
+        // general + product stays exactly the total even if the source vocabulary ever grows.
+        var expenses = new FakeExpensesModule(
+            Expense(Today, 30m, Product),
+            Expense(Today, 70m, "supplier"));
+        var handler = new GetSummaryHandler(new FakeSalesModule(), expenses, new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        SummaryDto summary = result.Value;
+        Assert.Equal(30m, summary.ProductExpenses);
         Assert.Equal(100m, summary.Expenses);
         Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses);
     }

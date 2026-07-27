@@ -23,11 +23,13 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
         // as zero, and reported separately so the frontend can flag "N sales with unknown profit".
         decimal profit = salesRows.Sum(s => s.Profit ?? 0m);
         decimal expensesTotal = expenseRows.Sum(e => e.Amount);
-        // Same total, split by source — general expenses never touched a product's cost.
-        decimal generalExpenses = expenseRows
-            .Where(e => e.Source == WireFormat.ExpenseSources.General).Sum(e => e.Amount);
+        // Same total, split by source — general expenses never touched a product's cost. Only the
+        // product side is filtered; general is the remainder, so the two parts always add up to the
+        // total exactly, whatever the source vocabulary grows into (anything that did not raise a
+        // product's cost is a general store expense by definition).
         decimal productExpenses = expenseRows
             .Where(e => e.Source == WireFormat.ExpenseSources.Product).Sum(e => e.Amount);
+        decimal generalExpenses = expensesTotal - productExpenses;
 
         return Result.Success(new SummaryDto(
             Period: window.Code,
