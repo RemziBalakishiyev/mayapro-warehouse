@@ -6,7 +6,8 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 /// <summary>
 /// End-to-end tests for the expense → product real-cost chain: a product-linked expense raises exactly
 /// that product's real cost, a general expense changes no product, and a non-existent product rolls the
-/// whole thing back (no expense written).
+/// whole thing back (no expense written). Also covers the server-side date rule (BE#9) — a future date is
+/// rejected with 400 on both create and update.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class ExpensesApiTests : IAsyncLifetime
@@ -159,6 +160,76 @@ public sealed class ExpensesApiTests : IAsyncLifetime
             Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
             Assert.Equal(15.00m, afterCost); // guard held
         }
+    }
+
+    [Fact]
+    public async Task Future_Dated_Expense_Returns_400_And_Writes_No_Expense()
+    {
+        // BE#9 / TC-01 over the wire: the rule must live on the server, not only in the form.
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        const string title = "Gələcək xərci (yazılmamalı)";
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/expenses", new
+        {
+            title,
+            category = "Yol",
+            amount = 100m,
+            date = DateTime.UtcNow.AddDays(2), // future in every time zone
+            productId = (Guid?)null,
+            note = (string?)null
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("General.Validation", error.Code);
+        Assert.Equal("Xərcin tarixi gələcək ola bilməz", error.Message);
+
+        List<IntegrationTestHelpers.ExpenseDto> all =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.ExpenseDto>>("/api/expenses"))!;
+        Assert.DoesNotContain(all, e => e.Title == title);
+    }
+
+    [Fact]
+    public async Task Today_Dated_Expense_Is_Accepted()
+    {
+        // TC-02/TC-04: an explicit "now" is today in Baku whatever the UTC hour is — it must not be rejected.
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/expenses", new
+        {
+            title = "Bugünkü xərc",
+            category = "Yol",
+            amount = 10m,
+            date = DateTime.UtcNow,
+            productId = (Guid?)null,
+            note = (string?)null
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_To_A_Future_Date_Returns_400()
+    {
+        // AC-2: editing obeys the same rule. Validation runs before the closed-day guard, so this is 400,
+        // never 409.
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-FUTURE-UPD", quantity: 10, salePrice: 20m);
+        var expense = await CreateExpenseAsync(client, product.Id, amount: 100m);
+
+        HttpResponseMessage update = await client.PutAsJsonAsync($"/api/expenses/{expense.Id}", new
+        {
+            title = "Karqo (gələcəyə köçürülmüş)",
+            category = "Yol",
+            amount = 100m,
+            date = DateTime.UtcNow.AddDays(2),
+            productId = product.Id,
+            note = (string?)null
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, update.StatusCode);
+        var error = (await update.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Xərcin tarixi gələcək ola bilməz", error.Message);
     }
 
     private static async Task<IntegrationTestHelpers.ExpenseDto> CreateExpenseAsync(

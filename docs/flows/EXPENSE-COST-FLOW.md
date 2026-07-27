@@ -4,7 +4,7 @@
 
 Tək transaction-da:
 
-1. Validation (kateqoriya wire dəyərlərindən biri olmalıdır: Yol, Fəhlə, Anbar/Yer, Paket/Qutu, Mağaza, Digər).
+1. Validation: ad boş olmamalı, məbləğ > 0, kateqoriya wire dəyərlərindən biri olmalıdır (Yol, Fəhlə, Anbar/Yer, Paket/Qutu, Mağaza, Digər), `date` göndərilibsə Bakı günü ilə **gələcək ola bilməz** (`IDateProvider.ToLocalDate(date) <= Today`, ADR-0005) → 400. `date` yoxdursa `IDateProvider.UtcNow` yazılır.
 2. Xərc məhsula bağlıdırsa (`productId` var):
    - `IProductsModule.GetSnapshotAsync` — məhsul adı snapshot + mövcudluq yoxlaması (yoxdursa rollback).
    - `AddExpenseToProductAsync(productId, kateqoriyaKodu, amount)` — məhsulun xərc sətirlərinə əlavə olunur (eyni adlı sətir varsa üstünə gəlir) → **RealCostPerUnit yenidən hesablanır**: `PurchasePrice + Σxərclər ÷ InitialQuantity`.
@@ -12,7 +12,7 @@ Tək transaction-da:
 
 ## Düzəliş / silinmə (Owner+Manager)
 
-- **Update**: reverse-and-reapply — köhnə məbləğ məhsuldan çıxarılır (`RemoveExpense`, tanınmayan sətir no-op), yeni məbləğ əlavə olunur; məhsul dəyişibsə köhnədən çıxıb yeniyə yazılır.
+- **Update**: eyni validation (gələcək tarix qadağası daxil, bağlı gün yoxlamasından əvvəl işləyir) + reverse-and-reapply — köhnə məbləğ məhsuldan çıxarılır (`RemoveExpense`, tanınmayan sətir no-op), yeni məbləğ əlavə olunur; məhsul dəyişibsə köhnədən çıxıb yeniyə yazılır.
 - **Delete**: məhsula bağlı idisə `RemoveExpense` ilə maya effekti geri sarılır, sonra xərc silinir.
 
 ## Məhsul tərəfi
@@ -25,7 +25,7 @@ Tək transaction-da:
 
 ## Last Updated
 
-2026-07-25 — sistem qurulanda yaradıldı.
+2026-07-27 — validation addımı dəqiqləşdi: xərc tarixi gələcək ola bilməz (BE#9).
 
 ## Related Code
 

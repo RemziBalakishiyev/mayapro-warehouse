@@ -4,6 +4,7 @@
 
 ## 2026-07-27
 
+- **Xərc tarixi gələcək ola bilməz** (BE#9): `CreateExpenseValidator` və `UpdateExpenseValidator` `IDateProvider` alır və `date` göndərilibsə `ToLocalDate(date) <= Today` (Asia/Baku, ADR-0005) yoxlayır → 400 «Xərcin tarixi gələcək ola bilməz». `date = null` (yaratmada "indi", düzəlişdə köhnə tarix) toxunulmayıb. FE#10-dakı yalnız-UI qorumasının backend qarşılığı; hesabatlardakı "Bu ay" fərqinin kökü bağlanır. `CreateExpenseHandler` default tarixi artıq `DateTime.UtcNow` yox, `IDateProvider.UtcNow` ilə yazır (eyni saat mənbəyi). Migration/kontrakt dəyişikliyi yoxdur.
 - **Təchizatçı ilkin borcu + tarixçə** (BE#3): yeni `SupplierDebtAdjustment` entity (`suppliers.SupplierDebtAdjustments`, migration `AddSupplierDebtAdjustments`, `SupplierId` üzərində index) — müştəri tərəfindəki `CustomerDebtAdjustment` pattern-inin güzgüsü. `POST /api/suppliers` `debt > 0` göndəriləndə təchizatçı + ilkin borc sətri + `"{ad} — ilkin borc {məbləğ} AZN"` activity log-u TƏK `IUnitOfWork` transaction-ında yazılır; `debt = 0`-da köhnə davranış olduğu kimi qalır, mənfi `debt` yenə 400. Yeni `GET /api/suppliers/{id}/history` — ilkin borc (`initialDebt`) + ödənişlər (`payment`) xronoloji artan sırada. Köhnə `GET /api/suppliers/{id}/payments` kontraktı dəyişməyib. Təchizatçı silinəndə ilkin borc sətirləri də təmizlənir (FK cascade yoxdur). Bilinən boşluq: `POST /{id}/debts` (kreditlə alış) hələ tarixçə sətri yaratmır.
 
 ## 2026-07-26
@@ -42,7 +43,7 @@
 
 ## Last Updated
 
-2026-07-27 — BE#3 (təchizatçı ilkin borcu + tarixçə endpoint-i).
+2026-07-27 — BE#9 (xərc tarixinin gələcək ola bilməməsi).
 
 ## Related Code
 

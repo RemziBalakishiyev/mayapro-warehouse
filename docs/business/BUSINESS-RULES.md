@@ -53,6 +53,13 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - **Tarixçə** (`GET /{id}/history`): `SupplierDebtAdjustments` (type `initialDebt`) + `SupplierPayments` (type `payment`), yaddaşda tarixə görə artan sırada birləşdirilir. Köhnə `GET /{id}/payments` toxunulmayıb — yalnız ödənişlər, azalan sırada.
 - Borcumuz qalıbsa təchizatçı silinə bilməz (`Suppliers.HasDebtConflict`, 409). Silinəndə ödəniş + ilkin borc sətirləri də silinir (tək transaction); məhsulların `SupplierId` referansı qalır.
 
+## Xərc qaydaları
+
+- Xərc tarixi **gələcək ola bilməz**: `date` göndərilibsə Bakı təqvimi ilə bugündən sonra ola bilməz (`IDateProvider`, ADR-0005) → 400 «Xərcin tarixi gələcək ola bilməz». Yaratma və düzəliş üçün eyni qayda. Qayda serverdədir — UI-dakı `max` yoxlaması yalnız rahatlıq üçündür.
+- `date` göndərilmirsə: yaratmada "indi" yazılır, düzəlişdə xərcin mövcud tarixi qalır (bu hallarda qayda işə düşmür).
+- Tarix UTC anı kimi saxlanılır; "hansı günə düşür" HƏMİŞƏ Bakı gününə görə hesablanır (gün sonu, aylıq siyahı, hesabatlar).
+- Düzəlişdə tarix qaydası bağlı gün yoxlamasından ƏVVƏL işləyir: gələcək tarixli düzəliş 409 yox, 400 qaytarır.
+
 ## Gün sonu qaydaları
 
 - `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`. Nisyə satışlar kassa üzləşdirməsinə daxil deyil.
@@ -69,7 +76,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 ## Last Updated
 
-2026-07-27 — təchizatçı borcu qaydaları ayrıca bölmə oldu (ilkin borc + tarixçə).
+2026-07-27 — xərc qaydaları bölməsi əlavə olundu (gələcək tarix qadağası, BE#9).
 
 ## Related Code
 

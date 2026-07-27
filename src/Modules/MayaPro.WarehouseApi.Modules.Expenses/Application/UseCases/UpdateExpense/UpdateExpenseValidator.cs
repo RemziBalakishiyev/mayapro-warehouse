@@ -19,9 +19,11 @@ public sealed class UpdateExpenseValidator : AbstractValidator<UpdateExpenseComm
             .Must(code => ExpenseCategoryCode.TryParse(code, out _))
             .WithMessage("Xərc kateqoriyası yanlışdır");
 
-        // "Bugün" iş saat qurşağı ilə (Asia/Baku) hesablanır — bax IDateProvider (ADR 0005).
+        // The date is a UTC instant, but "future" is judged on the business calendar (ADR-0005):
+        // 20:00 UTC is already the next Baku day. An omitted date keeps the current one, so nothing to check.
         RuleFor(x => x.Date)
-            .Must(date => date is null || dateProvider.ToLocalDate(date.Value) <= dateProvider.Today)
+            .Must(date => dateProvider.ToLocalDate(date!.Value) <= dateProvider.Today)
+            .When(x => x.Date is not null)
             .WithMessage("Xərcin tarixi gələcək ola bilməz");
     }
 }

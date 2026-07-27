@@ -19,7 +19,8 @@ public sealed class CreateExpenseHandler(
     IProductsModule products,
     IValidator<CreateExpenseCommand> validator,
     IActivityLogger activityLogger,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IDateProvider dateProvider)
 {
     public async Task<Result<ExpenseDto>> Handle(CreateExpenseCommand command, CancellationToken ct)
     {
@@ -29,7 +30,9 @@ public sealed class CreateExpenseHandler(
 
         // Validated above, so this always succeeds.
         ExpenseCategoryCode.TryParse(command.Category, out ExpenseCategory category);
-        DateTime date = command.Date ?? DateTime.UtcNow;
+        // One clock for the whole use case: the validator judges "future" against IDateProvider, so the
+        // omitted-date default comes from the same source (ADR-0005) instead of a bare DateTime.UtcNow.
+        DateTime date = command.Date ?? dateProvider.UtcNow;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
