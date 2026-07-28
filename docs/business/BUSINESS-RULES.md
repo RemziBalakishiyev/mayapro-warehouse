@@ -49,6 +49,17 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Müştəri statistikaları bütün satış növlərini əhatə edir: `lastPurchaseDate` son İSTƏNİLƏN satış, `totalPurchases`/`purchaseCount` ömürlük cəm/say (qruplaşdırılmış tək sorğu).
 - Müştəri silinəndə ödəniş/ilkin borc tarixçəsi də silinir (borc qalsa belə); köhnə satışlar `CustomerId` saxlayır — frontend "Silinmiş müştəri" göstərir.
 
+## Təchizatçı borcu qaydaları
+
+`Supplier.Debt` = BİZİM ona borcumuz (müştəri borcunun əksi). Yalnız domain metodları ilə dəyişir, 0-dan aşağı düşmür.
+
+- **İlkin borc**: təchizatçı yaradılarkən `debt > 0` göndərilibsə borc + `SupplierDebtAdjustment` tarixçə sətri (`Note = "İlkin borc (sistemə keçid)"`) yazılır; activity log `"{ad} — ilkin borc {məbləğ} AZN"` olur. `debt = 0`-da nə tarixçə sətri, nə də xüsusi log mətni yaranır. Mənfi `debt` → 400 «Borc mənfi ola bilməz» (validator; heç nə yaranmır).
+- Təchizatçı + ilkin borc sətri + activity log EYNİ `IUnitOfWork` transaction-ında commit olunur (müştəri tərəfindəki eyni pattern).
+- **Kreditlə alış** (`POST /{id}/debts`): `Supplier.IncreaseDebt` — borcu artırır, ayrıca sorğulana bilən tarixçə sətri YARATMIR (bilinən boşluq; tarixçədə yalnız ilkin borc + ödənişlər görünür).
+- **Ödəniş** (`POST /{id}/payments`): `Supplier.DecreaseDebt` — məbləğ borcdan böyükdürsə `Suppliers.PaymentExceedsDebt`. `SupplierPayment` sətri yazılır.
+- **Tarixçə** (`GET /{id}/history`): `SupplierDebtAdjustments` (type `initialDebt`) + `SupplierPayments` (type `payment`), yaddaşda tarixə görə artan sırada birləşdirilir. Köhnə `GET /{id}/payments` toxunulmayıb — yalnız ödənişlər, azalan sırada.
+- Borcumuz qalıbsa təchizatçı silinə bilməz (`Suppliers.HasDebtConflict`, 409). Silinəndə ödəniş + ilkin borc sətirləri də silinir (tək transaction); məhsulların `SupplierId` referansı qalır.
+
 ## Gün sonu qaydaları
 
 - `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`. Nisyə satışlar kassa üzləşdirməsinə daxil deyil.
@@ -59,14 +70,17 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 ## Digər
 
 - Settings singleton sətirdir (sabit Id), ilk oxunuşda default-larla yaranır.
-- Təchizatçı borcu qalıbsa silinə bilməz (409).
 - WhatsApp: backend mesaj GÖNDƏRMİR — yalnız şablon saxlayır, `{debt}`-i frontend əvəz edir.
 - Açıq faktura linki: hər satışın bir dəfə yaranan sabit tokeni var (`Sale.InvoiceToken`); token linki bilən HƏR KƏSƏ auth-suz PDF verir — link paylaşımı müştəri ilə bölüşməyə bərabərdir. IP başına 30/dəq limit.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
 
+<<<<<<< HEAD
 2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source: general/product).
+=======
+2026-07-27 — təchizatçı borcu qaydaları ayrıca bölmə oldu (ilkin borc + tarixçə).
+>>>>>>> origin/main
 
 ## Related Code
 

@@ -150,4 +150,91 @@ public sealed class SuppliersApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
+
+    [Fact]
+    public async Task Supplier_Created_With_Initial_Debt_Sets_Debt_And_Records_History_Row()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var supplier = await client.CreateSupplierAsync("İlkin borclu təchizatçı", debt: 150m);
+
+        Assert.Equal(150m, supplier.Debt);
+
+        List<IntegrationTestHelpers.SupplierHistoryEntryDto> history =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SupplierHistoryEntryDto>>(
+                $"/api/suppliers/{supplier.Id}/history"))!;
+
+        var initial = Assert.Single(history);
+        Assert.Equal("initialDebt", initial.Type);
+        Assert.Equal(150m, initial.Amount);
+        Assert.Equal("İlkin borc (sistemə keçid)", initial.Note);
+    }
+
+    [Fact]
+    public async Task Supplier_Created_Without_Debt_Has_Empty_History()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var supplier = await client.CreateSupplierAsync("Borcsuz təchizatçı", debt: 0m);
+
+        Assert.Equal(0m, supplier.Debt);
+
+        List<IntegrationTestHelpers.SupplierHistoryEntryDto> history =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SupplierHistoryEntryDto>>(
+                $"/api/suppliers/{supplier.Id}/history"))!;
+
+        Assert.Empty(history);
+    }
+
+    [Fact]
+    public async Task History_Returns_Initial_Debt_And_Payment_In_Chronological_Order_And_Payments_Endpoint_Stays_Unchanged()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var supplier = await client.CreateSupplierAsync("İlkin borc və ödəniş", debt: 150m);
+
+        HttpResponseMessage payment = await client.PostAsJsonAsync(
+            $"/api/suppliers/{supplier.Id}/payments", new { amount = 50m, note = (string?)null });
+        payment.EnsureSuccessStatusCode();
+
+        List<IntegrationTestHelpers.SupplierHistoryEntryDto> history =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SupplierHistoryEntryDto>>(
+                $"/api/suppliers/{supplier.Id}/history"))!;
+
+        Assert.Equal(2, history.Count);
+        Assert.Equal("initialDebt", history[0].Type);
+        Assert.Equal(150m, history[0].Amount);
+        Assert.Equal("payment", history[1].Type);
+        Assert.Equal(50m, history[1].Amount);
+        Assert.True(history[0].Date <= history[1].Date);
+
+        // The pre-existing payments-only endpoint stays exactly as it was — no opening-balance row.
+        List<IntegrationTestHelpers.SupplierPaymentDto> payments =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SupplierPaymentDto>>(
+                $"/api/suppliers/{supplier.Id}/payments"))!;
+        Assert.Single(payments);
+        Assert.Equal(50m, payments[0].Amount);
+    }
+
+    [Fact]
+    public async Task Negative_Initial_Debt_Returns_400_And_Creates_Nothing()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/suppliers", new
+        {
+            name = "Mənfi borclu təchizatçı",
+            contactName = (string?)null,
+            phone = (string?)null,
+            note = (string?)null,
+            debt = -10m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Borc mənfi ola bilməz", error.Message);
+
+        List<IntegrationTestHelpers.SupplierDto> all =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.SupplierDto>>("/api/suppliers"))!;
+        Assert.DoesNotContain(all, s => s.Name == "Mənfi borclu təchizatçı");
+    }
 }

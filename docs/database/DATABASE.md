@@ -10,8 +10,13 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 | `products` | ProductsDbContext | Products, Categories | ✅ |
 | `sales` | SalesDbContext | Sales | ✅ |
 | `customers` | CustomersDbContext | Customers, CustomerPayments, CustomerDebtAdjustments | ✅ |
+<<<<<<< HEAD
 | `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments | ✅ |
 | `expenses` | ExpensesDbContext | Expenses, ExpenseTypes | ✅ |
+=======
+| `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments, SupplierDebtAdjustments | ✅ |
+| `expenses` | ExpensesDbContext | Expenses | ✅ |
+>>>>>>> origin/main
 | `dayend` | DayEndDbContext | Closings | ✅ |
 | `activity` | ActivityDbContext | ActivityLogs | ✅ |
 | `settings` | SettingsDbContext | StoreSettings (singleton sətir, sabit Id) | ❌ (standalone) |
@@ -36,6 +41,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 - `dayend.Closings.Date` — unique (bir günə bir bağlanış, race qoruması)
 - `activity.ActivityLogs.CreatedAt` — descending index (feed sorğusu üçün)
 - `sales.Sales.InvoiceToken` — unique filtered (`IS NOT NULL`) — açıq faktura linki tokeni
+- `customers.CustomerDebtAdjustments.CustomerId`, `suppliers.SupplierDebtAdjustments.SupplierId` — non-unique (tarixçə sorğusu üçün; ödəniş cədvəllərində də eyni)
 
 ## Seed (yalnız Development)
 
@@ -43,7 +49,11 @@ UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeed
 
 ## Last Updated
 
+<<<<<<< HEAD
 2026-07-27 — `expenses.ExpenseTypes` cədvəli, `Expense.Category` enum→string, `Expense.Source` sütunu (migration `ExpenseTypesAndSource`, BE#4).
+=======
+2026-07-27 — `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
+>>>>>>> origin/main
 
 ## Related Code
 

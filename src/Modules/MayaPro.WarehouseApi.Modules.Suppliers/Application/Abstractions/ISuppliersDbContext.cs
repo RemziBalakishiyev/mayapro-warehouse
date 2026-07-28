@@ -10,5 +10,7 @@ public interface ISuppliersDbContext
 
     DbSet<SupplierPayment> SupplierPayments { get; }
 
+    DbSet<SupplierDebtAdjustment> SupplierDebtAdjustments { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
