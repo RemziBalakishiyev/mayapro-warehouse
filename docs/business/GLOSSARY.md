@@ -21,13 +21,14 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 | **Sahibkar (sahib)** | Mağaza sahibi rolu — tam səlahiyyət (wire: `role = "sahib"`) |
 | **Satıcı (satici)** | Satış edən işçi rolu — məhdud səlahiyyət (wire: `"satici"`) |
 | **Menecer** | Wire formatda mövcud rol dəyəri (`"menecer"`) |
-| **Xərc kateqoriyaları** | Yol, Fəhlə, Anbar/Yer, Paket/Qutu, Mağaza, Digər (wire dəyərləri) |
+| **Xərc növü (ExpenseType)** | İdarə olunan pick-list (Category kimi, ayrı cədvəl, unique ad): Yol pulu, Fəhlə pulu, Yer/Anbar xərci, Paket/Qutu, Gömrük, Mağaza xərci, Digər (seed). `Expense.Category` bunun sərbəst-string snapshot-udur — növ silinsə/adı dəyişsə köhnə xərclər pozulmur |
+| **Xərc mənbəyi (Source)** | `Expense.Source`: `"product"` (mala bağlı, ProductId dolu, real mayaya təsir edir) və ya `"general"` (ümumi mağaza xərci, ProductId yoxdur, mayaya təsirsiz) |
 | **WhatsApp şablonu** | Settings-də borc xatırlatma mesajı şablonu; `{debt}` placeholder-ini frontend əvəz edir. Backend mesaj göndərmir |
 | **Açıq faktura linki** | Satışın sabit tokenli auth-suz PDF linki (`/api/public/invoices/{token}`) — WhatsApp-la paylaşmaq üçün; IP başına 30/dəq limit |
 
 ## Last Updated
 
-2026-07-26 — «Alış qiyməti (PurchasePricePerUnit)» termini əlavə olundu.
+2026-07-27 — BE#4: «Xərc növü (ExpenseType)» və «Xərc mənbəyi (Source)» terminləri əlavə olundu; köhnə sabit «Xərc kateqoriyaları» sətri çıxarıldı (artıq idarə olunan növlərdir, wire-da frozen deyil).
 
 ## Related Code
 
@@ -35,3 +36,4 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 - `src/Modules/MayaPro.WarehouseApi.Modules.Products/Domain/Product.cs`
 - `src/Modules/MayaPro.WarehouseApi.Modules.Sales/Domain/Sale.cs`
 - `src/Modules/MayaPro.WarehouseApi.Modules.DayEnd/Domain/Closing.cs`
+- `src/Modules/MayaPro.WarehouseApi.Modules.Expenses/Domain/ExpenseType.cs`, `ExpenseSource.cs`

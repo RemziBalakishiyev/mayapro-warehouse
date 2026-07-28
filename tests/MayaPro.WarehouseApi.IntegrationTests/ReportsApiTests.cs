@@ -200,10 +200,41 @@ public sealed class ReportsApiTests : IAsyncLifetime
         client.PostAsJsonAsync("/api/expenses", new
         {
             title = "Hesabat xərci",
-            category = "Mağaza",
+            category = "Mağaza xərci",
+            source = "general",
             amount,
             date = (DateTime?)null,
             productId = (Guid?)null,
             note = (string?)null
         });
+
+    private static Task AddProductExpenseAsync(HttpClient client, Guid productId, decimal amount) =>
+        client.PostAsJsonAsync("/api/expenses", new
+        {
+            title = "Karqo",
+            category = "Yol pulu",
+            source = "product",
+            amount,
+            date = (DateTime?)null,
+            productId,
+            note = (string?)null
+        });
+
+    [Fact]
+    public async Task Summary_Splits_Expenses_By_Source_And_Sums_To_The_Total()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("RPT-SRC-SUM", quantity: 10, salePrice: 10m);
+
+        await AddGeneralExpenseAsync(client, amount: 100m);
+        await AddProductExpenseAsync(client, product.Id, amount: 250m);
+
+        var s = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+
+        Assert.True(s.GeneralExpenses >= 100m);
+        Assert.True(s.ProductExpenses >= 250m);
+        Assert.Equal(s.Expenses, s.GeneralExpenses + s.ProductExpenses); // split always sums to the total
+        Assert.Equal(s.Profit - s.Expenses, s.NetProfit);                // net profit formula unaffected
+    }
 }

@@ -13,7 +13,8 @@ public sealed class Expense : Entity
 
     private Expense(
         string name,
-        ExpenseCategory category,
+        string category,
+        ExpenseSource source,
         decimal amount,
         DateTime date,
         Guid? productId,
@@ -23,6 +24,7 @@ public sealed class Expense : Entity
     {
         Name = name;
         Category = category;
+        Source = source;
         Amount = amount;
         Date = date;
         ProductId = productId;
@@ -33,7 +35,19 @@ public sealed class Expense : Entity
 
     public string Name { get; private set; } = string.Empty;
 
-    public ExpenseCategory Category { get; private set; }
+    /// <summary>
+    /// Free-form expense type name — a snapshot of the chosen <see cref="ExpenseType"/>'s name at the time
+    /// the expense was recorded (see <see cref="ExpenseType"/> for the managed pick-list). Renaming or
+    /// deleting a type never rewrites existing expenses.
+    /// </summary>
+    public string Category { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Whether this expense is attached to a product (<see cref="ExpenseSource.Product"/>, raises that
+    /// product's real cost) or a general store expense with no product effect
+    /// (<see cref="ExpenseSource.General"/>). Always consistent with <see cref="ProductId"/>.
+    /// </summary>
+    public ExpenseSource Source { get; private set; }
 
     public decimal Amount { get; private set; }
 
@@ -51,14 +65,15 @@ public sealed class Expense : Entity
 
     public static Expense Create(
         string name,
-        ExpenseCategory category,
+        string category,
+        ExpenseSource source,
         decimal amount,
         DateTime date,
         Guid? productId,
         string? productName,
         string? note,
         Guid? createdByUserId) =>
-        new(name, category, amount, date, productId, productName, note, createdByUserId);
+        new(name, category, source, amount, date, productId, productName, note, createdByUserId);
 
     /// <summary>
     /// Re-applies an expense's values in place after its old product-cost effect was reversed (the "reapply"
@@ -67,7 +82,8 @@ public sealed class Expense : Entity
     /// </summary>
     public void Update(
         string name,
-        ExpenseCategory category,
+        string category,
+        ExpenseSource source,
         decimal amount,
         DateTime date,
         Guid? productId,
@@ -76,6 +92,7 @@ public sealed class Expense : Entity
     {
         Name = name;
         Category = category;
+        Source = source;
         Amount = amount;
         Date = date;
         ProductId = productId;

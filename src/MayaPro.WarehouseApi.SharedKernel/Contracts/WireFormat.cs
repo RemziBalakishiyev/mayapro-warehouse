@@ -16,15 +16,14 @@ public static class WireFormat
         public const string Credit = "Nisyə";
     }
 
-    /// <summary>Expense categories as the frontend sends them in <c>category</c> (EXP_CATS).</summary>
-    public static class ExpenseCategories
+    /// <summary>
+    /// Expense source as the frontend sends/reads it in <c>source</c>: <c>"product"</c> raises that
+    /// product's real cost, <c>"general"</c> is a store expense with no product effect.
+    /// </summary>
+    public static class ExpenseSources
     {
-        public const string Transport = "Yol";
-        public const string Labor = "Fəhlə";
-        public const string Storage = "Anbar/Yer";
-        public const string Packaging = "Paket/Qutu";
-        public const string Store = "Mağaza";
-        public const string Other = "Digər";
+        public const string General = "general";
+        public const string Product = "product";
     }
 
     /// <summary>User roles as the frontend reads them in the <c>role</c> field.</summary>

@@ -84,7 +84,8 @@ public sealed class DayEndApiTests : IAsyncLifetime
         client.PostAsJsonAsync("/api/expenses", new
         {
             title = "Gün sonu xərci",
-            category = "Mağaza",
+            category = "Mağaza xərci",
+            source = "general",
             amount,
             date = (DateTime?)null,
             productId = (Guid?)null,

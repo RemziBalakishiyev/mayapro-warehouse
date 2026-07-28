@@ -4,7 +4,11 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
+<<<<<<< HEAD
+## Endpoint-lər (44)
+=======
 ## Endpoint-lər (43)
+>>>>>>> origin/main
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
@@ -51,14 +55,21 @@ POST/PUT `/api/sales` optional `purchasePricePerUnit` (nullable decimal) qəbul 
 | PUT | `/api/suppliers/{id}` | O+M |
 | DELETE | `/api/suppliers/{id}` (borc qalıbsa 409) | O |
 
+<<<<<<< HEAD
+### Expenses (`/api/expenses`, `/api/expense-types`)
+=======
 POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənfi → 400 «Borc mənfi ola bilməz». `debt > 0` olduqda `SupplierDebtAdjustment` tarixçə sətri də yazılır. `GET /{id}/history` = ilkin borc + ödənişlər, xronoloji ARTAN sırada (`{date, type, amount, note}`, `type` = `initialDebt` | `payment`). Köhnə `GET /{id}/payments` dəyişməz qalıb — YALNIZ ödənişləri, tarix üzrə AZALAN sırada qaytarır.
 
 ### Expenses (`/api/expenses`)
+>>>>>>> origin/main
 | Verb | Route | Auth |
 |---|---|---|
-| GET | `/api/expenses?month` | auth |
+| GET | `/api/expenses?month&source` | auth |
 | POST | `/api/expenses` | O+M |
 | PUT / DELETE | `/api/expenses/{id}` | O+M |
+| GET / POST | `/api/expense-types` | auth |
+
+`source` (idarə olunan xərc mənbəyi: `general` \| `product`) POST/PUT `/api/expenses`-də MƏCBURİdir və `productId` ilə uyğun olmalıdır (`product` → productId var, `general` → yoxdur); uyğunsuzluq/naməlum dəyər 400. `GET /api/expenses` üzərindəki `source` filtri optionaldır, naməlum dəyər 400 (`Expenses.InvalidSource`). `category` artıq sabit kod (EXP_CATS) deyil — idarə olunan `ExpenseType`-ın sərbəst-string ad snapshot-udur (dublikat ad → 400 `Expenses.ExpenseTypeDuplicate`). `GET /api/reports/summary` cavabına `generalExpenses`/`productExpenses` bölgüsü əlavə olundu (cəmi `expenses` sahəsinə bərabərdir).
 
 ### DayEnd (`/api/closings`)
 | Verb | Route | Auth |
@@ -93,7 +104,11 @@ Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları
 
 ## Last Updated
 
+<<<<<<< HEAD
+2026-07-27 — BE#4: `GET/POST /api/expense-types` (idarə olunan xərc növləri), `Expense.category` sərbəst string oldu, `source` (general/product) sahəsi + `GET /api/expenses?source` filtri, summary-ə `generalExpenses`/`productExpenses`.
+=======
 2026-07-27 — təchizatçı ilkin borcu + `GET /api/suppliers/{id}/history`.
+>>>>>>> origin/main
 
 ## Related Code
 

@@ -8,5 +8,7 @@ public interface IExpensesDbContext
 {
     DbSet<Expense> Expenses { get; }
 
+    DbSet<ExpenseType> ExpenseTypes { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
