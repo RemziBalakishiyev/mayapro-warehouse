@@ -41,7 +41,8 @@ public sealed class DashboardCalculatorTests
     private static SalesReportRow Sale(DateOnly date, decimal total, decimal? profit, int qty = 1, string? payment = null, Guid? product = null, string name = "P") =>
         new(date, total, profit, payment ?? Cash, product, name, qty, UnitPrice: total / qty, IsManual: false);
 
-    private static ExpenseReportRow Exp(DateOnly date, decimal amount) => new(date, "Yol", amount);
+    private static ExpenseReportRow Exp(DateOnly date, decimal amount) =>
+        new(date, "Yol pulu", amount, WireFormat.ExpenseSources.General);
 
     [Fact]
     public void Today_Aggregates_Only_Todays_Rows()

@@ -5,6 +5,7 @@
 ## 2026-07-27
 
 - **Xərc tarixi gələcək ola bilməz** (BE#9): `CreateExpenseValidator` və `UpdateExpenseValidator` `IDateProvider` alır və `date` göndərilibsə `ToLocalDate(date) <= Today` (Asia/Baku, ADR-0005) yoxlayır → 400 «Xərcin tarixi gələcək ola bilməz». `date = null` (yaratmada "indi", düzəlişdə köhnə tarix) toxunulmayıb. FE#10-dakı yalnız-UI qorumasının backend qarşılığı; hesabatlardakı "Bu ay" fərqinin kökü bağlanır. `CreateExpenseHandler` default tarixi artıq `DateTime.UtcNow` yox, `IDateProvider.UtcNow` ilə yazır (eyni saat mənbəyi). Migration/kontrakt dəyişikliyi yoxdur.
+- **İdarə olunan xərc növləri + xərc mənbəyi ayrımı** (BE#4): yeni `ExpenseType` (Category-nin analoqu — unique ad, `GET/POST /api/expense-types`, hər rola açıq, seed Development-də 7 default növ). `Expense.Category` enum-dan sərbəst-string snapshot-a keçdi (`nvarchar(20)`→`nvarchar(100)`); köhnə `ExpenseCategory`/`ExpenseCategoryCode` tamamilə çıxarıldı. Yeni `Expense.Source` (daxildə enum, wire `"general"`\|`"product"`): `product` — `ProductId` məcburi, maya zənciri işə düşür; `general` — `ProductId` qadağan, mayaya təsirsiz. `CreateExpenseValidator`/`UpdateExpenseValidator`-da qarşılıqlı validasiya. `GET /api/expenses` üzərinə optional `source` filtri (mövcud `month` ilə birgə), naməlum dəyər → 400 (`Expenses.InvalidSource`). `GetSummaryHandler`/`SummaryDto`-ya `generalExpenses`/`productExpenses` bölgüsü (cəmi mövcud `expenses`-ə bərabər, `netProfit` dəyişməyib) — kontrakt: `ExpenseReportRow`-a `Source` sahəsi. Migration `ExpenseTypesAndSource`: köhnə enum dəyərləri Azərbaycanca adlara çevrilir (Transport→Yol pulu və s.), `Source` `ProductId`-dən backfill olunur (dolu→product, boş→general). **Breaking wire change**: `POST/PUT /api/expenses` indi `source` sahəsini MƏCBURİ tələb edir; `category` artıq sabit EXP_CATS kodu deyil, sərbəst string. Review düzəlişləri: dublikat növ adı yoxlaması açıq şəkildə case-insensitive (DB collation-undan asılı deyil), ad/kateqoriya üçün 100 simvol validasiyası (DB truncation → 500 əvəzinə 400), migration-da `Source` default constraint olmadan nullable→backfill→NOT NULL ardıcıllığı ilə doldurulur və `Down()` naməlum adları `Other`-ə yığır.
 - **Təchizatçı ilkin borcu + tarixçə** (BE#3): yeni `SupplierDebtAdjustment` entity (`suppliers.SupplierDebtAdjustments`, migration `AddSupplierDebtAdjustments`, `SupplierId` üzərində index) — müştəri tərəfindəki `CustomerDebtAdjustment` pattern-inin güzgüsü. `POST /api/suppliers` `debt > 0` göndəriləndə təchizatçı + ilkin borc sətri + `"{ad} — ilkin borc {məbləğ} AZN"` activity log-u TƏK `IUnitOfWork` transaction-ında yazılır; `debt = 0`-da köhnə davranış olduğu kimi qalır, mənfi `debt` yenə 400. Yeni `GET /api/suppliers/{id}/history` — ilkin borc (`initialDebt`) + ödənişlər (`payment`) xronoloji artan sırada. Köhnə `GET /api/suppliers/{id}/payments` kontraktı dəyişməyib. Təchizatçı silinəndə ilkin borc sətirləri də təmizlənir (FK cascade yoxdur). Bilinən boşluq: `POST /{id}/debts` (kreditlə alış) hələ tarixçə sətri yaratmır.
 
 ## 2026-07-26
@@ -43,7 +44,7 @@
 
 ## Last Updated
 
-2026-07-27 — BE#9 (xərc tarixinin gələcək ola bilməməsi).
+2026-07-27 — BE#9 (xərc tarixinin gələcək ola bilməməsi), BE#4 (idarə olunan xərc növləri + xərc mənbəyi ayrımı), BE#3 (təchizatçı ilkin borcu + tarixçə endpoint-i).
 
 ## Related Code
 

@@ -34,8 +34,8 @@ public sealed class DeleteExpenseHandler(
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         // Reverse the product-cost effect (best-effort — the only possible failure is a since-deleted product).
-        if (expense.ProductId is { } productId)
-            await products.RemoveExpenseFromProductAsync(productId, expense.Category.ToCode(), expense.Amount, ct);
+        if (expense.Source == ExpenseSource.Product && expense.ProductId is { } productId)
+            await products.RemoveExpenseFromProductAsync(productId, expense.Category, expense.Amount, ct);
 
         db.Expenses.Remove(expense);
 

@@ -14,8 +14,14 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 
         builder.Property(e => e.Name).IsRequired().HasMaxLength(200);
 
-        // Persist the category by name (Transport/Labor/...) for a readable, reorder-safe column.
+        // Free-form snapshot of the chosen ExpenseType's name at creation time (never an FK — deleting or
+        // renaming a type must not touch existing expenses).
         builder.Property(e => e.Category)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        // Persisted by name ("general"/"product") for a readable, reorder-safe column.
+        builder.Property(e => e.Source)
             .IsRequired()
             .HasConversion<string>()
             .HasMaxLength(20);

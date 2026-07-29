@@ -22,7 +22,7 @@ public sealed class CreateExpenseValidatorTests
     private static CreateExpenseValidator ValidatorAt(DateTime utcNow) => new(new AppDateProvider(Baku, () => utcNow));
 
     private static CreateExpenseCommand CommandWithDate(DateTime? date) =>
-        new("Karqo", "Yol", 100m, date, null, null);
+        new("Karqo", "Yol", "general", 100m, date, null, null);
 
     [Fact]
     public void Tomorrows_Date_Is_Invalid()

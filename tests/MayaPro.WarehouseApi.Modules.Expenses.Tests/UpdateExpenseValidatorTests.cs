@@ -20,7 +20,7 @@ public sealed class UpdateExpenseValidatorTests
     private static UpdateExpenseValidator ValidatorAt(DateTime utcNow) => new(new AppDateProvider(Baku, () => utcNow));
 
     private static UpdateExpenseCommand CommandWithDate(DateTime? date) =>
-        new(Guid.NewGuid(), "Karqo (düzəliş)", "Yol", 100m, date, null, null);
+        new(Guid.NewGuid(), "Karqo (düzəliş)", "Yol", "general", 100m, date, null, null);
 
     [Fact]
     public void Tomorrows_Date_Is_Invalid()

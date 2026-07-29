@@ -16,5 +16,8 @@ public interface IExpensesModule
         CancellationToken cancellationToken = default);
 }
 
-/// <summary>A single expense as seen by reports: date, category code and amount.</summary>
-public sealed record ExpenseReportRow(DateOnly Date, string Category, decimal Amount);
+/// <summary>
+/// A single expense as seen by reports: date, category snapshot, amount and source ("general" | "product",
+/// see <see cref="WireFormat.ExpenseSources"/>).
+/// </summary>
+public sealed record ExpenseReportRow(DateOnly Date, string Category, decimal Amount, string Source);

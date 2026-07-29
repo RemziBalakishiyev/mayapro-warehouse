@@ -11,7 +11,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 | `sales` | SalesDbContext | Sales | ✅ |
 | `customers` | CustomersDbContext | Customers, CustomerPayments, CustomerDebtAdjustments | ✅ |
 | `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments, SupplierDebtAdjustments | ✅ |
-| `expenses` | ExpensesDbContext | Expenses | ✅ |
+| `expenses` | ExpensesDbContext | Expenses, ExpenseTypes | ✅ |
 | `dayend` | DayEndDbContext | Closings | ✅ |
 | `activity` | ActivityDbContext | ActivityLogs | ✅ |
 | `settings` | SettingsDbContext | StoreSettings (singleton sətir, sabit Id) | ❌ (standalone) |
@@ -28,7 +28,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 - Data köçürən (backfill) migration-lar mövcud sətirləri korlamamalıdır: JSON oxunuşu `ISJSON`/`TRY_CAST` ilə müdafiə olunur, sıfıra bölmə və NULL halları açıq şəkildə idarə edilir, UPDATE yalnız hələ doldurulmamış sətirlərə vurur (təkrar icra təhlükəsiz). Nümunə: `20260726142954_AddSalePurchasePricePerUnit` — sərbəst satışların alış qiymətini mövcud mayadan bərpa edir, kataloq satışlarına toxunmur (onlarda NULL qalır). Testi: `tests/MayaPro.WarehouseApi.IntegrationTests/SalesMigrationTests.cs`.
 - Soft delete YOXDUR — silmələr həqiqi DELETE-dir.
 - JSON sütunlar (value converter): `Product.Attributes`, `Product.Expenses`, `Sale.ExpenseItems`.
-- Enum-ların saxlanması: `User.Role` string ("Owner"/"Manager"/"Seller"); `Sale.PaymentType`, `Expense.Category` — enum.
+- Enum-ların saxlanması: `User.Role` string ("Owner"/"Manager"/"Seller"); `Sale.PaymentType` — enum. `Expense.Category` artıq enum DEYİL — idarə olunan `ExpenseType.Name`-in sərbəst-string snapshot-u (`nvarchar(100)`, FK yoxdur). `Expense.Source` (general/product) — enum, string kimi saxlanır.
 
 ## Vacib indekslər / məhdudiyyətlər
 
@@ -40,11 +40,11 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 
 ## Seed (yalnız Development)
 
-UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeeder, SupplierSeeder. Sales/Expenses boş başlayır. Referans: `docs/seed.ts` (frontend seed data-sı).
+UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeeder, SupplierSeeder, ExpenseTypeSeeder (7 default xərc növü). Sales/Expenses boş başlayır. Referans: `docs/seed.ts` (frontend seed data-sı).
 
 ## Last Updated
 
-2026-07-27 — `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
+2026-07-27 — `expenses.ExpenseTypes` cədvəli, `Expense.Category` enum→string, `Expense.Source` sütunu (migration `ExpenseTypesAndSource`, BE#4); `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
 
 ## Related Code
 

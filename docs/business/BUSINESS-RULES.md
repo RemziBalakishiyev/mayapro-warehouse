@@ -32,6 +32,17 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - `AdjustStock(delta)` — əl korreksiyası, 0-da floor.
 - Məhsul silmək təhlükəsizdir — satışlar öz snapshot-larını daşıyır.
 
+## Xərc qaydaları
+
+- **Xərc növləri (ExpenseType)** idarə olunan pick-list-dir (Category-nin analoqu): ayrı cədvəl, unique ad, `GET/POST /api/expense-types` (hər ikisi hər rola açıq). Seed (yalnız Development): Yol pulu, Fəhlə pulu, Yer/Anbar xərci, Paket/Qutu, Gömrük, Mağaza xərci, Digər. `Expense.Category` bu adın sərbəst-string snapshot-udur — FK yoxdur, növ silinsə/adı dəyişsə köhnə xərclər pozulmur.
+- **Xərc mənbəyi (Source)**: `"product"` (mala bağlı, `ProductId` MƏCBURİ, `AddExpenseToProductAsync` işə düşür → maya artır) və ya `"general"` (ümumi mağaza xərci, `ProductId` GÖNDƏRİLMƏMƏLİDİR, heç bir malın mayasına toxunmur). Validasiya hər iki istiqamətdə: uyğunsuzluq 400.
+- `GET /api/expenses` optional `source=general|product` filtri dəstəkləyir (mövcud `month` filtri ilə birlikdə); naməlum dəyər 400 (`Expenses.InvalidSource`).
+- Dashboard/summary xərc CƏMİ (`Expenses`) source-dan asılı olmayaraq bütün xərcləri əhatə edir; `GET /api/reports/summary` üzərinə `generalExpenses`/`productExpenses` bölgüsü əlavə olunub (cəmi `Expenses`-ə bərabərdir), `netProfit` düsturu dəyişməyib.
+- Xərc tarixi **gələcək ola bilməz**: `date` göndərilibsə Bakı təqvimi ilə bugündən sonra ola bilməz (`IDateProvider`, ADR-0005) → 400 «Xərcin tarixi gələcək ola bilməz». Yaratma və düzəliş üçün eyni qayda. Qayda serverdədir — UI-dakı `max` yoxlaması yalnız rahatlıq üçündür.
+- `date` göndərilmirsə: yaratmada "indi" yazılır, düzəlişdə xərcin mövcud tarixi qalır (bu hallarda qayda işə düşmür).
+- Tarix UTC anı kimi saxlanılır; "hansı günə düşür" HƏMİŞƏ Bakı gününə görə hesablanır (gün sonu, aylıq siyahı, hesabatlar).
+- Düzəlişdə tarix qaydası bağlı gün yoxlamasından ƏVVƏL işləyir: gələcək tarixli düzəliş 409 yox, 400 qaytarır.
+
 ## Müştəri borcu qaydaları
 
 - Borc yalnız domain metodları ilə dəyişir; heç vaxt 0-dan aşağı düşmür.
@@ -53,13 +64,6 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - **Tarixçə** (`GET /{id}/history`): `SupplierDebtAdjustments` (type `initialDebt`) + `SupplierPayments` (type `payment`), yaddaşda tarixə görə artan sırada birləşdirilir. Köhnə `GET /{id}/payments` toxunulmayıb — yalnız ödənişlər, azalan sırada.
 - Borcumuz qalıbsa təchizatçı silinə bilməz (`Suppliers.HasDebtConflict`, 409). Silinəndə ödəniş + ilkin borc sətirləri də silinir (tək transaction); məhsulların `SupplierId` referansı qalır.
 
-## Xərc qaydaları
-
-- Xərc tarixi **gələcək ola bilməz**: `date` göndərilibsə Bakı təqvimi ilə bugündən sonra ola bilməz (`IDateProvider`, ADR-0005) → 400 «Xərcin tarixi gələcək ola bilməz». Yaratma və düzəliş üçün eyni qayda. Qayda serverdədir — UI-dakı `max` yoxlaması yalnız rahatlıq üçündür.
-- `date` göndərilmirsə: yaratmada "indi" yazılır, düzəlişdə xərcin mövcud tarixi qalır (bu hallarda qayda işə düşmür).
-- Tarix UTC anı kimi saxlanılır; "hansı günə düşür" HƏMİŞƏ Bakı gününə görə hesablanır (gün sonu, aylıq siyahı, hesabatlar).
-- Düzəlişdə tarix qaydası bağlı gün yoxlamasından ƏVVƏL işləyir: gələcək tarixli düzəliş 409 yox, 400 qaytarır.
-
 ## Gün sonu qaydaları
 
 - `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`. Nisyə satışlar kassa üzləşdirməsinə daxil deyil.
@@ -76,10 +80,11 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 ## Last Updated
 
-2026-07-27 — xərc qaydaları bölməsi əlavə olundu (gələcək tarix qadağası, BE#9).
+2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source: general/product); BE#9: xərc qaydalarına gələcək tarix qadağası əlavə olundu; təchizatçı borcu qaydaları ayrıca bölmə oldu (ilkin borc + tarixçə).
 
 ## Related Code
 
 - `src/Modules/*/Domain/` (entity davranışları + *Errors.cs)
 - `src/Modules/MayaPro.WarehouseApi.Modules.Sales/Application/UseCases/` (zəncirlər)
+- `src/Modules/MayaPro.WarehouseApi.Modules.Expenses/` (ExpenseType, ExpenseSource)
 - `docs/handlers.ts` (frontend mock — davranış referansı)

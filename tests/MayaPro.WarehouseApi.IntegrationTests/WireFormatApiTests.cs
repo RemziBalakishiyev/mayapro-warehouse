@@ -4,12 +4,15 @@ using System.Text.Json;
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
 /// <summary>
-/// Guards the frontend wire contract. Frozen pieces (paymentType "Nağd"..., expense category "Yol"..., role
-/// "sahib"...) must stay byte-for-byte. Every assertion reads RAW JSON, not a typed DTO.
+/// Guards the frontend wire contract. Frozen pieces (paymentType "Nağd"..., role "sahib"...) must stay
+/// byte-for-byte. Every assertion reads RAW JSON, not a typed DTO.
 /// <para>
 /// DELIBERATE CONTRACT CHANGES (agreed with the frontend): product <c>attributes: [{ name, value }]</c>;
 /// product <c>expenses: [{ name, amount }]</c> (the old yol/fehle/yer/paket/diger object is gone); managed
-/// categories; sales PagedResult. The tests below assert the NEW shapes on purpose.
+/// categories; sales PagedResult. Expense <c>category</c> is NO LONGER a fixed code (EXP_CATS) — it is now
+/// a free-form snapshot string of a managed expense type's name (<c>GET/POST /api/expense-types</c>); a new
+/// required <c>source</c> field ("general" | "product") replaces the old ProductId-only inference. The
+/// tests below assert the NEW shapes on purpose.
 /// </para>
 /// </summary>
 [Collection(ApiCollection.Name)]
@@ -344,19 +347,21 @@ public sealed class WireFormatApiTests : IAsyncLifetime
         Assert.Equal("Nağd", saleDoc.RootElement.GetProperty("paymentType").GetString());
         Assert.Equal("Test", saleDoc.RootElement.GetProperty("category").GetString());
 
-        // category stays "Yol" on the wire.
+        // category is a free-form snapshot — round-trips exactly as sent.
         HttpResponseMessage expense = await client.PostAsJsonAsync("/api/expenses", new
         {
             title = "Wire xərci",
-            category = "Yol",
+            category = "Yol pulu",
+            source = "general",
             amount = 5m,
             date = (DateTime?)null,
             productId = (Guid?)null,
             note = (string?)null
         });
         expense.EnsureSuccessStatusCode();
-        Assert.Equal("Yol", JsonDocument.Parse(await expense.Content.ReadAsStringAsync())
-            .RootElement.GetProperty("category").GetString());
+        using JsonDocument expenseDoc = JsonDocument.Parse(await expense.Content.ReadAsStringAsync());
+        Assert.Equal("Yol pulu", expenseDoc.RootElement.GetProperty("category").GetString());
+        Assert.Equal("general", expenseDoc.RootElement.GetProperty("source").GetString());
 
         // role stays "sahib" on the wire.
         using JsonDocument me = JsonDocument.Parse(

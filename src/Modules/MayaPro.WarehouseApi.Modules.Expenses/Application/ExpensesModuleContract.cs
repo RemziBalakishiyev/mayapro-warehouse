@@ -37,7 +37,7 @@ internal sealed class ExpensesModuleContract(IExpensesDbContext db, IDateProvide
         List<Expense> expenses = await query.OrderBy(e => e.Date).ToListAsync(cancellationToken);
 
         return expenses
-            .Select(e => new ExpenseReportRow(dateProvider.ToLocalDate(e.Date), e.Category.ToCode(), e.Amount))
+            .Select(e => new ExpenseReportRow(dateProvider.ToLocalDate(e.Date), e.Category, e.Amount, e.Source.ToCode()))
             .ToList();
     }
 }
