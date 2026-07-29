@@ -185,6 +185,12 @@ public sealed class Product : Entity
     /// <summary>Manual stock correction by a signed delta. Never drops below zero.</summary>
     public void AdjustStock(int delta) => Quantity = Math.Max(0, Quantity + delta);
 
+    /// <summary>
+    /// Assigns a system-generated barcode to a product that does not have one yet. Callers must check
+    /// <see cref="Barcode"/> is empty first — see <see cref="ProductErrors.BarcodeAlreadyExists"/>.
+    /// </summary>
+    public void AssignBarcode(string barcode) => Barcode = barcode;
+
     /// <summary>Returns reserved stock (a deleted or revised sale) — the inverse of <see cref="TryDecreaseStock"/>.</summary>
     public void IncreaseStock(int quantity) => Quantity += quantity;
 

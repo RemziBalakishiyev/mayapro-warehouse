@@ -173,4 +173,76 @@ public sealed class ExportsApiTests : IAsyncLifetime
         byte[] bytes = await response.Content.ReadAsByteArrayAsync();
         Assert.NotEmpty(bytes);
     }
+
+    [Fact]
+    public async Task Labels_Pdf_Returns_Pdf_With_Magic_Bytes_For_Barcoded_Products()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-LABEL-BARCODE-1", quantity: 20, salePrice: 12.5m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/exports/products/labels.pdf", new
+        {
+            items = new[] { new { productId = product.Id, count = 10 } }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.StartsWith("etiketler-", response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.NotEmpty(bytes);
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task Labels_Pdf_Renders_Qr_Codes_When_Type_Is_Qr()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-LABEL-QR-1", quantity: 5, salePrice: 3m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/exports/products/labels.pdf", new
+        {
+            items = new[] { new { productId = product.Id, count = 1 } },
+            type = "qr"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task Labels_Pdf_Returns_400_When_A_Product_Has_No_Barcode()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("", quantity: 5, salePrice: 4m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/exports/products/labels.pdf", new
+        {
+            items = new[] { new { productId = product.Id, count = 2 } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>();
+        Assert.Equal("Exports.ProductsWithoutBarcode", error!.Code);
+        Assert.Contains("barkodu yoxdur", error.Message);
+        Assert.Contains("Satış test malı", error.Message); // the fixed test-fixture product name
+    }
+
+    [Fact]
+    public async Task Labels_Pdf_Returns_400_When_Total_Count_Exceeds_500()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("EXP-LABEL-TOOMANY-1", quantity: 999, salePrice: 6m);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/exports/products/labels.pdf", new
+        {
+            items = new[] { new { productId = product.Id, count = 501 } }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>();
+        Assert.Equal("Exports.TooManyLabels", error!.Code);
+    }
 }

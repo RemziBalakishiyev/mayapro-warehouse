@@ -76,6 +76,15 @@ public interface IProductsModule
     /// not the Products API shape.
     /// </summary>
     Task<IReadOnlyList<ProductExportRow>> GetExportProductsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the label-printing fields (name, barcode, sale price) for the given products. Unknown ids
+    /// are simply absent from the result — callers decide how to report them. Used by the read-only
+    /// Exports module for the barcode/QR label sheet.
+    /// </summary>
+    Task<IReadOnlyList<ProductLabelInfo>> GetLabelInfoAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -120,4 +129,14 @@ public sealed record ProductExportRow(
     int MinStock,
     string Location,
     string SupplierId);
+
+/// <summary>
+/// A product's label-printing fields: display name, its barcode (empty if none has been assigned yet) and
+/// current sale price.
+/// </summary>
+public sealed record ProductLabelInfo(
+    Guid Id,
+    string Name,
+    string Barcode,
+    decimal SalePrice);
 

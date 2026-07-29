@@ -149,6 +149,23 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         product.Location,
         product.SupplierId);
 
+    public async Task<IReadOnlyList<ProductLabelInfo>> GetLabelInfoAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (productIds.Count == 0)
+            return Array.Empty<ProductLabelInfo>();
+
+        List<Product> products = await db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+
+        return products
+            .Select(p => new ProductLabelInfo(p.Id, p.Name, p.Barcode, p.SalePrice))
+            .ToList();
+    }
+
     private static string FormatAttributes(IReadOnlyList<ProductAttribute> attributes) =>
         string.Join("; ", attributes
             .Where(a => !string.IsNullOrWhiteSpace(a.Name) && !string.IsNullOrWhiteSpace(a.Value))

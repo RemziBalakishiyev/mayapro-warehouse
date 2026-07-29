@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.Modules.Exports.Application;
+using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductLabelsPdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsExcel;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSaleInvoicePdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSalesPdf;
@@ -46,6 +47,20 @@ internal static class ExportsEndpoints
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
             .WithName("ExportSalesPdf");
+
+        group.MapPost("/products/labels.pdf", async (
+                LabelsPdfRequest request,
+                ExportProductLabelsPdfHandler handler,
+                CancellationToken ct) =>
+            {
+                Result<ExportFileResult> result = await handler.Handle(request, ct);
+                if (result.IsFailure)
+                    return result.ToHttpResult();
+
+                ExportFileResult file = result.Value;
+                return Results.File(file.Content, file.ContentType, file.FileName);
+            })
+            .WithName("ExportProductLabelsPdf");
 
         group.MapGet("/sales/{id:guid}/invoice.pdf", async (
                 Guid id,

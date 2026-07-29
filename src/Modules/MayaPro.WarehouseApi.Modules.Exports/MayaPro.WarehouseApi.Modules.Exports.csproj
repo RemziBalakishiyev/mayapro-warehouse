@@ -7,6 +7,8 @@
   <ItemGroup>
     <PackageReference Include="ClosedXML" />
     <PackageReference Include="QuestPDF" />
+    <PackageReference Include="ZXing.Net" />
+    <PackageReference Include="ZXing.Net.Bindings.ImageSharp.V3" />
   </ItemGroup>
 
   <ItemGroup>
