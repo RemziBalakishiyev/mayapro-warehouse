@@ -35,23 +35,15 @@ Eyni schema daxilində, sahib entity-nin Id-si ilə. Konfiqurasiyalarda navigati
 - **Customer**: Name, Phone, Note, Debt (0-dan aşağı düşmür)
 - **CustomerPayment / CustomerDebtAdjustment**: məbləğ + tarix + qeyd
 - **Supplier**: Name, ContactName, Phone, Note, Debt, ItemCount
-<<<<<<< HEAD
-- **Expense**: Title, Category(string snapshot, ExpenseType-a FK-sız), Source(enum: general/product), Amount, Date, ProductId?, ProductName?, Note
-=======
 - **SupplierPayment / SupplierDebtAdjustment**: məbləğ + tarix + qeyd
-- **Expense**: Title, Category(enum), Amount, Date, ProductId?, ProductName?, Note
->>>>>>> origin/main
+- **Expense**: Title, Category(string snapshot, ExpenseType-a FK-sız), Source(enum: general/product), Amount, Date, ProductId?, ProductName?, Note
 - **Closing**: gün totalları + ExpectedCash/Difference (constructor-da hesablanır), Date unique
 - **ActivityLog**: Type(≤50), Message(≤1000), UserId?, UserName snapshot
 - **StoreSettings**: singleton — StoreName, OwnerName?, Address?, Phone?, WhatsappTemplate, Currency, DefaultMinStock, Language
 
 ## Last Updated
 
-<<<<<<< HEAD
-2026-07-27 — BE#4: `ExpenseType` əlavə olundu; `Expense.Category` enum-dan sərbəst-string snapshot-a keçdi, `Expense.Source` (general/product) sahəsi əlavə olundu.
-=======
-2026-07-27 — `SupplierDebtAdjustment` əlavə olundu; modul daxili münasibətlərin FK-sızlığı dəqiqləşdirildi.
->>>>>>> origin/main
+2026-07-27 — BE#4: `ExpenseType` əlavə olundu; `Expense.Category` enum-dan sərbəst-string snapshot-a keçdi, `Expense.Source` (general/product) sahəsi əlavə olundu. `SupplierDebtAdjustment` əlavə olundu; modul daxili münasibətlərin FK-sızlığı dəqiqləşdirildi.
 
 ## Related Code
 

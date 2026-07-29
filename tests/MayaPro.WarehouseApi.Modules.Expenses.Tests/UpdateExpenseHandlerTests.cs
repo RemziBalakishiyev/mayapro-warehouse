@@ -158,7 +158,7 @@ public sealed class UpdateExpenseHandlerTests
             new FakeUnitOfWork(db),
             products,
             new FakeDayEndModule(),
-            new UpdateExpenseValidator(),
+            new UpdateExpenseValidator(new FakeDateProvider()),
             new FakeActivityLogger(),
             new FakeCurrentUser(Guid.NewGuid()),
             new FakeDateProvider());

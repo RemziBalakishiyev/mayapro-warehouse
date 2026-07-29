@@ -20,7 +20,7 @@ Ad qaydaları: boşluqlar kəsilir (trim), dublikat yoxlaması **case-insensitiv
 
 Tək transaction-da:
 
-1. Validation: ad boş deyil, məbləğ > 0, kateqoriya boş deyil, `source` `general`/`product`-dan biridir və `productId` ilə uyğundur.
+1. Validation: ad boş deyil, məbləğ > 0, kateqoriya boş deyil, `source` `general`/`product`-dan biridir və `productId` ilə uyğundur; `date` göndərilibsə Bakı günü ilə **gələcək ola bilməz** (`IDateProvider.ToLocalDate(date) <= Today`, ADR-0005) → 400. `date` yoxdursa `IDateProvider.UtcNow` yazılır.
 2. `source = "product"` olduqda:
    - `IProductsModule.GetSnapshotAsync` — məhsul adı snapshot + mövcudluq yoxlaması (yoxdursa rollback).
    - `AddExpenseToProductAsync(productId, category, amount)` — məhsulun xərc sətirlərinə əlavə olunur (eyni adlı sətir varsa üstünə gəlir, `category` sərbəst xərc növü adı kimi keçir) → **RealCostPerUnit yenidən hesablanır**: `PurchasePrice + Σxərclər ÷ InitialQuantity`.
@@ -29,7 +29,7 @@ Tək transaction-da:
 
 ## Düzəliş / silinmə (Owner+Manager)
 
-- **Update**: reverse-and-reapply — köhnə `Source == product` idisə köhnə məbləğ məhsuldan çıxarılır (`RemoveExpense`, tanınmayan sətir no-op), yeni `source == product`-dursa yeni məbləğ əlavə olunur; məhsul dəyişibsə köhnədən çıxıb yeniyə yazılır. `general` ↔ `product` arası keçid də eyni reverse-and-reapply ilə düzgün işləyir.
+- **Update**: eyni validation (gələcək tarix qadağası daxil — bağlı gün yoxlamasından əvvəl işləyir) + reverse-and-reapply — köhnə `Source == product` idisə köhnə məbləğ məhsuldan çıxarılır (`RemoveExpense`, tanınmayan sətir no-op), yeni `source == product`-dursa yeni məbləğ əlavə olunur; məhsul dəyişibsə köhnədən çıxıb yeniyə yazılır. `general` ↔ `product` arası keçid də eyni reverse-and-reapply ilə düzgün işləyir.
 - **Delete**: `Source == product` idisə `RemoveExpense` ilə maya effekti geri sarılır, sonra xərc silinir; `general` xərcin silinməsi heç bir mala toxunmur.
 
 ## Siyahı və filtrlər (`GET /api/expenses`)
@@ -54,7 +54,7 @@ Tək transaction-da:
 
 ## Last Updated
 
-2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source), migration qeydi; review-dan sonra: ad qaydaları (case-insensitive dublikat, ≤100 simvol) və migration backfill/Down detalları.
+2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source), migration qeydi; review-dan sonra: ad qaydaları (case-insensitive dublikat, ≤100 simvol) və migration backfill/Down detalları. BE#9: validation addımı dəqiqləşdi — xərc tarixi gələcək ola bilməz.
 
 ## Related Code
 

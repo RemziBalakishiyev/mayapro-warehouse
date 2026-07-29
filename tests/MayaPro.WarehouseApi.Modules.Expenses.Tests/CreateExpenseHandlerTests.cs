@@ -155,7 +155,8 @@ public sealed class CreateExpenseHandlerTests
         new(db,
             new FakeUnitOfWork(db),
             products,
-            new CreateExpenseValidator(),
+            new CreateExpenseValidator(new FakeDateProvider()),
             new FakeActivityLogger(),
-            new FakeCurrentUser(Guid.NewGuid()));
+            new FakeCurrentUser(Guid.NewGuid()),
+            new FakeDateProvider());
 }

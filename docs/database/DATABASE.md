@@ -10,13 +10,8 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 | `products` | ProductsDbContext | Products, Categories | ✅ |
 | `sales` | SalesDbContext | Sales | ✅ |
 | `customers` | CustomersDbContext | Customers, CustomerPayments, CustomerDebtAdjustments | ✅ |
-<<<<<<< HEAD
-| `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments | ✅ |
-| `expenses` | ExpensesDbContext | Expenses, ExpenseTypes | ✅ |
-=======
 | `suppliers` | SuppliersDbContext | Suppliers, SupplierPayments, SupplierDebtAdjustments | ✅ |
-| `expenses` | ExpensesDbContext | Expenses | ✅ |
->>>>>>> origin/main
+| `expenses` | ExpensesDbContext | Expenses, ExpenseTypes | ✅ |
 | `dayend` | DayEndDbContext | Closings | ✅ |
 | `activity` | ActivityDbContext | ActivityLogs | ✅ |
 | `settings` | SettingsDbContext | StoreSettings (singleton sətir, sabit Id) | ❌ (standalone) |
@@ -49,11 +44,7 @@ UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeed
 
 ## Last Updated
 
-<<<<<<< HEAD
-2026-07-27 — `expenses.ExpenseTypes` cədvəli, `Expense.Category` enum→string, `Expense.Source` sütunu (migration `ExpenseTypesAndSource`, BE#4).
-=======
-2026-07-27 — `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
->>>>>>> origin/main
+2026-07-27 — `expenses.ExpenseTypes` cədvəli, `Expense.Category` enum→string, `Expense.Source` sütunu (migration `ExpenseTypesAndSource`, BE#4); `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
 
 ## Related Code
 

@@ -38,6 +38,10 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - **Xərc mənbəyi (Source)**: `"product"` (mala bağlı, `ProductId` MƏCBURİ, `AddExpenseToProductAsync` işə düşür → maya artır) və ya `"general"` (ümumi mağaza xərci, `ProductId` GÖNDƏRİLMƏMƏLİDİR, heç bir malın mayasına toxunmur). Validasiya hər iki istiqamətdə: uyğunsuzluq 400.
 - `GET /api/expenses` optional `source=general|product` filtri dəstəkləyir (mövcud `month` filtri ilə birlikdə); naməlum dəyər 400 (`Expenses.InvalidSource`).
 - Dashboard/summary xərc CƏMİ (`Expenses`) source-dan asılı olmayaraq bütün xərcləri əhatə edir; `GET /api/reports/summary` üzərinə `generalExpenses`/`productExpenses` bölgüsü əlavə olunub (cəmi `Expenses`-ə bərabərdir), `netProfit` düsturu dəyişməyib.
+- Xərc tarixi **gələcək ola bilməz**: `date` göndərilibsə Bakı təqvimi ilə bugündən sonra ola bilməz (`IDateProvider`, ADR-0005) → 400 «Xərcin tarixi gələcək ola bilməz». Yaratma və düzəliş üçün eyni qayda. Qayda serverdədir — UI-dakı `max` yoxlaması yalnız rahatlıq üçündür.
+- `date` göndərilmirsə: yaratmada "indi" yazılır, düzəlişdə xərcin mövcud tarixi qalır (bu hallarda qayda işə düşmür).
+- Tarix UTC anı kimi saxlanılır; "hansı günə düşür" HƏMİŞƏ Bakı gününə görə hesablanır (gün sonu, aylıq siyahı, hesabatlar).
+- Düzəlişdə tarix qaydası bağlı gün yoxlamasından ƏVVƏL işləyir: gələcək tarixli düzəliş 409 yox, 400 qaytarır.
 
 ## Müştəri borcu qaydaları
 
@@ -76,11 +80,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 ## Last Updated
 
-<<<<<<< HEAD
-2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source: general/product).
-=======
-2026-07-27 — təchizatçı borcu qaydaları ayrıca bölmə oldu (ilkin borc + tarixçə).
->>>>>>> origin/main
+2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source: general/product); BE#9: xərc qaydalarına gələcək tarix qadağası əlavə olundu; təchizatçı borcu qaydaları ayrıca bölmə oldu (ilkin borc + tarixçə).
 
 ## Related Code
 
