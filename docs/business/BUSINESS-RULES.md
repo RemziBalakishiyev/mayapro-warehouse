@@ -31,6 +31,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Məhsula bağlı xərc yaradılanda `AddExpenseToProductAsync` → maya yenidən hesablanır; xərc silinəndə/düzələndə əks proses.
 - `AdjustStock(delta)` — əl korreksiyası, 0-da floor.
 - Məhsul silmək təhlükəsizdir — satışlar öz snapshot-larını daşıyır.
+- **Barkod**: mağazanın öz formatı `SDK` + 7 rəqəm. Yalnız barkodu BOŞ olan mala verilir (`POST /api/products/{id}/generate-barcode`, O+M); barkodu olan mal → 409 «Malın artıq barkodu var» — təkrar generasiya yoxdur, çünki etiket artıq çap olunmuş ola bilər. Barkod boş olmayan mallar arasında unikaldır (filtrli unique index); paralel iki sorğu eyni kodu seçsə, index rədd edir və handler yeni kodla təkrar yazır.
+- **Etiket çapı** (`POST /api/exports/products/labels.pdf`) yalnız çap edir — barkodu olmayan mal siyahıda gəlsə, bütün siyahı 400 ilə rədd olunur (adları göstərilir), avtomatik barkod verilmir. Bir vərəqdə maksimum 500 etiket.
 
 ## Xərc qaydaları
 
@@ -79,6 +81,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
+
+2026-07-30 — BE#12: stok bölməsinə barkod generasiyası (SDK formatı, təkrar generasiya yoxdur) və etiket çapı qaydaları əlavə olundu.
 
 2026-07-27 — BE#4: idarə olunan xərc növləri (ExpenseType) + xərc mənbəyi ayrımı (Source: general/product); BE#9: xərc qaydalarına gələcək tarix qadağası əlavə olundu; təchizatçı borcu qaydaları ayrıca bölmə oldu (ilkin borc + tarixçə).
 

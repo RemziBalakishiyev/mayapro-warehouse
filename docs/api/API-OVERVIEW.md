@@ -4,7 +4,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
-## Endpoint-lər (45)
+## Endpoint-lər (47)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
@@ -20,7 +20,10 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 | POST | `/api/products` | O+M |
 | PUT / DELETE | `/api/products/{id}` | O+M |
 | POST | `/api/products/{id}/adjust-stock` (`{delta, note}`) | auth |
+| POST | `/api/products/{id}/generate-barcode` | O+M |
 | GET / POST | `/api/categories` | auth |
+
+`POST /api/products/{id}/generate-barcode` barkodu boş olan mala `SDK` + 7 rəqəm formatında unikal barkod verir və yenilənmiş `ProductDto`-nu qaytarır. Barkodu artıq varsa → 409 `Products.BarcodeAlreadyExists` «Malın artıq barkodu var» (təkrar generasiya yoxdur). Unikallığı `Barcode` üzərindəki filtrli unique index təmin edir; toqquşmada handler yeni namizədlə save-i təkrarlayır (maks. 5 cəhd).
 
 ### Sales (`/api/sales`)
 | Verb | Route | Auth |
@@ -82,7 +85,11 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 | PUT | `/api/settings` | O |
 
 ### Exports (`/api/exports`) — hamısı auth
-`GET /products.xlsx` · `GET /sales.pdf?from&to` · `GET /sales/{id}/invoice.pdf`
+`GET /products.xlsx` · `GET /sales.pdf?from&to` · `GET /sales/{id}/invoice.pdf` · `POST /products/labels.pdf`
+
+`POST /api/exports/products/labels.pdf` — barkod/QR etiket vərəqi. Body: `{ items: [{ productId, count }], type?: "barcode" | "qr" }` (default `barcode`). A4-də 3×8 grid (63×34mm etiket, 2mm kəsim boşluğu), hər etiketdə mal adı (maks. 2 sətir), qalın satış qiyməti (`12.50 ₼`, invariant format), kod şəkli və altında barkod mətni. `Content-Disposition: attachment; filename="etiketler-{yyyy-MM-dd}.pdf"`.
+
+400 halları: `Exports.NoLabelItems` (boş body / `items` boş və ya null element) · `Exports.InvalidLabelCount` (`count <= 0`) · `Exports.TooManyLabels` (cəmi > 500) · `Exports.UnknownProducts` (tapılmayan id-lər) · `Exports.ProductsWithoutBarcode` (barkodsuz malların adları ilə). Eyni `productId` bir neçə dəfə göndərilə bilər — hər sətir öz nüsxələrini verir, cəmi yenə 500 limitinə tabedir.
 
 ### Public (`/api/public`) — AUTH-SUZ
 `GET /api/public/invoices/{token}` — token ilə qaimə PDF, inline (WhatsApp paylaşımı). Rate limit: IP başına 30/dəq (429). Yanlış token → 404.
@@ -95,6 +102,8 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-07-30 — BE#12: `POST /api/products/{id}/generate-barcode` (O+M, SDK barkodu) və `POST /api/exports/products/labels.pdf` (barkod/QR etiket vərəqi).
 
 2026-07-27 — BE#4: `GET/POST /api/expense-types` (idarə olunan xərc növləri), `Expense.category` sərbəst string oldu, `source` (general/product) sahəsi + `GET /api/expenses?source` filtri, summary-ə `generalExpenses`/`productExpenses`; təchizatçı ilkin borcu + `GET /api/suppliers/{id}/history`.
 

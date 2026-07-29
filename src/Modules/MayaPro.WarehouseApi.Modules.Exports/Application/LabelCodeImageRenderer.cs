@@ -3,7 +3,6 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using ZXing;
 using ZXing.Common;
-using ZXing.ImageSharp;
 using ZXing.ImageSharp.Rendering;
 
 namespace MayaPro.WarehouseApi.Modules.Exports.Application;
@@ -14,15 +13,21 @@ namespace MayaPro.WarehouseApi.Modules.Exports.Application;
 /// </summary>
 internal static class LabelCodeImageRenderer
 {
-    /// <summary>Renders <paramref name="value"/> as a Code128 barcode, white background, no quiet-zone margin.</summary>
+    // Quiet zone (the mandatory blank run before the first bar and after the last one), in modules.
+    // Without it a handheld scanner cannot find the code's edges, so the printed label would be useless.
+    // 10 modules is the Code128 minimum; QR tolerates less than its nominal 4 and label space is scarce.
+    private const int BarcodeQuietZoneModules = 10;
+    private const int QrQuietZoneModules = 2;
+
+    /// <summary>Renders <paramref name="value"/> as a Code128 barcode with a scanner-safe quiet zone.</summary>
     public static byte[] RenderBarcode(string value, int width, int height) =>
-        Render(value, BarcodeFormat.CODE_128, width, height);
+        Render(value, BarcodeFormat.CODE_128, width, height, BarcodeQuietZoneModules);
 
     /// <summary>Renders <paramref name="value"/> as a square QR code.</summary>
     public static byte[] RenderQrCode(string value, int size) =>
-        Render(value, BarcodeFormat.QR_CODE, size, size);
+        Render(value, BarcodeFormat.QR_CODE, size, size, QrQuietZoneModules);
 
-    private static byte[] Render(string value, BarcodeFormat format, int width, int height)
+    private static byte[] Render(string value, BarcodeFormat format, int width, int height, int margin)
     {
         var writer = new ZXing.ImageSharp.BarcodeWriter<Rgba32>
         {
@@ -31,8 +36,8 @@ internal static class LabelCodeImageRenderer
             {
                 Width = width,
                 Height = height,
-                Margin = 0,
-                PureBarcode = true
+                Margin = margin,
+                PureBarcode = true // the human-readable digits are drawn by the PDF, not burned into the image
             },
             Renderer = new ImageSharpRenderer<Rgba32>()
         };

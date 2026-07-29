@@ -156,14 +156,13 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         if (productIds.Count == 0)
             return Array.Empty<ProductLabelInfo>();
 
-        List<Product> products = await db.Products
+        // Projected in SQL: a label needs four columns, so there is no reason to materialise whole
+        // products (their attributes/expenses are nvarchar(max) JSON behind value converters).
+        return await db.Products
             .AsNoTracking()
             .Where(p => productIds.Contains(p.Id))
-            .ToListAsync(cancellationToken);
-
-        return products
             .Select(p => new ProductLabelInfo(p.Id, p.Name, p.Barcode, p.SalePrice))
-            .ToList();
+            .ToListAsync(cancellationToken);
     }
 
     private static string FormatAttributes(IReadOnlyList<ProductAttribute> attributes) =>

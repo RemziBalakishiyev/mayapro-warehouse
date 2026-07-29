@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The label code renderer is module-internal; its unit tests still need to reach it. -->
+    <InternalsVisibleTo Include="MayaPro.WarehouseApi.Modules.Exports.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Resources\Fonts\NotoSans-Regular.ttf" />
     <EmbeddedResource Include="Resources\Fonts\NotoSans-Bold.ttf" />
   </ItemGroup>

@@ -14,9 +14,13 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GenerateBar
 /// </summary>
 public sealed class GenerateBarcodeHandler(IProductsDbContext db)
 {
-    // The unique index makes a real collision astronomically unlikely (10^7 candidates); a handful of
-    // retries is just a safety net, not a load-bearing loop.
-    private const int MaxAttempts = 20;
+    // Two requests can pick the same candidate between the "is it free?" read and the write, so the
+    // filtered unique index on Barcode — not the read — is the real guard. Each save attempt that the
+    // index rejects gets a fresh candidate.
+    private const int MaxSaveAttempts = 5;
+
+    // Probes before falling back to the index: at 10^7 candidates even one collision is already unlikely.
+    private const int CandidateProbes = 3;
 
     public async Task<Result<ProductDto>> Handle(Guid id, CancellationToken ct)
     {
@@ -27,17 +31,32 @@ public sealed class GenerateBarcodeHandler(IProductsDbContext db)
         if (!string.IsNullOrWhiteSpace(product.Barcode))
             return Result.Failure<ProductDto>(ProductErrors.BarcodeAlreadyExists);
 
-        string barcode = await NextUniqueBarcodeAsync(ct);
-        product.AssignBarcode(barcode);
+        for (int attempt = 1; ; attempt++)
+        {
+            product.AssignBarcode(await NextFreeCandidateAsync(ct));
 
-        await db.SaveChangesAsync(ct);
-
-        return Result.Success(product.ToDto());
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                return Result.Success(product.ToDto());
+            }
+            catch (DbUpdateException) when (attempt < MaxSaveAttempts)
+            {
+                // This update touches one column guarded by one unique index, so a rejected save means we
+                // lost the race for that exact code: take a new candidate and try again. The last attempt
+                // is deliberately left uncaught — a failure that survives every retry is a real fault and
+                // must surface instead of being reported as a business error.
+            }
+        }
     }
 
-    private async Task<string> NextUniqueBarcodeAsync(CancellationToken ct)
+    /// <summary>
+    /// A candidate the database does not know yet. The check is only a fast path — it cannot rule out a
+    /// concurrent writer, which is why the caller still retries on the unique-index violation.
+    /// </summary>
+    private async Task<string> NextFreeCandidateAsync(CancellationToken ct)
     {
-        for (int attempt = 0; attempt < MaxAttempts; attempt++)
+        for (int probe = 0; probe < CandidateProbes; probe++)
         {
             string candidate = BarcodeGenerator.NextCandidate();
             bool taken = await db.Products.AnyAsync(p => p.Barcode == candidate, ct);
@@ -45,8 +64,8 @@ public sealed class GenerateBarcodeHandler(IProductsDbContext db)
                 return candidate;
         }
 
-        // Only reachable if MaxAttempts collisions happen in a row — effectively impossible at 10^7
-        // candidates, but fail loudly rather than silently assign a duplicate.
-        throw new InvalidOperationException("Unikal barkod generasiya edilə bilmədi, yenidən cəhd edin.");
+        // Every probe hit an existing code — hand the last word to the unique index rather than looping
+        // against the database.
+        return BarcodeGenerator.NextCandidate();
     }
 }

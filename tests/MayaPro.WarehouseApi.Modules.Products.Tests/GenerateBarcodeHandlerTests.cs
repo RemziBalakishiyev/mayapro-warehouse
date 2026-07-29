@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GenerateBarcode;
 using MayaPro.WarehouseApi.Modules.Products.Domain;
 using MayaPro.WarehouseApi.Modules.Products.Infrastructure;
@@ -43,6 +44,70 @@ public sealed class GenerateBarcodeHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.NotEqual("SDK1234567", result.Value.Barcode);
+    }
+
+    /// <summary>Generating in bulk must never hand out the same code twice.</summary>
+    [Fact]
+    public async Task Gives_Every_Product_A_Distinct_Barcode()
+    {
+        const int productCount = 50;
+        await using ProductsDbContext db = NewDb();
+        List<Product> products = Enumerable.Range(0, productCount)
+            .Select(_ => CreateProduct(barcode: ""))
+            .ToList();
+        db.Products.AddRange(products);
+        await db.SaveChangesAsync();
+
+        var handler = new GenerateBarcodeHandler(db);
+        var barcodes = new List<string>();
+        foreach (Product product in products)
+        {
+            var result = await handler.Handle(product.Id, default);
+            Assert.True(result.IsSuccess);
+            barcodes.Add(result.Value.Barcode);
+        }
+
+        Assert.All(barcodes, barcode => Assert.Matches("^SDK[0-9]{7}$", barcode));
+        Assert.Equal(productCount, barcodes.Distinct().Count());
+    }
+
+    /// <summary>
+    /// The read that looks for a free code cannot see a concurrent writer, so the unique index is what
+    /// actually enforces uniqueness. When it rejects a save, the handler must take a fresh code and try
+    /// again instead of surfacing the database error.
+    /// </summary>
+    [Fact]
+    public async Task Retries_With_A_New_Code_When_The_Unique_Index_Rejects_The_Save()
+    {
+        await using ProductsDbContext db = NewDb();
+        Product product = CreateProduct(barcode: "");
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var racing = new SaveFailsFirstAttemptsDbContext(db, failures: 2);
+        var handler = new GenerateBarcodeHandler(racing);
+
+        var result = await handler.Handle(product.Id, default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Matches("^SDK[0-9]{7}$", result.Value.Barcode);
+        Assert.Equal(3, racing.SaveAttempts); // two rejected races, then the winning save
+    }
+
+    /// <summary>A database failure that survives every retry is a real fault and must not be swallowed.</summary>
+    [Fact]
+    public async Task Surfaces_The_Database_Error_When_Every_Attempt_Is_Rejected()
+    {
+        await using ProductsDbContext db = NewDb();
+        Product product = CreateProduct(barcode: "");
+        db.Products.Add(product);
+        await db.SaveChangesAsync();
+
+        var alwaysFailing = new SaveFailsFirstAttemptsDbContext(db, failures: int.MaxValue);
+        var handler = new GenerateBarcodeHandler(alwaysFailing);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => handler.Handle(product.Id, default));
+        Assert.Equal(5, alwaysFailing.SaveAttempts); // bounded — no infinite retry loop
     }
 
     [Fact]
@@ -103,5 +168,30 @@ public sealed class GenerateBarcodeHandlerTests
             .UseInMemoryDatabase($"products-tests-{Guid.NewGuid()}")
             .Options;
         return new ProductsDbContext(options);
+    }
+
+    /// <summary>
+    /// Stands in for the race the in-memory provider cannot reproduce: the first
+    /// <paramref name="failures"/> saves are rejected the way SQL Server rejects a duplicate key, the
+    /// rest go through to the real context.
+    /// </summary>
+    private sealed class SaveFailsFirstAttemptsDbContext(ProductsDbContext inner, int failures)
+        : IProductsDbContext
+    {
+        public int SaveAttempts { get; private set; }
+
+        public DbSet<Product> Products => inner.Products;
+
+        public DbSet<Category> Categories => inner.Categories;
+
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            SaveAttempts++;
+            if (SaveAttempts <= failures)
+                throw new DbUpdateException(
+                    "Cannot insert duplicate key row in object 'products.Products' with unique index 'IX_Products_Barcode'.");
+
+            return inner.SaveChangesAsync(cancellationToken);
+        }
     }
 }

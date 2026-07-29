@@ -48,8 +48,10 @@ internal static class ExportsEndpoints
             })
             .WithName("ExportSalesPdf");
 
+        // The body is optional at the binding level on purpose: an empty or null body then reaches the
+        // handler and comes back as the usual { code, message } 400, not the framework's bare 400.
         group.MapPost("/products/labels.pdf", async (
-                LabelsPdfRequest request,
+                LabelsPdfRequest? request,
                 ExportProductLabelsPdfHandler handler,
                 CancellationToken ct) =>
             {
