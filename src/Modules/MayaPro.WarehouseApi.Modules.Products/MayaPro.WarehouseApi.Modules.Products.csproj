@@ -8,10 +8,17 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="FluentValidation" />
+    <!-- Reads the uploaded Excel file for the products import preview/commit flow. -->
+    <PackageReference Include="ClosedXML" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\MayaPro.WarehouseApi.SharedKernel\MayaPro.WarehouseApi.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The import token cache and template header list are module-internal; unit tests still reach them. -->
+    <InternalsVisibleTo Include="MayaPro.WarehouseApi.Modules.Products.Tests" />
   </ItemGroup>
 
 </Project>

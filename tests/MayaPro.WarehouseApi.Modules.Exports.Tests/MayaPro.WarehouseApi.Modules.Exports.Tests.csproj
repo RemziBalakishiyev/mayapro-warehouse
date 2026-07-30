@@ -13,6 +13,8 @@
     <!-- Decoding what the label renderer produced is how the barcode/QR tests assert, not eyeballing bytes. -->
     <PackageReference Include="ZXing.Net" />
     <PackageReference Include="ZXing.Net.Bindings.ImageSharp.V3" />
+    <!-- Reads back the workbook the products-template handler builds. -->
+    <PackageReference Include="ClosedXML" />
   </ItemGroup>
 
   <ItemGroup>

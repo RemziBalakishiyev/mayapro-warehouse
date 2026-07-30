@@ -4,6 +4,7 @@ using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CommitProductsImport;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateCategory;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.DeleteProduct;
@@ -11,6 +12,7 @@ using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GenerateBarcode
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetCategories;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProducts;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.PreviewProductsImport;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.UpdateProduct;
 using MayaPro.WarehouseApi.Modules.Products.Endpoints;
 using MayaPro.WarehouseApi.Modules.Products.Infrastructure;
@@ -48,6 +50,10 @@ public sealed class ProductsModule : IModule
         // Cross-module contract: stock decrement for the sales chain.
         services.AddScoped<IProductsModule, ProductsModuleContract>();
 
+        // Singleton: an import token must survive across the two separate HTTP requests (preview, then
+        // commit) that share it — a scoped/per-request instance would lose it immediately.
+        services.AddSingleton<IImportTokenCache, ImportTokenCache>();
+
         services.AddScoped<ProductSeeder>();
 
         services.AddScoped<IValidator<CreateProductCommand>, CreateProductValidator>();
@@ -64,12 +70,16 @@ public sealed class ProductsModule : IModule
         services.AddScoped<GenerateBarcodeHandler>();
         services.AddScoped<GetCategoriesHandler>();
         services.AddScoped<CreateCategoryHandler>();
+
+        services.AddScoped<PreviewProductsImportHandler>();
+        services.AddScoped<CommitProductsImportHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapProductsEndpoints();
         endpoints.MapCategoriesEndpoints();
+        endpoints.MapImportsEndpoints();
     }
 
     public async Task MigrateAsync(IServiceProvider services)

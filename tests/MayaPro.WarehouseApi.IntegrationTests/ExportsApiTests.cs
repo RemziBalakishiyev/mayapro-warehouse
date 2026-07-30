@@ -161,6 +161,30 @@ public sealed class ExportsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Products_Template_Returns_Two_Sheet_Workbook_For_Any_Role()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.SellerPhone);
+
+        HttpResponseMessage response = await client.GetAsync("/api/exports/products-template.xlsx");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("mallar-sablon.xlsx", response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        using var stream = new MemoryStream(bytes);
+        using var workbook = new XLWorkbook(stream);
+
+        Assert.Equal(2, workbook.Worksheets.Count);
+        IXLWorksheet sheet = workbook.Worksheet(1);
+        Assert.Equal("Ad*", sheet.Cell(1, 1).GetString());
+        Assert.Equal("Miqdar*", sheet.Cell(1, 6).GetString());
+        Assert.Equal(3, sheet.LastRowUsed()!.RowNumber()); // header + 2 sample rows
+    }
+
+    [Fact]
     public async Task Seller_Can_Export_Products_Excel()
     {
         HttpClient owner = await _factory.AuthenticatedClientAsync();

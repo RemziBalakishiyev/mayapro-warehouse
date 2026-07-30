@@ -1,6 +1,7 @@
 using MayaPro.WarehouseApi.Modules.Exports.Application;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductLabelsPdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsExcel;
+using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsTemplate;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSaleInvoicePdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSalesPdf;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -27,6 +28,15 @@ internal static class ExportsEndpoints
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
             .WithName("ExportProductsExcel");
+
+        // The blank template for the Products import flow — same reach as the catalogue export (every
+        // authenticated role): a seller may prepare the file even though only Owner/Manager can commit it.
+        group.MapGet("/products-template.xlsx", async (ExportProductsTemplateHandler handler, CancellationToken ct) =>
+            {
+                ExportFileResult file = await handler.Handle(ct);
+                return Results.File(file.Content, file.ContentType, file.FileName);
+            })
+            .WithName("ExportProductsTemplate");
 
         group.MapGet("/sales.pdf", async (
                 string? from,
