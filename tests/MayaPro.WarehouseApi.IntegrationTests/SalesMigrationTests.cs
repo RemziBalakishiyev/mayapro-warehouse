@@ -129,6 +129,56 @@ public sealed class SalesMigrationTests
         Assert.Equal((0m, "Cash"), await ReadPaymentAsync(db, creditId));
     }
 
+    // ── QA (BE#15 / AC1) — the migration's own doc comment claims the backfill statement is safe to replay ──
+
+    [Fact]
+    public async Task Migration_Backfill_Statement_Is_Safe_To_Rerun()
+    {
+        // AC1: "re-run təhlükəsiz" — proves the claim directly by replaying the migration's own backfill
+        // UPDATE a second time (as a redeploy that somehow re-executed it would) and showing every row —
+        // both the already-backfilled Cash/Card rows and the untouched Credit row — comes out unchanged.
+        var options = new DbContextOptionsBuilder<SalesDbContext>()
+            .UseSqlServer(ConnectionString, sql => sql
+                .MigrationsHistoryTable("__EFMigrationsHistory", SalesDbContext.Schema)
+                .CommandTimeout(120))
+            .Options;
+
+        await using var db = new SalesDbContext(options);
+        await db.Database.EnsureDeletedAsync();
+
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(BeforePaidAmountMigration);
+
+        Guid cashId = Guid.NewGuid();
+        Guid creditId = Guid.NewGuid();
+
+        await InsertSaleAsync(db, cashId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Cash");
+        await InsertSaleAsync(db, creditId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Credit");
+
+        await db.Database.MigrateAsync();
+
+        (decimal PaidAmount, string PaidVia) cashAfterFirstRun = await ReadPaymentAsync(db, cashId);
+        (decimal PaidAmount, string PaidVia) creditAfterFirstRun = await ReadPaymentAsync(db, creditId);
+        Assert.Equal((200m, "Cash"), cashAfterFirstRun);
+        Assert.Equal((0m, "Cash"), creditAfterFirstRun);
+
+        // Replay the exact statement from AddSalePaidAmount.Up() a second time.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE sales.Sales
+            SET PaidAmount = TotalAmount,
+                PaidVia = PaymentType
+            WHERE PaymentType <> N'Credit' AND PaidAmount = 0;
+            """);
+
+        // Nothing changed: the Cash row's WHERE clause no longer matches (PaidAmount is already non-zero),
+        // and the Credit row is correctly excluded by PaymentType regardless of how many times it reruns.
+        Assert.Equal(cashAfterFirstRun, await ReadPaymentAsync(db, cashId));
+        Assert.Equal(creditAfterFirstRun, await ReadPaymentAsync(db, creditId));
+    }
+
     /// <summary>
     /// Inserts a pre-migration sale row. Written against a raw command (not <c>ExecuteSqlRaw</c>) so the
     /// nullable columns under test — ProductId and CostPerUnit — can be passed as real SQL NULLs.

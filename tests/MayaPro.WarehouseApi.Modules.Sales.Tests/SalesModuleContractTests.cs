@@ -2,6 +2,7 @@ using MayaPro.WarehouseApi.Modules.Sales.Application;
 using MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.DeleteSale;
 using MayaPro.WarehouseApi.Modules.Sales.Domain;
 using MayaPro.WarehouseApi.Modules.Sales.Infrastructure;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +76,42 @@ public sealed class SalesModuleContractTests
         Assert.Equal(0m, totals.Cash);
         Assert.Equal(300m, totals.Card); // the paid-in-full portion is still real card income
         Assert.Equal(0m, totals.Credit);
+    }
+
+    // ── QA (BE#15) — a deleted sale must stop counting toward the day's totals ─────────────────────────
+
+    [Fact]
+    public async Task Deleting_A_Sale_Removes_It_From_The_Days_Totals()
+    {
+        await using SalesDbContext db = NewDb();
+
+        Sale cashSale = Manual(total: 200m, PaymentType.Cash, customerId: null);
+        Sale cardSale = Manual(total: 150m, PaymentType.Card, customerId: null);
+        db.Sales.Add(cashSale);
+        db.Sales.Add(cardSale);
+        await db.SaveChangesAsync();
+
+        var deleteHandler = new DeleteSaleHandler(
+            db,
+            new FakeUnitOfWork(db),
+            new UnusedProductsModule(),
+            new UnusedCustomersModule(),
+            new FakeActivityLogger(),
+            new FakeCurrentUser());
+        SalesModuleContract contract = new(db, DateProvider, deleteHandler);
+
+        SalesDayTotals before = await contract.GetDayTotalsAsync(DateProvider.Today, default);
+        Assert.Equal(200m, before.Cash);
+        Assert.Equal(150m, before.Card);
+
+        // The deleted sale is free-form (ProductId null) and non-credit (PaymentType.Cash), so neither
+        // Unused collaborator is ever hit — nothing to reverse but the row itself.
+        Result delete = await deleteHandler.Handle(cashSale.Id, default);
+        Assert.True(delete.IsSuccess);
+
+        SalesDayTotals after = await contract.GetDayTotalsAsync(DateProvider.Today, default);
+        Assert.Equal(0m, after.Cash);    // the deleted sale no longer contributes
+        Assert.Equal(150m, after.Card);  // the untouched sale still does
     }
 
     private static Sale Manual(
