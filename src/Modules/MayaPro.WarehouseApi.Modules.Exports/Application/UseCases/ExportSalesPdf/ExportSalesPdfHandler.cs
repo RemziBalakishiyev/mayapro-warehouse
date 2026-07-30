@@ -41,9 +41,6 @@ public sealed class ExportSalesPdfHandler(
         // side applies (SalesModuleContract.GetDayTotalsAsync), via the shared helper so the summary endpoint
         // and this PDF never drift again. Credit is only what remains unpaid, not the row's full total.
         SalesDayTotals receivedTotals = salesRows.ComputeReceivedTotals();
-        decimal cash = receivedTotals.Cash;
-        decimal card = receivedTotals.Card;
-        decimal credit = receivedTotals.Credit;
 
         var model = new SalesPdfModel(
             StoreName: storeName,
@@ -55,9 +52,9 @@ public sealed class ExportSalesPdfHandler(
             Profit: profitKnown,
             UnknownProfitCount: unknownProfitCount,
             ExpensesTotal: expensesTotal,
-            CashSales: cash,
-            CardSales: card,
-            CreditSales: credit,
+            CashSales: receivedTotals.Cash,
+            CardSales: receivedTotals.Card,
+            CreditSales: receivedTotals.Credit,
             Rows: salesRows);
 
         byte[] bytes = Document.Create(container =>
@@ -134,7 +131,9 @@ public sealed class ExportSalesPdfHandler(
                 columns.RelativeColumn(0.6f); // say
                 columns.RelativeColumn(0.9f); // qiymət
                 columns.RelativeColumn(0.9f); // yekun
-                columns.RelativeColumn(0.9f); // ödəniş
+                // BE#19: wider than the other money columns — a partially paid Nisyə row prints its
+                // ödənildi/qalıq split underneath the payment type.
+                columns.RelativeColumn(1.3f); // ödəniş
                 columns.RelativeColumn(0.9f); // qazanc
             });
 
@@ -157,7 +156,7 @@ public sealed class ExportSalesPdfHandler(
                 table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString());
                 table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.UnitPrice));
                 table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.TotalAmount));
-                table.Cell().Element(BodyCell).Text(PaymentLabel(row));
+                table.Cell().Element(BodyCell).Element(c => ComposePaymentCell(c, row));
                 table.Cell().Element(BodyCell).AlignRight().Text(
                     row.Profit is { } p ? FormatMoney(p) : "—");
             }
@@ -165,20 +164,29 @@ public sealed class ExportSalesPdfHandler(
     }
 
     /// <summary>
-    /// BE#19: a Nisyə row's "Ödəniş" cell shows its paid/remaining split when partially paid — e.g.
-    /// "Nisyə (300.00 / 200.00 qalıq)" — so the reader does not have to infer it from the down-payment
-    /// alone; a fully-unpaid or fully-paid Nisyə row (and every Nağd/Kart row) keeps the plain payment type.
+    /// BE#19: the "Ödəniş" cell. A partially paid Nisyə row spells its split out on two labelled lines
+    /// beneath the payment type ("Ödənildi: …" / "Qalıq: …") — the same vocabulary and two-line cell idiom
+    /// the sale invoice PDF uses, rather than an unlabelled "300,00 / 200,00" the reader has to decode.
+    /// A fully unpaid or fully paid Nisyə row (and every Nağd/Kart row) shows the plain payment type: there
+    /// is no split to report, so the summary block's Nağd/Kart/Nisyə line already tells the whole story.
     /// </summary>
-    private static string PaymentLabel(SalesReportRow row)
+    private static void ComposePaymentCell(IContainer container, SalesReportRow row)
     {
-        if (row.PaymentType != WireFormat.PaymentTypes.Credit)
-            return row.PaymentType;
+        decimal paid = row.ReceivedAmount;
+        decimal remaining = row.TotalAmount - paid;
+        bool isPartiallyPaidCredit =
+            row.PaymentType == WireFormat.PaymentTypes.Credit && paid > 0m && remaining > 0m;
 
-        decimal remaining = row.TotalAmount - row.ReceivedAmount;
-        if (row.ReceivedAmount <= 0m || remaining <= 0m)
-            return row.PaymentType;
+        container.Column(col =>
+        {
+            col.Item().Text(row.PaymentType);
 
-        return $"{row.PaymentType} ({FormatMoney(row.ReceivedAmount)} / {FormatMoney(remaining)} qalıq)";
+            if (!isPartiallyPaidCredit)
+                return;
+
+            col.Item().Text($"Ödənildi: {FormatMoney(paid)}").FontSize(7).FontColor(Colors.Grey.Darken1);
+            col.Item().Text($"Qalıq: {FormatMoney(remaining)}").FontSize(7).FontColor(Colors.Grey.Darken1);
+        });
     }
 
     private static IContainer HeaderCell(IContainer container) =>

@@ -54,6 +54,40 @@ public sealed class SalesReportRowTotalsTests
     }
 
     [Fact]
+    public void A_Credit_Rows_Card_Down_Payment_Counts_As_Card_Income_Not_Cash()
+    {
+        // TC5: the down-payment follows PaidVia, not the sale's own payment type nor a Nağd default.
+        SalesReportRow[] rows =
+            [Row(total: 400m, WireFormat.PaymentTypes.Credit, paidAmount: 250m, paidVia: WireFormat.PaymentTypes.Card)];
+
+        SalesDayTotals totals = rows.ComputeReceivedTotals();
+
+        Assert.Equal(0m, totals.Cash);
+        Assert.Equal(250m, totals.Card);
+        Assert.Equal(150m, totals.Credit);
+    }
+
+    [Fact]
+    public void The_Split_Never_Loses_Money_Whatever_The_Mix_Is()
+    {
+        // The split's own invariant: every manat of a period's sales is either received (Nağd/Kart) or still
+        // owed (Nisyə), so Cash + Card + Credit is exactly the period's total sales — the property that makes
+        // the summary reconcilable and would have caught BE#19's "Credit = full TotalAmount" double counting.
+        SalesReportRow[] rows =
+        [
+            Row(total: 200m, WireFormat.PaymentTypes.Cash, paidAmount: 200m, paidVia: WireFormat.PaymentTypes.Cash),
+            Row(total: 150m, WireFormat.PaymentTypes.Card, paidAmount: 150m, paidVia: WireFormat.PaymentTypes.Card),
+            Row(total: 500m, WireFormat.PaymentTypes.Credit, paidAmount: 300m, paidVia: WireFormat.PaymentTypes.Cash),
+            Row(total: 400m, WireFormat.PaymentTypes.Credit, paidAmount: 250m, paidVia: WireFormat.PaymentTypes.Card),
+            Row(total: 100m, WireFormat.PaymentTypes.Credit, paidAmount: 0m, paidVia: null),
+        ];
+
+        SalesDayTotals totals = rows.ComputeReceivedTotals();
+
+        Assert.Equal(rows.Sum(r => r.TotalAmount), totals.Cash + totals.Card + totals.Credit);
+    }
+
+    [Fact]
     public void Legacy_Rows_Without_PaidAmount_Fall_Back_To_The_Sales_TotalAmount_Rule()
     {
         // Rows constructed without PaidAmount/PaidVia (pre-BE#15 shape) still default sensibly:

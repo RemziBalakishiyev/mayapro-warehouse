@@ -237,4 +237,52 @@ public sealed class ReportsApiTests : IAsyncLifetime
         Assert.Equal(s.Expenses, s.GeneralExpenses + s.ProductExpenses); // split always sums to the total
         Assert.Equal(s.Profit - s.Expenses, s.NetProfit);                // net profit formula unaffected
     }
+
+    /// <summary>
+    /// BE#19 at the HTTP boundary: <c>GET /api/reports/summary</c>'s Nağd/Kart/Nisyə must be the money
+    /// actually received, exactly like the dashboard and the day-end close. The bug's repro — Total 500 with
+    /// 300 received in cash — used to report Cash 0 / Nisyə 500 here while the dashboard said Cash 300 /
+    /// Nisyə 200. Asserted as deltas around the one sale, so the shared, accumulating database cannot
+    /// weaken the check into a lower bound.
+    /// </summary>
+    [Fact]
+    public async Task Summary_Splits_A_Partially_Paid_Credit_Sale_Into_Received_Cash_And_Remaining_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("RPT-BE19", quantity: 50, salePrice: 10m);
+        var customer = await client.CreateCustomerAsync("Qismən ödəyən müştəri");
+
+        var before = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 50,
+            salePrice = 10m,
+            paymentType = "Nisyə",
+            customerId = (Guid?)customer.Id,
+            paidAmount = 300m,
+            paidVia = "Nağd"
+        });
+        sale.EnsureSuccessStatusCode();
+
+        var after = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+
+        decimal cash = after.CashSales - before.CashSales;
+        decimal card = after.CardSales - before.CardSales;
+        decimal credit = after.CreditSales - before.CreditSales;
+
+        Assert.Equal(300m, cash);                              // the down-payment is real cash income…
+        Assert.Equal(200m, credit);                            // …and only the remainder is still owed
+        Assert.Equal(0m, card);
+        Assert.Equal(500m, after.SalesTotal - before.SalesTotal);
+        // The split reconciles: every manat of the sale is either received or owed, never both.
+        Assert.Equal(after.SalesTotal - before.SalesTotal, cash + card + credit);
+
+        // And the dashboard — the other side of the BE#19 mismatch — agrees on the cash figure.
+        var d = (await client.GetFromJsonAsync<IntegrationTestHelpers.DashboardDto>("/api/reports/dashboard"))!;
+        Assert.True(d.TodaySales >= 500m);
+    }
 }

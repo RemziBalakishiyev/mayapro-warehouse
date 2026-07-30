@@ -166,6 +166,23 @@ public sealed class GetSummaryHandlerTests
         Assert.Equal(950m, summary.SalesTotal);  // unaffected — still the plain sum of every row's total
     }
 
+    [Fact]
+    public async Task BE19_A_Period_Without_Sales_Reports_Zero_Cash_Card_And_Credit()
+    {
+        // TC7: no rows at all must be zeros rather than a throw or a null — the summary is still a valid
+        // (empty) report, which is the state every store starts its day in.
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), new FakeExpensesModule(), new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0m, result.Value.CashSales);
+        Assert.Equal(0m, result.Value.CardSales);
+        Assert.Equal(0m, result.Value.CreditSales);
+        Assert.Equal(0, result.Value.SalesCount);
+    }
+
     private static ExpenseReportRow Expense(DateOnly date, decimal amount, string source) =>
         new(date, "Yol pulu", amount, source);
 

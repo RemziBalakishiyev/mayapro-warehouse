@@ -70,9 +70,21 @@ internal sealed class FixedDateProvider(DateOnly today) : IDateProvider
             localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
 }
 
-/// <summary>Serves one fixed sale to <see cref="ExportSaleInvoicePdf.ExportSaleInvoicePdfHandler"/>.</summary>
-internal sealed class StubSalesModule(Guid saleId, SaleInvoiceInfo? sale, string? token = null) : ISalesModule
+/// <summary>
+/// Serves one fixed sale to <see cref="ExportSaleInvoicePdf.ExportSaleInvoicePdfHandler"/> and — via
+/// <see cref="ForReport"/> (BE#19) — a fixed set of report rows to
+/// <see cref="ExportSalesPdf.ExportSalesPdfHandler"/>. Whichever half a test does not set up keeps throwing,
+/// so an accidental new dependency still shows up as a failing test.
+/// </summary>
+internal sealed class StubSalesModule(
+    Guid saleId = default,
+    SaleInvoiceInfo? sale = null,
+    string? token = null,
+    IReadOnlyList<SalesReportRow>? reportRows = null) : ISalesModule
 {
+    /// <summary>The sales-period handlers' half: a fixed row set, served through the requested window.</summary>
+    public static StubSalesModule ForReport(params SalesReportRow[] rows) => new(reportRows: rows);
+
     public Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(id == saleId ? sale : null);
 
@@ -83,8 +95,16 @@ internal sealed class StubSalesModule(Guid saleId, SaleInvoiceInfo? sale, string
         throw new NotSupportedException();
 
     public Task<IReadOnlyList<SalesReportRow>> GetSalesAsync(
-        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default)
+    {
+        if (reportRows is null)
+            throw new NotSupportedException();
+
+        IReadOnlyList<SalesReportRow> window = reportRows
+            .Where(r => (from is null || r.Date >= from) && (to is null || r.Date <= to))
+            .ToList();
+        return Task.FromResult(window);
+    }
 
     public Task<IReadOnlyList<ProductLastSale>> GetLastSaleDatesAsync(CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
@@ -124,6 +144,22 @@ internal sealed class StubCustomersModule(CustomerInfo? customer = null) : ICust
     public Task<Dictionary<Guid, string>> GetNamesAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+}
+
+/// <summary>Serves a fixed set of expense rows (none by default) to the sales-period PDF.</summary>
+internal sealed class StubExpensesModule(params ExpenseReportRow[] rows) : IExpensesModule
+{
+    public Task<decimal> GetDayTotalAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+        Task.FromResult(rows.Where(r => r.Date == date).Sum(r => r.Amount));
+
+    public Task<IReadOnlyList<ExpenseReportRow>> GetExpensesAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ExpenseReportRow> window = rows
+            .Where(r => (from is null || r.Date >= from) && (to is null || r.Date <= to))
+            .ToList();
+        return Task.FromResult(window);
+    }
 }
 
 /// <summary>Serves one fixed store profile to the invoice/label PDFs.</summary>

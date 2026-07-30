@@ -25,15 +25,7 @@ public sealed class SalesModuleContractTests
     public async Task TC12_Mixed_Day_Splits_Cash_Card_And_Credit_Correctly()
     {
         await using SalesDbContext db = NewDb();
-
-        // Nağd 200 (fully paid) + Kart 150 (fully paid)
-        db.Sales.Add(Manual(total: 200m, PaymentType.Cash, customerId: null));
-        db.Sales.Add(Manual(total: 150m, PaymentType.Card, customerId: null));
-        // Nisyə 500, paid 300 via Nağd → remaining 200
-        db.Sales.Add(Manual(total: 500m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 300m, paidVia: PaymentType.Cash));
-        // Nisyə 100, paid 0 → remaining 100
-        db.Sales.Add(Manual(total: 100m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 0m));
-        await db.SaveChangesAsync();
+        await SeedMixedDayAsync(db);
 
         SalesModuleContract contract = NewContract(db);
 
@@ -55,12 +47,7 @@ public sealed class SalesModuleContractTests
     public async Task TC_Reports_Path_Matches_The_Day_End_Path_For_The_Same_Mixed_Day()
     {
         await using SalesDbContext db = NewDb();
-
-        db.Sales.Add(Manual(total: 200m, PaymentType.Cash, customerId: null));
-        db.Sales.Add(Manual(total: 150m, PaymentType.Card, customerId: null));
-        db.Sales.Add(Manual(total: 500m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 300m, paidVia: PaymentType.Cash));
-        db.Sales.Add(Manual(total: 100m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 0m));
-        await db.SaveChangesAsync();
+        await SeedMixedDayAsync(db);
 
         SalesModuleContract contract = NewContract(db);
 
@@ -146,6 +133,23 @@ public sealed class SalesModuleContractTests
         SalesDayTotals after = await contract.GetDayTotalsAsync(DateProvider.Today, default);
         Assert.Equal(0m, after.Cash);    // the deleted sale no longer contributes
         Assert.Equal(150m, after.Card);  // the untouched sale still does
+    }
+
+    /// <summary>
+    /// The mixed day both TC12 and BE#19's cross-path comparison run on — Nağd 200 + Kart 150 +
+    /// Nisyə(500 total, 300 paid via Nağd) + Nisyə(100 total, nothing paid) → Cash 500 / Card 150 /
+    /// Credit 300. Seeded from one place so the two tests can never drift onto different data.
+    /// </summary>
+    private static async Task SeedMixedDayAsync(SalesDbContext db)
+    {
+        // Nağd 200 (fully paid) + Kart 150 (fully paid)
+        db.Sales.Add(Manual(total: 200m, PaymentType.Cash, customerId: null));
+        db.Sales.Add(Manual(total: 150m, PaymentType.Card, customerId: null));
+        // Nisyə 500, paid 300 via Nağd → remaining 200
+        db.Sales.Add(Manual(total: 500m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 300m, paidVia: PaymentType.Cash));
+        // Nisyə 100, paid 0 → remaining 100
+        db.Sales.Add(Manual(total: 100m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 0m));
+        await db.SaveChangesAsync();
     }
 
     private static Sale Manual(
