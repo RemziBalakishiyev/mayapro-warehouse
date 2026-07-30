@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.Modules.Exports.Application;
+using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductLabelsPdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsExcel;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSaleInvoicePdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSalesPdf;
@@ -46,6 +47,22 @@ internal static class ExportsEndpoints
                 return Results.File(file.Content, file.ContentType, file.FileName);
             })
             .WithName("ExportSalesPdf");
+
+        // The body is optional at the binding level on purpose: an empty or null body then reaches the
+        // handler and comes back as the usual { code, message } 400, not the framework's bare 400.
+        group.MapPost("/products/labels.pdf", async (
+                LabelsPdfRequest? request,
+                ExportProductLabelsPdfHandler handler,
+                CancellationToken ct) =>
+            {
+                Result<ExportFileResult> result = await handler.Handle(request, ct);
+                if (result.IsFailure)
+                    return result.ToHttpResult();
+
+                ExportFileResult file = result.Value;
+                return Results.File(file.Content, file.ContentType, file.FileName);
+            })
+            .WithName("ExportProductLabelsPdf");
 
         group.MapGet("/sales/{id:guid}/invoice.pdf", async (
                 Guid id,

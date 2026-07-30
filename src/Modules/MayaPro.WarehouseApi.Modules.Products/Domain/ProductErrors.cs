@@ -15,6 +15,13 @@ public static class ProductErrors
         new("Products.InsufficientStock", "Stokda kifayət qədər mal yoxdur");
 
     /// <summary>
+    /// Barcode generation was requested for a product that already has one. Code ends in
+    /// <c>AlreadyExists</c> so the shared Result→HTTP convention maps it to 409.
+    /// </summary>
+    public static readonly Error BarcodeAlreadyExists =
+        new("Products.BarcodeAlreadyExists", "Malın artıq barkodu var");
+
+    /// <summary>
     /// A category with the same name already exists. Code deliberately does not end in
     /// <c>AlreadyExists</c>/<c>Conflict</c> so the shared Result→HTTP convention maps it to 400 (the agreed
     /// behaviour for a duplicate category), not 409.

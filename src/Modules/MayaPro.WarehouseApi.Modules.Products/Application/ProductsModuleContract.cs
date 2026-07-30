@@ -149,6 +149,22 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         product.Location,
         product.SupplierId);
 
+    public async Task<IReadOnlyList<ProductLabelInfo>> GetLabelInfoAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (productIds.Count == 0)
+            return Array.Empty<ProductLabelInfo>();
+
+        // Projected in SQL: a label needs four columns, so there is no reason to materialise whole
+        // products (their attributes/expenses are nvarchar(max) JSON behind value converters).
+        return await db.Products
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .Select(p => new ProductLabelInfo(p.Id, p.Name, p.Barcode, p.SalePrice))
+            .ToListAsync(cancellationToken);
+    }
+
     private static string FormatAttributes(IReadOnlyList<ProductAttribute> attributes) =>
         string.Join("; ", attributes
             .Where(a => !string.IsNullOrWhiteSpace(a.Name) && !string.IsNullOrWhiteSpace(a.Value))

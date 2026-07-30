@@ -7,10 +7,17 @@
   <ItemGroup>
     <PackageReference Include="ClosedXML" />
     <PackageReference Include="QuestPDF" />
+    <PackageReference Include="ZXing.Net" />
+    <PackageReference Include="ZXing.Net.Bindings.ImageSharp.V3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\MayaPro.WarehouseApi.SharedKernel\MayaPro.WarehouseApi.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The label code renderer is module-internal; its unit tests still need to reach it. -->
+    <InternalsVisibleTo Include="MayaPro.WarehouseApi.Modules.Exports.Tests" />
   </ItemGroup>
 
   <ItemGroup>

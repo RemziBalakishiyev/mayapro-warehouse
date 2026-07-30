@@ -105,6 +105,59 @@ public sealed class ProductsApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
 
+    [Fact]
+    public async Task Generate_Barcode_Assigns_Unique_SDK_Code_To_Barcodeless_Product()
+    {
+        HttpClient client = await AuthenticatedClientAsync(OwnerPhone);
+        HttpResponseMessage create = await client.PostAsJsonAsync(
+            "/api/products", NewProductBody("Barkodsuz mal", "", quantity: 4));
+        ProductDto created = (await create.Content.ReadFromJsonAsync<ProductDto>())!;
+        Assert.Equal(string.Empty, created.Barcode);
+
+        HttpResponseMessage generate = await client.PostAsync(
+            $"/api/products/{created.Id}/generate-barcode", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, generate.StatusCode);
+        ProductDto updated = (await generate.Content.ReadFromJsonAsync<ProductDto>())!;
+        Assert.Matches("^SDK[0-9]{7}$", updated.Barcode);
+
+        HttpResponseMessage afterGet = await client.GetAsync($"/api/products/{created.Id}");
+        ProductDto persisted = (await afterGet.Content.ReadFromJsonAsync<ProductDto>())!;
+        Assert.Equal(updated.Barcode, persisted.Barcode);
+    }
+
+    [Fact]
+    public async Task Generate_Barcode_Returns_409_When_Product_Already_Has_One()
+    {
+        HttpClient client = await AuthenticatedClientAsync(OwnerPhone);
+        HttpResponseMessage create = await client.PostAsJsonAsync(
+            "/api/products", NewProductBody("Barkodlu mal", "TSTPRD-HASBARCODE", quantity: 4));
+        ProductDto created = (await create.Content.ReadFromJsonAsync<ProductDto>())!;
+
+        HttpResponseMessage generate = await client.PostAsync(
+            $"/api/products/{created.Id}/generate-barcode", content: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, generate.StatusCode);
+        var error = await generate.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>();
+        Assert.Equal("Products.BarcodeAlreadyExists", error!.Code);
+        Assert.Equal("Malın artıq barkodu var", error.Message);
+    }
+
+    [Fact]
+    public async Task Seller_Cannot_Generate_Barcode_Returns_403()
+    {
+        HttpClient owner = await AuthenticatedClientAsync(OwnerPhone);
+        HttpResponseMessage create = await owner.PostAsJsonAsync(
+            "/api/products", NewProductBody("Satıcı barkod ala bilməz", "", quantity: 2));
+        ProductDto created = (await create.Content.ReadFromJsonAsync<ProductDto>())!;
+
+        HttpClient seller = await AuthenticatedClientAsync(SellerPhone);
+        HttpResponseMessage generate = await seller.PostAsync(
+            $"/api/products/{created.Id}/generate-barcode", content: null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, generate.StatusCode);
+    }
+
     private async Task<HttpClient> AuthenticatedClientAsync(string phone)
     {
         HttpClient client = _factory.CreateClient();

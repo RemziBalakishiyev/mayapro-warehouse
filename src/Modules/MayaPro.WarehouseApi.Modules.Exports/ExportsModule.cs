@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductLabelsPdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsExcel;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSaleInvoicePdf;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportSalesPdf;
@@ -24,6 +25,7 @@ public sealed class ExportsModule : IModule
         QuestPDF.Settings.License = LicenseType.Community;
 
         services.AddScoped<ExportProductsExcelHandler>();
+        services.AddScoped<ExportProductLabelsPdfHandler>();
         services.AddScoped<ExportSalesPdfHandler>();
         services.AddScoped<ExportSaleInvoicePdfHandler>();
         services.AddScoped<PublicInvoicePdfHandler>();

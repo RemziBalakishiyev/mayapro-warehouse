@@ -7,6 +7,7 @@ using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateCategory;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.DeleteProduct;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GenerateBarcode;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetCategories;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProducts;
@@ -60,6 +61,7 @@ public sealed class ProductsModule : IModule
         services.AddScoped<UpdateProductHandler>();
         services.AddScoped<DeleteProductHandler>();
         services.AddScoped<AdjustStockHandler>();
+        services.AddScoped<GenerateBarcodeHandler>();
         services.AddScoped<GetCategoriesHandler>();
         services.AddScoped<CreateCategoryHandler>();
     }

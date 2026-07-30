@@ -2,6 +2,10 @@
 
 Əhəmiyyətli dəyişikliklərin qısa qeydiyyatı — yeni girişlər yuxarıya. Tam tarixçə üçün `git log`.
 
+## 2026-07-30
+
+- **Barkod generasiyası + etiket PDF çapı** (BE#12): `POST /api/products/{id}/generate-barcode` (O+M) barkodsuz mala `SDK` + 7 rəqəm formatında unikal kod verir (`BarcodeGenerator`, `Product.AssignBarcode`); barkodu olan mal → 409 `Products.BarcodeAlreadyExists`. Unikallıq mövcud filtrli unique index-lə təmin olunur — handler namizədi əvvəlcə oxuyur, save unique index tərəfindən rədd olunarsa yeni namizədlə təkrarlayır (maks. 5 cəhd, sonuncunun xətası gizlədilmir). Migration yoxdur (index onsuz da vardı). Yeni `POST /api/exports/products/labels.pdf` — A4 3×8 etiket vərəqi (63×34mm, QuestPDF), Code128 (default) və ya QR (`type: "qr"`), ZXing.Net + ImageSharp binding ilə render; hər fərqli barkod bir dəfə render olunur və eyni embedded şəkil təkrar istifadə olunur (500 nüsxə ≈ 80 KB). Kontrakt: `IProductsModule.GetLabelInfoAsync` (tək SQL projeksiyası). 400 halları: `Exports.NoLabelItems`, `Exports.InvalidLabelCount`, `Exports.TooManyLabels` (>500), `Exports.UnknownProducts`, `Exports.ProductsWithoutBarcode` (adlarla). Qiymət etiketi invariant formatda (`12.50 ₼`), barkod şəkli scanner üçün quiet zone saxlayır. Yeni test layihəsi: `MayaPro.WarehouseApi.Modules.Exports.Tests`.
+
 ## 2026-07-27
 
 - **Xərc tarixi gələcək ola bilməz** (BE#9): `CreateExpenseValidator` və `UpdateExpenseValidator` `IDateProvider` alır və `date` göndərilibsə `ToLocalDate(date) <= Today` (Asia/Baku, ADR-0005) yoxlayır → 400 «Xərcin tarixi gələcək ola bilməz». `date = null` (yaratmada "indi", düzəlişdə köhnə tarix) toxunulmayıb. FE#10-dakı yalnız-UI qorumasının backend qarşılığı; hesabatlardakı "Bu ay" fərqinin kökü bağlanır. `CreateExpenseHandler` default tarixi artıq `DateTime.UtcNow` yox, `IDateProvider.UtcNow` ilə yazır (eyni saat mənbəyi). Migration/kontrakt dəyişikliyi yoxdur.

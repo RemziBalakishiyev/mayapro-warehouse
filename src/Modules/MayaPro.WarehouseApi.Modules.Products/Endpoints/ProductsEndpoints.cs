@@ -1,6 +1,7 @@
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.AdjustStock;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.DeleteProduct;
+using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GenerateBarcode;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProduct;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.GetProducts;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.UpdateProduct;
@@ -77,6 +78,15 @@ internal static class ProductsEndpoints
                 return result.ToHttpResult();
             })
             .WithName("AdjustStock");
+
+        // Barcode generation is a stock/pricing action, same reach as create/edit/delete.
+        group.MapPost("/{id:guid}/generate-barcode", async (
+                Guid id,
+                GenerateBarcodeHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("GenerateProductBarcode");
     }
 
     /// <summary>Body for <c>POST /api/products/{id}/adjust-stock</c> — the id comes from the route.</summary>
