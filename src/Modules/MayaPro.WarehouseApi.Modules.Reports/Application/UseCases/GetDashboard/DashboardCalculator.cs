@@ -72,6 +72,13 @@ public static class DashboardCalculator
     /// <summary>
     /// Expected cash in the drawer: the cash counted at the last close, plus cash sales and minus expenses
     /// booked since then. With no prior close we sum from the beginning of time.
+    /// <para>
+    /// BE#15 — qismən ödənişli satış: "cash sales" is the REAL cash received, not <c>TotalAmount</c> of every
+    /// Nağd sale — <see cref="SalesReportRow.ReceivedVia"/> also picks up a Nisyə sale's cash down-payment, and
+    /// only the <see cref="SalesReportRow.ReceivedAmount"/> of it counts (both handle rows that predate the
+    /// fields). This mirrors <c>ISalesModule.GetDayTotalsAsync</c>'s cash figure, so the dashboard and the
+    /// day-end close always agree on what should be in the drawer.
+    /// </para>
     /// </summary>
     private static decimal ExpectedCash(
         IReadOnlyList<SalesReportRow> allSales,
@@ -83,8 +90,8 @@ public static class DashboardCalculator
         decimal openingCash = lastClosing?.ActualCash ?? 0m;
 
         decimal cashSince = allSales
-            .Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash && (since is null || s.Date >= since))
-            .Sum(s => s.TotalAmount);
+            .Where(s => s.ReceivedVia == WireFormat.PaymentTypes.Cash && (since is null || s.Date >= since))
+            .Sum(s => s.ReceivedAmount);
         decimal expensesSince = allExpenses
             .Where(e => (since is null || e.Date >= since) && e.Date <= today)
             .Sum(e => e.Amount);

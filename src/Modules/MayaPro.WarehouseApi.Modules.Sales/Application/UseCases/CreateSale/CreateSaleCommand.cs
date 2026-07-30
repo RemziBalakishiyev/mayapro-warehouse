@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
@@ -23,6 +24,15 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 /// negative; enforced by the validator). Ignored for catalogued sales, whose value is snapshotted from
 /// the product instead.
 /// </para>
+/// <para>
+/// <see cref="PaidAmount"/> (BE#15 — qismən ödənişli satış) is optional: omitted, it defaults to the full
+/// total on Nağd/Kart and to zero on Nisyə (back-compat). When it leaves a remaining balance
+/// (<c>Total − PaidAmount &gt; 0</c>), the sale is stored as Nisyə regardless of <see cref="PaymentType"/>
+/// and <see cref="CustomerId"/> becomes mandatory — see <c>SalePaymentPlan</c>. <see cref="PaidVia"/>
+/// (<c>"Nağd"|"Kart"</c>, default Nağd) records how that paid portion was actually received. A Nağd/Kart sale
+/// paid in full ignores it (the money follows <see cref="PaymentType"/>); a Nisyə request settled in full at
+/// sale time is stored under it, since that is the only thing left saying where the money went.
+/// </para>
 /// </summary>
 public sealed record CreateSaleCommand(
     Guid? ProductId,
@@ -35,4 +45,6 @@ public sealed record CreateSaleCommand(
     decimal? CostPerUnit = null,
     string? Category = null,
     IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null,
-    decimal? PurchasePricePerUnit = null);
+    decimal? PurchasePricePerUnit = null,
+    decimal? PaidAmount = null,
+    string? PaidVia = null) : ISaleWriteCommand;

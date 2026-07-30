@@ -20,7 +20,10 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Satış anında ad/kateqoriya/maya snapshot olunur (ADR-0004).
 - **Maya ≠ alış qiyməti**: `CostPerUnit` (real maya) ilə yanaşı `PurchasePricePerUnit` (təmiz alış qiyməti) ayrıca saxlanılır. Kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur; sərbəst satışda command-dan olduğu kimi yazılır (yenidən hesablanmır, mənfi ola bilməz). Qazanc HƏMİŞƏ yalnız `CostPerUnit`-dən hesablanır — alış qiyməti hesablamaya girmir. Bilinmirsə `null` (0 yazılmır).
 - Stok satışdan böyükdürsə `Sales.InsufficientStock`; stok heç vaxt 0-dan aşağı düşmür.
-- `customerId` HƏR ödəniş növündə göndərilə bilər (nağd/kartda istəyə bağlı, nisyədə MƏCBURİ). Borca təsir yalnız nisyədə: satış cəmi müştəri borcuna əlavə olunur; nağd/kartda müştəri yalnız alış tarixçəsi üçündür.
+- **Qismən ödənişli satış** (BE#15): `paidAmount` optionaldır — göndərilməyəndə nağd/kartda yekun, nisyədə 0 sayılır (geriyə uyğunluq). Qayda: `0 ≤ paidAmount ≤ TotalAmount` (yekun serverdə `salePrice × quantity` kimi hesablanır; validator eyni düsturu işlədir) → 400 «Ödənilən məbləğ mənfi ola bilməz» / «Ödənilən məbləğ ümumi məbləğdən çox ola bilməz». `qalıq = TotalAmount − paidAmount`.
+- **Saxlanan ödəniş növü qalıqla müəyyən olunur** (`SalePaymentPlan`): qalıq > 0 → HƏMİŞƏ Nisyə (command-da Nağd yazılsa belə); qalıq = 0 → Nağd/Kart. Nisyə istənib satış anında tam ödənilibsə, sətir `paidVia`-nın altında yazılır (Nağd/Kart) — pul hansı üsulla gəlibsə orada görünür.
+- `paidVia` (`"Nağd"|"Kart"`, default Nağd) ödənilən hissənin NECƏ alındığını saxlayır — nisyə satışın nağd/kart ilkin ödənişi də real kassa/kart gəliridir. Yalnız qalıq > 0 olanda `paymentType`-dan fərqlənə bilər; qalıq = 0-da həmişə saxlanan ödəniş növünə bərabərdir (eyni pul iki üsulda sayılmır). Başqa dəyər → 400 «Ödəniş üsulu Nağd və ya Kart olmalıdır».
+- `customerId` HƏR ödəniş növündə göndərilə bilər. **Qalıq > 0 olanda MƏCBURİdir** — göndərilən `paymentType`-dan asılı olmayaraq (400 «Qalıq borc üçün müştəri seçilməlidir»). Borca təsir yalnız qalıq qədərdir (satış cəmi qədər YOX); qalıq = 0-da borc dəyişmir və müştəri yalnız alış tarixçəsi üçündür.
 - Satış düzəlişi = köhnə effektlər geri sarılır + yeni dəyərlərlə yenidən tətbiq (eyni Id/tarix/satıcı qalır). Günü bağlanmış satış redaktə oluna bilməz (`Sales.DayClosedConflict`, 409). Silmədə bağlı gün qoruması YOXDUR.
 - Silinmə/düzəliş geri sarılması best-effort-dur: məhsul/müştəri artıq silinibsə zəncir yenə işləyir.
 
@@ -49,7 +52,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 - Borc yalnız domain metodları ilə dəyişir; heç vaxt 0-dan aşağı düşmür.
 - Ödəniş borcdan böyükdürsə imtina: `Customers.PaymentExceedsDebt`.
-- Nisyə satış silinəndə borc azalır, amma 0-da floor (borc artıq ödənilibsə mənfiyə düşmür).
+- Nisyə satış silinəndə/düzəlişdə borc satışın QALIĞI qədər azalır (cəmi qədər yox — qismən ödənilmiş satışda əks-əməliyyat həddindən artıq geri sarmazdı), 0-da floor (borc artıq ödənilibsə mənfiyə düşmür).
 - İlkin borc `CustomerDebtAdjustment` sətri kimi tarixçəyə düşür.
 - Müştəri tarixçəsi = ilkin borc + BÜTÜN satışlar (hər ödəniş növü, Sales kontraktından; `paymentType` sahəsi fərqləndirir — borcu yalnız Nisyə sətirləri artırıb) + ödənişlər, xronoloji birləşdirilir.
 - Müştəri statistikaları bütün satış növlərini əhatə edir: `lastPurchaseDate` son İSTƏNİLƏN satış, `totalPurchases`/`purchaseCount` ömürlük cəm/say (qruplaşdırılmış tək sorğu).
@@ -68,7 +71,9 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 ## Gün sonu qaydaları
 
-- `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`. Nisyə satışlar kassa üzləşdirməsinə daxil deyil.
+- `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`.
+- **`CashSales` = REAL alınan nağd** (BE#15): `PaidVia = Nağd` olan satışların `PaidAmount` cəmi — buraya nisyə satışın nağd ilkin ödənişi də daxildir, tam yekun isə YOX. `CardSales` eyni məntiqlə `PaidVia = Kart`. `CreditSales` = nisyə satışların QALIQLARININ cəmi (ödənilməmiş hissə). Nisyənin ödənilməmiş hissəsi kassa üzləşdirməsinə daxil deyil. Dashboard "kassada olmalı" göstəricisi eyni düsturla hesablanır (`SalesReportRow.ReceivedAmount`/`ReceivedVia`), ona görə gün sonu ilə uyğun gəlir.
+- ⚠️ `GET /api/reports/summary`-dəki `cashSales`/`cardSales`/`creditSales` HƏLƏ köhnə məntiqlə (ödəniş növü üzrə `TotalAmount` cəmi) hesablanır — BE#15 scope-una daxil deyil; qismən ödənişli satış olanda summary ilə gün sonu rəqəmləri fərqlənə bilər (ayrıca task).
 - Satış/xərc totalları HƏMİŞƏ server hesablayır; client yalnız kassa rəqəmlərini göndərir.
 - Bir günə bir bağlanış: `DayEnd.AlreadyClosed` (409); real qoruma `Date` üzərində unique index-dir.
 - "Bu gün" = Asia/Baku günü (ADR-0005).
@@ -81,6 +86,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
+
+2026-07-30 — BE#15: qismən ödənişli satış (paidAmount/paidVia, qalıq borc, borc yalnız qalıq qədər, gün sonu/dashboard nağd hesabı real alınan pula keçdi).
 
 2026-07-30 — BE#12: stok bölməsinə barkod generasiyası (SDK formatı, təkrar generasiya yoxdur) və etiket çapı qaydaları əlavə olundu.
 

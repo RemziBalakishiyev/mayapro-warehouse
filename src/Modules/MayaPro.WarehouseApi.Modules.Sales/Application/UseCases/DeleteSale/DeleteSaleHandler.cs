@@ -31,10 +31,12 @@ public sealed class DeleteSaleHandler(
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         // Reverse the sale's effects (best-effort — the only possible failure is a since-deleted counterparty).
+        // Only the sale's remaining balance was ever added to the debt (BE#15), so only that much is unwound —
+        // never the full total, which would over-reverse a partially paid (or already-settled) credit sale.
         if (sale.ProductId is { } productId)
             await products.IncreaseStockAsync(productId, sale.Quantity, ct);
         if (sale.PaymentType == PaymentType.Credit && sale.CustomerId is { } customerId)
-            await customers.DecreaseDebtAsync(customerId, sale.TotalAmount, ct);
+            await customers.DecreaseDebtAsync(customerId, sale.RemainingAmount, ct);
 
         db.Sales.Remove(sale);
 

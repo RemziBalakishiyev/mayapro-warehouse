@@ -29,6 +29,8 @@ public sealed class DayEndApiTests : IAsyncLifetime
         await SellAsync(client, product.Id, quantity: 3, "Nağd");                 // +30 cash
         await SellAsync(client, product.Id, quantity: 2, "Kart");                 // +20 card
         await SellAsync(client, product.Id, quantity: 1, "Nisyə", customer.Id);   // +10 credit
+        // BE#15 / AC7: 50 sold, only 30 received in cash → +30 cash and +20 credit, never +50 to either.
+        await SellPartiallyPaidAsync(client, product.Id, quantity: 5, paidAmount: 30m, customer.Id);
         await AddGeneralExpenseAsync(client, amount: 40m);                        // +40 expenses
 
         // The client sends only cash figures + note; totals are the server's job.
@@ -38,11 +40,16 @@ public sealed class DayEndApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Created, close.StatusCode);
         var c = (await close.Content.ReadFromJsonAsync<IntegrationTestHelpers.ClosingDto>())!;
 
-        // Server aggregated real sales/expenses (client sent none of these).
-        Assert.True(c.CashSales >= 30m);
+        // Server aggregated real sales/expenses (client sent none of these). The shared integration database
+        // carries other tests' sales for the same day, so these are lower bounds — the exact BE#15 arithmetic
+        // is pinned down in SalesModuleContractTests.
+        Assert.True(c.CashSales >= 60m);     // 30 outright + the partially paid sale's 30 down-payment
         Assert.True(c.CardSales >= 20m);
-        Assert.True(c.CreditSales >= 10m);
+        Assert.True(c.CreditSales >= 30m);   // 10 owed outright + 20 still owed on the partially paid sale
         Assert.True(c.Expenses >= 40m);
+
+        // The partially paid sale added its down-payment to the debt-free side and only the rest to the debt.
+        Assert.Equal(30m, (await client.GetCustomerAsync(customer.Id)).Debt); // 10 + 20, not 10 + 50
 
         // Server-side maths is self-consistent.
         Assert.Equal(100m, c.OpeningCash);
@@ -79,6 +86,23 @@ public sealed class DayEndApiTests : IAsyncLifetime
             paymentType,
             customerId
         });
+
+    /// <summary>A Nisyə sale with a cash down-payment (BE#15): paid now, the rest becomes the customer's debt.</summary>
+    private static async Task SellPartiallyPaidAsync(
+        HttpClient client, Guid productId, int quantity, decimal paidAmount, Guid customerId)
+    {
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId,
+            quantity,
+            salePrice = 10m,
+            paymentType = "Nisyə",
+            customerId,
+            paidAmount,
+            paidVia = "Nağd"
+        });
+        response.EnsureSuccessStatusCode();
+    }
 
     private static Task AddGeneralExpenseAsync(HttpClient client, decimal amount) =>
         client.PostAsJsonAsync("/api/expenses", new

@@ -40,16 +40,21 @@ public sealed class UpdateSaleHandler(
             return Result.Failure<SaleDto>(SaleErrors.DayClosedConflict);
 
         // Validated above, so this always succeeds.
-        PaymentTypeCode.TryParse(command.PaymentType, out PaymentType paymentType);
+        PaymentTypeCode.TryParse(command.PaymentType, out PaymentType requestedType);
         decimal total = command.SalePrice * command.Quantity;
+
+        // BE#15 — qismən ödənişli satış: same resolution as CreateSale (see SalePaymentPlan).
+        SalePaymentPlan plan = SalePaymentPlan.Resolve(requestedType, total, command.PaidAmount, command.PaidVia);
+        PaymentType paymentType = plan.PaymentType;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
         // ① Reverse the old effects (best-effort — the only possible failure is a since-deleted counterparty).
+        // Only the old remaining balance was ever added to the debt, so only that much is unwound.
         if (sale.ProductId is { } oldProductId)
             await products.IncreaseStockAsync(oldProductId, sale.Quantity, ct);
         if (sale.PaymentType == PaymentType.Credit && sale.CustomerId is { } oldCustomerId)
-            await customers.DecreaseDebtAsync(oldCustomerId, sale.TotalAmount, ct);
+            await customers.DecreaseDebtAsync(oldCustomerId, sale.RemainingAmount, ct);
 
         // ② Reapply with the new values — same chain as CreateSale; any shortfall rolls the whole thing back.
         if (command.ProductId is { } productId)
@@ -61,7 +66,7 @@ public sealed class UpdateSaleHandler(
 
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, plan.Remaining, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -75,13 +80,15 @@ public sealed class UpdateSaleHandler(
                 stock.Value.RealCostPerUnit,
                 stock.Value.PurchasePrice,
                 paymentType,
-                command.CustomerId);
+                command.CustomerId,
+                plan.PaidAmount,
+                plan.PaidVia);
         }
         else
         {
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, plan.Remaining, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -99,7 +106,9 @@ public sealed class UpdateSaleHandler(
                 paymentType,
                 command.CustomerId,
                 expenseItems,
-                command.PurchasePricePerUnit);
+                command.PurchasePricePerUnit,
+                plan.PaidAmount,
+                plan.PaidVia);
         }
 
         await activityLogger.LogAsync(

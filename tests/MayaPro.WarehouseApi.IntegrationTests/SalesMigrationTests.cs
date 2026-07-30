@@ -6,10 +6,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
 /// <summary>
-/// Verifies the data-preserving sales migration against a real SQL Server (throwaway DB, never the shared
+/// Verifies the data-preserving sales migrations against a real SQL Server (throwaway DB, never the shared
 /// API test database): AddSalePurchasePricePerUnit recovers each free-form sale's purchase price from the
 /// cost it already stored, leaves catalogued sales alone, and survives the awkward rows (unknown cost,
-/// zero quantity, empty or corrupt expense JSON) without failing the deployment.
+/// zero quantity, empty or corrupt expense JSON) without failing the deployment; AddSalePaidAmount (BE#15)
+/// backfills what every pre-existing sale had actually been paid.
 /// </summary>
 public sealed class SalesMigrationTests
 {
@@ -20,6 +21,9 @@ public sealed class SalesMigrationTests
 
     // The migration applied just before AddSalePurchasePricePerUnit.
     private const string BeforePurchasePriceMigration = "20260725160000_AddSaleInvoiceToken";
+
+    // The migration applied just before AddSalePaidAmount (BE#15).
+    private const string BeforePaidAmountMigration = "20260726142954_AddSalePurchasePricePerUnit";
 
     [Fact]
     public async Task Migration_Backfills_Purchase_Price_Only_For_Free_Form_Sales()
@@ -85,13 +89,103 @@ public sealed class SalesMigrationTests
         Assert.Equal(96.67m, await ReadPurchasePriceAsync(db, roundingId));
     }
 
+    [Fact]
+    public async Task Migration_Backfills_PaidAmount_From_The_Payment_Type()
+    {
+        // BE#15 / AC1: every row that existed before the column did was either paid in full (Nağd/Kart) or
+        // wholly owed (Nisyə) — the backfill must say exactly that, and must attribute the money to the
+        // method it actually arrived by.
+        var options = new DbContextOptionsBuilder<SalesDbContext>()
+            .UseSqlServer(ConnectionString, sql => sql
+                .MigrationsHistoryTable("__EFMigrationsHistory", SalesDbContext.Schema)
+                .CommandTimeout(120))
+            .Options;
+
+        await using var db = new SalesDbContext(options);
+        await db.Database.EnsureDeletedAsync();
+
+        // Bring the schema up to just before the migration under test (no PaidAmount/PaidVia columns yet).
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(BeforePaidAmountMigration);
+
+        Guid cashId = Guid.NewGuid();
+        Guid cardId = Guid.NewGuid();
+        Guid creditId = Guid.NewGuid();
+
+        await InsertSaleAsync(db, cashId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Cash");
+        await InsertSaleAsync(db, cardId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Card");
+        await InsertSaleAsync(db, creditId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Credit");
+
+        await db.Database.MigrateAsync();
+
+        // Cash/Card: paid in full at sale time, booked under their own method.
+        Assert.Equal((200m, "Cash"), await ReadPaymentAsync(db, cashId));
+        Assert.Equal((200m, "Card"), await ReadPaymentAsync(db, cardId));
+
+        // Credit: nothing was received, so nothing may be attributed to the drawer (PaidVia is inert at 0).
+        Assert.Equal((0m, "Cash"), await ReadPaymentAsync(db, creditId));
+    }
+
+    // ── QA (BE#15 / AC1) — the migration's own doc comment claims the backfill statement is safe to replay ──
+
+    [Fact]
+    public async Task Migration_Backfill_Statement_Is_Safe_To_Rerun()
+    {
+        // AC1: "re-run təhlükəsiz" — proves the claim directly by replaying the migration's own backfill
+        // UPDATE a second time (as a redeploy that somehow re-executed it would) and showing every row —
+        // both the already-backfilled Cash/Card rows and the untouched Credit row — comes out unchanged.
+        var options = new DbContextOptionsBuilder<SalesDbContext>()
+            .UseSqlServer(ConnectionString, sql => sql
+                .MigrationsHistoryTable("__EFMigrationsHistory", SalesDbContext.Schema)
+                .CommandTimeout(120))
+            .Options;
+
+        await using var db = new SalesDbContext(options);
+        await db.Database.EnsureDeletedAsync();
+
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(BeforePaidAmountMigration);
+
+        Guid cashId = Guid.NewGuid();
+        Guid creditId = Guid.NewGuid();
+
+        await InsertSaleAsync(db, cashId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Cash");
+        await InsertSaleAsync(db, creditId, isManual: true, costPerUnit: 50m, quantity: 1,
+            expenseItems: "[]", paymentType: "Credit");
+
+        await db.Database.MigrateAsync();
+
+        (decimal PaidAmount, string PaidVia) cashAfterFirstRun = await ReadPaymentAsync(db, cashId);
+        (decimal PaidAmount, string PaidVia) creditAfterFirstRun = await ReadPaymentAsync(db, creditId);
+        Assert.Equal((200m, "Cash"), cashAfterFirstRun);
+        Assert.Equal((0m, "Cash"), creditAfterFirstRun);
+
+        // Replay the exact statement from AddSalePaidAmount.Up() a second time.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE sales.Sales
+            SET PaidAmount = TotalAmount,
+                PaidVia = PaymentType
+            WHERE PaymentType <> N'Credit' AND PaidAmount = 0;
+            """);
+
+        // Nothing changed: the Cash row's WHERE clause no longer matches (PaidAmount is already non-zero),
+        // and the Credit row is correctly excluded by PaymentType regardless of how many times it reruns.
+        Assert.Equal(cashAfterFirstRun, await ReadPaymentAsync(db, cashId));
+        Assert.Equal(creditAfterFirstRun, await ReadPaymentAsync(db, creditId));
+    }
+
     /// <summary>
     /// Inserts a pre-migration sale row. Written against a raw command (not <c>ExecuteSqlRaw</c>) so the
     /// nullable columns under test — ProductId and CostPerUnit — can be passed as real SQL NULLs.
     /// </summary>
     private static async Task InsertSaleAsync(
         SalesDbContext db, Guid id, bool isManual, decimal? costPerUnit, int quantity, string expenseItems,
-        Guid? productId = null)
+        Guid? productId = null, string paymentType = "Cash")
     {
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText =
@@ -102,7 +196,7 @@ public sealed class SalesMigrationTests
                  [SoldByUserId],[SoldByName],[Date],[ExpenseItems],[CreatedAt],[UpdatedAt])
             VALUES
                 (@id,@productId,@isManual,N'Migrasiya malı',NULL,@quantity,200,
-                 200,200,@costPerUnit,NULL,N'Cash',NULL,
+                 200,200,@costPerUnit,NULL,@paymentType,NULL,
                  NULL,N'Satıcı',SYSUTCDATETIME(),@expenseItems,SYSUTCDATETIME(),SYSUTCDATETIME());
             """;
 
@@ -112,6 +206,7 @@ public sealed class SalesMigrationTests
         AddParameter(command, "@quantity", quantity);
         AddParameter(command, "@costPerUnit", costPerUnit);
         AddParameter(command, "@expenseItems", expenseItems);
+        AddParameter(command, "@paymentType", paymentType);
 
         await db.Database.OpenConnectionAsync();
         try
@@ -130,6 +225,25 @@ public sealed class SalesMigrationTests
         parameter.ParameterName = name;
         parameter.Value = value ?? DBNull.Value;
         command.Parameters.Add(parameter);
+    }
+
+    private static async Task<(decimal PaidAmount, string PaidVia)> ReadPaymentAsync(SalesDbContext db, Guid id)
+    {
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "SELECT [PaidAmount],[PaidVia] FROM [sales].[Sales] WHERE [Id] = @id";
+        AddParameter(command, "@id", id);
+
+        await db.Database.OpenConnectionAsync();
+        try
+        {
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            return (reader.GetDecimal(0), reader.GetString(1));
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
     }
 
     private static async Task<decimal?> ReadPurchasePriceAsync(SalesDbContext db, Guid id)

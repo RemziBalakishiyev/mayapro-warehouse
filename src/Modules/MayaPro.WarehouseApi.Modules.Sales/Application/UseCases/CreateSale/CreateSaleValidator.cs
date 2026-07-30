@@ -1,33 +1,11 @@
-using FluentValidation;
-using MayaPro.WarehouseApi.Modules.Sales.Domain;
+using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 
 namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.CreateSale;
 
-public sealed class CreateSaleValidator : AbstractValidator<CreateSaleCommand>
+/// <summary>
+/// Creating a sale carries no rules of its own — every check is the shared
+/// <see cref="SaleWriteValidator{TCommand}"/> set, which <c>UpdateSaleValidator</c> applies too.
+/// </summary>
+public sealed class CreateSaleValidator : SaleWriteValidator<CreateSaleCommand>
 {
-    public CreateSaleValidator()
-    {
-        // Free-form (manual) sale: no product is chosen, so the name must be typed by hand.
-        RuleFor(x => x.ProductName)
-            .NotEmpty().When(x => x.ProductId is null)
-            .WithMessage("Sərbəst satışda mal adı məcburidir");
-
-        RuleFor(x => x.Quantity)
-            .GreaterThanOrEqualTo(1).WithMessage("Say ən azı 1 olmalıdır");
-
-        RuleFor(x => x.SalePrice)
-            .GreaterThanOrEqualTo(0).WithMessage("Qiymət mənfi ola bilməz");
-
-        RuleFor(x => x.PaymentType)
-            .Must(code => PaymentTypeCode.TryParse(code, out _))
-            .WithMessage("Ödəniş növü yanlışdır");
-
-        RuleFor(x => x.CustomerId)
-            .NotNull().When(x => x.PaymentType == PaymentTypeCode.Credit)
-            .WithMessage("Nisyə satış üçün müştəri seçilməlidir");
-
-        RuleFor(x => x.PurchasePricePerUnit)
-            .GreaterThanOrEqualTo(0m).When(x => x.PurchasePricePerUnit is not null)
-            .WithMessage("Alış qiyməti mənfi ola bilməz");
-    }
 }

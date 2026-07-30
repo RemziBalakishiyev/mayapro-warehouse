@@ -69,3 +69,69 @@ internal sealed class FixedDateProvider(DateOnly today) : IDateProvider
         (localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
             localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
 }
+
+/// <summary>Serves one fixed sale to <see cref="ExportSaleInvoicePdf.ExportSaleInvoicePdfHandler"/>.</summary>
+internal sealed class StubSalesModule(Guid saleId, SaleInvoiceInfo? sale, string? token = null) : ISalesModule
+{
+    public Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(id == saleId ? sale : null);
+
+    public Task<Guid?> GetSaleIdByInvoiceTokenAsync(string requestedToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(token is not null && requestedToken == token ? (Guid?)saleId : null);
+
+    public Task<SalesDayTotals> GetDayTotalsAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<SalesReportRow>> GetSalesAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<ProductLastSale>> GetLastSaleDatesAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<RecentSaleInfo>> GetRecentSalesAsync(int take, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<CustomerPurchaseStats>> GetPurchaseStatsByCustomerAsync(
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task<IReadOnlyList<CustomerSaleEntry>> GetSalesByCustomerAsync(
+        Guid customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task<Result> DeleteCreditSaleAsync(
+        Guid saleIdToDelete, Guid customerId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Serves one fixed customer (or none) to the invoice handler's credit-sale customer block.</summary>
+internal sealed class StubCustomersModule(CustomerInfo? customer = null) : ICustomersModule
+{
+    public Task<CustomerInfo?> GetCustomerInfoAsync(Guid customerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(customer);
+
+    public Task<Result> IncreaseDebtAsync(Guid customerId, decimal amount, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<Result> DecreaseDebtAsync(Guid customerId, decimal amount, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<decimal> GetTotalDebtAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<RecentPaymentInfo>> GetRecentPaymentsAsync(
+        int take, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public Task<Dictionary<Guid, string>> GetNamesAsync(
+        IEnumerable<Guid> ids, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Serves one fixed store profile to the invoice/label PDFs.</summary>
+internal sealed class StubSettingsModule(StoreInfo store) : ISettingsModule
+{
+    public Task<string> GetStoreNameAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(store.StoreName);
+
+    public Task<StoreInfo> GetStoreInfoAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(store);
+}

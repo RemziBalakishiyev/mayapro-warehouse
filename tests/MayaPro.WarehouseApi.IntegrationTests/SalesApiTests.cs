@@ -627,6 +627,266 @@ public sealed class SalesApiTests : IAsyncLifetime
         }
     }
 
+    // ── Qismən ödənişli satış (BE#15) ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TC1_Partial_Credit_Payment_Splits_Paid_And_Remaining_And_Grows_Debt_By_Remaining_Only()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC1 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC1 mal",
+            quantity = 1,
+            salePrice = 500m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 300m,
+            paidVia = "Nağd"
+        });
+
+        Assert.Equal(300m, sale.PaidAmount);
+        Assert.Equal(200m, sale.RemainingAmount);
+        Assert.Equal("Nisyə", sale.PaymentType); // a remaining balance is always stored as Nisyə
+        Assert.Equal("Nağd", sale.PaidVia);
+
+        Assert.Equal(200m, (await client.GetCustomerAsync(customer.Id)).Debt); // only the remaining, not 500
+    }
+
+    [Fact]
+    public async Task TC2_Cash_Sale_Without_PaidAmount_Is_Fully_Paid_And_Leaves_No_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC2 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC2 mal",
+            quantity = 1,
+            salePrice = 500m,
+            paymentType = "Nağd",
+            customerId = customer.Id
+        });
+
+        Assert.Equal(500m, sale.PaidAmount);
+        Assert.Equal(0m, sale.RemainingAmount);
+        Assert.Equal("Nağd", sale.PaymentType);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
+    }
+
+    [Fact]
+    public async Task TC3_Credit_Sale_Without_PaidAmount_Defaults_To_Fully_Unpaid()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC3 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC3 mal",
+            quantity = 1,
+            salePrice = 200m,
+            paymentType = "Nisyə",
+            customerId = customer.Id
+        });
+
+        Assert.Equal(0m, sale.PaidAmount);
+        Assert.Equal(200m, sale.RemainingAmount);
+        Assert.Equal(200m, (await client.GetCustomerAsync(customer.Id)).Debt);
+    }
+
+    [Fact]
+    public async Task TC4_Card_Down_Payment_On_A_Nisye_Sale_Splits_Card_And_Remaining_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC4 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC4 mal",
+            quantity = 1,
+            salePrice = 1000m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 600m,
+            paidVia = "Kart"
+        });
+
+        Assert.Equal(600m, sale.PaidAmount);
+        Assert.Equal(400m, sale.RemainingAmount);
+        Assert.Equal("Nisyə", sale.PaymentType);
+        Assert.Equal("Kart", sale.PaidVia);
+        Assert.Equal(400m, (await client.GetCustomerAsync(customer.Id)).Debt);
+    }
+
+    [Fact]
+    public async Task TC5_Zero_Paid_Cash_Sale_Without_Customer_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC5 mal",
+            quantity = 1,
+            salePrice = 150m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null,
+            paidAmount = 0m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Qalıq borc üçün müştəri seçilməlidir", error.Message);
+    }
+
+    [Fact]
+    public async Task TC6_PaidAmount_Above_Total_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC6 mal",
+            quantity = 1,
+            salePrice = 300m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null,
+            paidAmount = 350m
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Ödənilən məbləğ ümumi məbləğdən çox ola bilməz", error.Message);
+    }
+
+    [Fact]
+    public async Task TC8_Deleting_A_Partially_Paid_Sale_Reverses_Only_The_Remaining_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("BE15-TC8", quantity: 10, salePrice: 500m);
+        var customer = await client.CreateCustomerAsync("BE15 TC8 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 500m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 300m,
+            paidVia = "Nağd"
+        });
+        Assert.Equal(200m, (await client.GetCustomerAsync(customer.Id)).Debt);
+        Assert.Equal(9, (await client.GetProductAsync(product.Id)).Quantity);
+
+        HttpResponseMessage delete = await client.DeleteAsync($"/api/sales/{sale.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt); // only the 200 remaining unwound
+        Assert.Equal(10, (await client.GetProductAsync(product.Id)).Quantity); // stock returned
+    }
+
+    [Fact]
+    public async Task TC9_Fully_Paying_Off_A_Partially_Paid_Sale_On_Update_Rewinds_The_Old_Remaining_And_Switches_To_Cash()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC9 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC9 mal",
+            quantity = 1,
+            salePrice = 500m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 300m,
+            paidVia = "Nağd"
+        });
+        Assert.Equal(200m, (await client.GetCustomerAsync(customer.Id)).Debt);
+
+        HttpResponseMessage update = await client.PutAsJsonAsync($"/api/sales/{sale.Id}", new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC9 mal",
+            quantity = 1,
+            salePrice = 500m,
+            paymentType = "Nağd",
+            customerId = (Guid?)null,
+            paidAmount = 500m
+        });
+
+        if (update.StatusCode == HttpStatusCode.OK)
+        {
+            var updated = (await update.Content.ReadFromJsonAsync<IntegrationTestHelpers.SaleDto>())!;
+            Assert.Equal(0m, updated.RemainingAmount);
+            Assert.Equal("Nağd", updated.PaymentType);
+            Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt); // the old 200 was rewound
+        }
+        else
+        {
+            // The day was already closed — the edit is refused and the original balance stands untouched.
+            Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
+            Assert.Equal(200m, (await client.GetCustomerAsync(customer.Id)).Debt);
+        }
+    }
+
+    [Fact]
+    public async Task TC10_Fully_Paid_Credit_Request_Never_Touches_The_Customers_Debt()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC10 müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC10 mal",
+            quantity = 1,
+            salePrice = 400m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 400m
+        });
+
+        Assert.Equal(0m, sale.RemainingAmount);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
+        Assert.Equal("Nağd", sale.PaymentType); // nothing owed → not a Nisyə sale; no paidVia given → Nağd
+        Assert.Equal("Nağd", sale.PaidVia);
+    }
+
+    [Fact]
+    public async Task TC10b_Nisye_Request_Settled_In_Full_By_Card_Is_Stored_As_Kart()
+    {
+        // AC5: with nothing remaining the sale is booked "command-dakı seçimlə" — for a Nisyə request that
+        // choice is paidVia, so the money must land on the card side rather than in the cash drawer.
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC10b müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC10b mal",
+            quantity = 1,
+            salePrice = 400m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 400m,
+            paidVia = "Kart"
+        });
+
+        Assert.Equal(400m, sale.PaidAmount);
+        Assert.Equal(0m, sale.RemainingAmount);
+        Assert.Equal("Kart", sale.PaymentType);
+        Assert.Equal("Kart", sale.PaidVia);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
+    }
+
     private static async Task<IntegrationTestHelpers.SaleDto> CreateSaleAsync(HttpClient client, object body)
     {
         HttpResponseMessage response = await client.PostAsJsonAsync("/api/sales", body);

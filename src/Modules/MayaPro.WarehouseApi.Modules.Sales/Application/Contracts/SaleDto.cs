@@ -9,6 +9,13 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
 /// unknown. <c>category</c> is the snapshot at sale time (product category for catalogued sales; optional
 /// for manual; null on older rows).
 /// </para>
+/// <para>
+/// BE#15 — qismən ödənişli satış: <c>paidAmount</c> is how much was actually received (equals
+/// <c>totalAmount</c> on a fully paid sale); <c>remainingAmount</c> is the computed
+/// <c>totalAmount − paidAmount</c> (zero when fully paid); <c>paidVia</c> (<c>"Nağd"|"Kart"</c>) is how the
+/// paid portion was received — only meaningful (may differ from <c>paymentType</c>) when
+/// <c>remainingAmount</c> is positive, i.e. a Nisyə sale with a cash/card down-payment.
+/// </para>
 /// </summary>
 public sealed record SaleDto(
     Guid Id,
@@ -28,4 +35,7 @@ public sealed record SaleDto(
     string SoldByName,
     DateTime CreatedAt,
     bool IsManual,
-    IReadOnlyList<SaleExpenseItemDto> ExpenseItems);
+    IReadOnlyList<SaleExpenseItemDto> ExpenseItems,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    string PaidVia);

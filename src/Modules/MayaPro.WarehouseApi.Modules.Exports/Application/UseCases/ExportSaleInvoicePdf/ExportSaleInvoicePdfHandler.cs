@@ -35,6 +35,10 @@ public sealed class ExportSaleInvoicePdfHandler(
         DateTime issuedAt = dateProvider.ToLocalDateTime(sale.Date);
         string invoiceNumber = BuildInvoiceNumber(sale.Id, issuedAt);
 
+        // BE#15 — qismən ödənişli satış: the remaining balance is this specific sale's, not the customer's
+        // running total (already shown separately below when the sale is Nisyə).
+        decimal remaining = sale.TotalAmount - sale.PaidAmount;
+
         var model = new InvoiceModel(
             store,
             invoiceNumber,
@@ -42,7 +46,9 @@ public sealed class ExportSaleInvoicePdfHandler(
             sale.PaymentType,
             customer,
             Lines: new[] { new InvoiceLine(sale.ProductName, sale.Category, sale.Quantity, sale.UnitPrice, sale.TotalAmount) },
-            Total: sale.TotalAmount);
+            Total: sale.TotalAmount,
+            PaidAmount: sale.PaidAmount,
+            RemainingAmount: remaining);
 
         ExportFonts.EnsureRegistered();
 
@@ -167,6 +173,16 @@ public sealed class ExportSaleInvoicePdfHandler(
             if (model.PaymentType == WireFormat.PaymentTypes.Credit)
             {
                 col.Item().PaddingTop(6).AlignRight().Text("Ödəniş: Nisyə").FontSize(9);
+
+                // BE#15 — qismən ödənişli satış: this sale's own paid/remaining split, shown only when a
+                // balance actually remains on it (fully paid Nisyə — an edge case — shows neither line).
+                // Money is printed like every other figure on the invoice: N2 + the store's own currency.
+                if (model.RemainingAmount > 0)
+                    col.Item().AlignRight()
+                        .Text($"Ödənildi: {FormatMoney(model.PaidAmount)} {model.Store.Currency} · " +
+                            $"Qalıq borc: {FormatMoney(model.RemainingAmount)} {model.Store.Currency}")
+                        .Bold().FontSize(9);
+
                 if (model.Customer is { } customer)
                     col.Item().AlignRight()
                         .Text($"Ümumi qalıq borc: {FormatMoney(customer.Debt)} {model.Store.Currency}")
@@ -201,7 +217,9 @@ public sealed class ExportSaleInvoicePdfHandler(
         string PaymentType,
         CustomerInfo? Customer,
         IReadOnlyList<InvoiceLine> Lines,
-        decimal Total);
+        decimal Total,
+        decimal PaidAmount,
+        decimal RemainingAmount);
 
     private sealed record InvoiceLine(
         string ProductName,

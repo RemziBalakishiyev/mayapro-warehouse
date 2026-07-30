@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.UpdateSale;
@@ -7,6 +8,8 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.UpdateSale;
 /// sale's date and seller are preserved by the update, only its values (product/quantity/price/
 /// payment/customer) change. Fields follow the create rules: a catalogued sale sets <see cref="ProductId"/>
 /// (cost/category come from the product); a free-form sale leaves it null and supplies <see cref="ProductName"/>.
+/// <see cref="PaidAmount"/>/<see cref="PaidVia"/> follow the same BE#15 rules as <c>CreateSaleCommand</c> —
+/// see there for the full contract.
 /// </summary>
 public sealed record UpdateSaleCommand(
     Guid Id,
@@ -20,4 +23,6 @@ public sealed record UpdateSaleCommand(
     decimal? CostPerUnit = null,
     string? Category = null,
     IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null,
-    decimal? PurchasePricePerUnit = null);
+    decimal? PurchasePricePerUnit = null,
+    decimal? PaidAmount = null,
+    string? PaidVia = null) : ISaleWriteCommand;

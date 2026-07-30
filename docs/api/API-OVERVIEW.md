@@ -34,6 +34,8 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 | POST | `/api/sales/{id}/invoice-link` → `{url}` (token ilk çağırışda yaranır, sonra sabit) | auth |
 | PUT / DELETE | `/api/sales/{id}` | O+M |
 
+POST/PUT `/api/sales` optional `paidAmount` (nullable decimal) və `paidVia` (`"Nağd"`\|`"Kart"`, default `"Nağd"`) qəbul edir (BE#15). `paidAmount` göndərilmirsə nağd/kartda yekun, nisyədə 0 sayılır (geriyə uyğunluq — köhnə body-lər dəyişmədən işləyir). Qaydalar: `0 ≤ paidAmount ≤ salePrice × quantity`; qalıq (`totalAmount − paidAmount`) > 0 olanda `customerId` MƏCBURİdir (400 «Qalıq borc üçün müştəri seçilməlidir») və satış Nisyə kimi saxlanılır — göndərilən `paymentType` nə olursa olsun; müştəri borcu YALNIZ qalıq qədər artır. Digər 400-lar: «Ödənilən məbləğ mənfi ola bilməz», «Ödənilən məbləğ ümumi məbləğdən çox ola bilməz», «Ödəniş üsulu Nağd və ya Kart olmalıdır». Cavab DTO-larında (`SaleDto`, `SaleDetailDto`) `paidAmount`, `remainingAmount` (hesablanmış) və `paidVia` sahələri var. Qaimə PDF-i qalıq varsa «Ödənildi: X · Qalıq borc: Y» sətrini göstərir (məbləğlər invoice-un qalan hissəsi kimi `N2` + mağazanın valyutası ilə).
+
 POST/PUT `/api/sales` optional `purchasePricePerUnit` (nullable decimal) qəbul edir — yalnız sərbəst satışda oxunur (kataloq satışında məhsulun `PurchasePrice`-ı snapshot olunur, göndərilən dəyər nəzərə alınmır). Mənfi → 400 «Alış qiyməti mənfi ola bilməz». Cavab DTO-larında (`SaleDto`, `SaleDetailDto`) `purchasePricePerUnit` sahəsi var; açıq faktura PDF-i bu sahəni GÖSTƏRMİR (`SaleInvoiceInfo`-da maya/alış sahələri yoxdur).
 
 ### Customers (`/api/customers`)
@@ -102,6 +104,8 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-07-30 — BE#15: POST/PUT `/api/sales` üzərinə `paidAmount`/`paidVia`, cavab DTO-larına `paidAmount`/`remainingAmount`/`paidVia`; «Nisyə satış üçün müştəri seçilməlidir» mesajı «Qalıq borc üçün müştəri seçilməlidir» ilə əvəz olundu.
 
 2026-07-30 — BE#12: `POST /api/products/{id}/generate-barcode` (O+M, SDK barkodu) və `POST /api/exports/products/labels.pdf` (barkod/QR etiket vərəqi).
 

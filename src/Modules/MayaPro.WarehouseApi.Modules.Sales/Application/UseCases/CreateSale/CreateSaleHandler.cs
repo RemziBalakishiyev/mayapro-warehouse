@@ -30,9 +30,14 @@ public sealed class CreateSaleHandler(
             return Result.Failure<SaleDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
         // Validated above, so this always succeeds.
-        PaymentTypeCode.TryParse(command.PaymentType, out PaymentType paymentType);
+        PaymentTypeCode.TryParse(command.PaymentType, out PaymentType requestedType);
 
         decimal total = command.SalePrice * command.Quantity;
+
+        // BE#15 — qismən ödənişli satış: resolves what actually gets stored (paid amount, remaining balance,
+        // final payment type and paid-via method) from what was requested.
+        SalePaymentPlan plan = SalePaymentPlan.Resolve(requestedType, total, command.PaidAmount, command.PaidVia);
+        PaymentType paymentType = plan.PaymentType;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
@@ -46,10 +51,10 @@ public sealed class CreateSaleHandler(
             if (stock.IsFailure)
                 return Result.Failure<SaleDto>(stock.Error);
 
-            // ④ Credit sale → increase the customer's debt by the sale total.
+            // ④ A remaining balance → increase the customer's debt by only that remaining amount, not the total.
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, plan.Remaining, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -65,14 +70,17 @@ public sealed class CreateSaleHandler(
                 paymentType,
                 command.CustomerId,
                 currentUser.UserId,
-                currentUser.Name ?? string.Empty);
+                currentUser.Name ?? string.Empty,
+                plan.PaidAmount,
+                plan.PaidVia);
         }
         else
         {
-            // ④ Credit still increases the customer's debt — the money is just as real as a catalogued sale.
+            // ④ Credit still increases the customer's debt (only the remaining amount) — the money is just as
+            // real as a catalogued sale.
             if (paymentType == PaymentType.Credit)
             {
-                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, total, ct);
+                Result debt = await customers.IncreaseDebtAsync(command.CustomerId!.Value, plan.Remaining, ct);
                 if (debt.IsFailure)
                     return Result.Failure<SaleDto>(debt.Error);
             }
@@ -93,7 +101,9 @@ public sealed class CreateSaleHandler(
                 currentUser.UserId,
                 currentUser.Name ?? string.Empty,
                 expenseItems,
-                command.PurchasePricePerUnit);
+                command.PurchasePricePerUnit,
+                plan.PaidAmount,
+                plan.PaidVia);
         }
 
         // ⑤ Record the sale.
