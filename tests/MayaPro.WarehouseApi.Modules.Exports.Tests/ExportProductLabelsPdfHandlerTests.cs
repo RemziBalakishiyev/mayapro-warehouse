@@ -169,6 +169,71 @@ public sealed class ExportProductLabelsPdfHandlerTests
         AssertIsPdf(result.Value);
     }
 
+    /// <summary>
+    /// AC7: <c>"type": "qr"</c> must actually switch what gets embedded on the sheet, not just be accepted
+    /// and ignored. <see cref="LabelCodeImageRendererTests"/> already proves each renderer individually
+    /// decodes back to the right symbology; this closes the gap between that and the handler by proving the
+    /// <c>Type</c> flag really reaches the renderer selection — a barcode sheet and a QR sheet built from the
+    /// identical item list must not come out byte-identical (different image content/size, different
+    /// embedded image dimensions: 600×160 Code128 vs 300×300 QR).
+    /// </summary>
+    [Fact]
+    public async Task Qr_And_Barcode_Requests_Produce_Different_Documents_For_The_Same_Input()
+    {
+        Result<ExportFileResult> barcodeResult = await Handler()
+            .Handle(new LabelsPdfRequest([new LabelItemRequest(ProductId, 1)], Type: null), default);
+        Result<ExportFileResult> qrResult = await Handler()
+            .Handle(new LabelsPdfRequest([new LabelItemRequest(ProductId, 1)], Type: "qr"), default);
+
+        Assert.True(barcodeResult.IsSuccess);
+        Assert.True(qrResult.IsSuccess);
+        AssertIsPdf(barcodeResult.Value);
+        AssertIsPdf(qrResult.Value);
+        Assert.NotEqual(barcodeResult.Value.Content, qrResult.Value.Content);
+    }
+
+    /// <summary>
+    /// AC8: requesting <c>count</c> copies of one product must place that many labels, not silently cap or
+    /// collapse them onto one — since every extra copy adds its own name/price/barcode-digits text (even
+    /// though the code image itself is shared, see <see cref="Reuses_One_Code_Image_For_Every_Copy_Of_A_Barcode"/>),
+    /// the rendered document must strictly grow as the requested count grows.
+    /// </summary>
+    [Theory]
+    [InlineData(1, 2)]
+    [InlineData(2, 3)]
+    [InlineData(9, 10)]
+    public async Task Increasing_The_Requested_Count_Strictly_Grows_The_Document(int smallerCount, int largerCount)
+    {
+        Result<ExportFileResult> smaller = await Handler().Handle(Request((ProductId, smallerCount)), default);
+        Result<ExportFileResult> larger = await Handler().Handle(Request((ProductId, largerCount)), default);
+
+        Assert.True(smaller.IsSuccess);
+        Assert.True(larger.IsSuccess);
+        Assert.True(
+            larger.Value.Content.Length > smaller.Value.Content.Length,
+            $"{largerCount} copies ({larger.Value.Content.Length} bytes) should be a strictly bigger document than " +
+            $"{smallerCount} copies ({smaller.Value.Content.Length} bytes)");
+    }
+
+    /// <summary>
+    /// AC8 ("count qədər eyni etiket ardıcıl düzülür"): the sheet lays labels out in the same order the
+    /// items arrived in (<c>labels.Chunk(Columns)</c> over the list built while iterating the request in
+    /// order) — swapping which of two distinctly-priced/named products comes first must change the produced
+    /// bytes, proving the request order is honoured rather than e.g. grouped by product or sorted.
+    /// </summary>
+    [Fact]
+    public async Task Item_Order_In_The_Request_Is_Reflected_In_The_Document()
+    {
+        Result<ExportFileResult> firstThenSecond = await Handler()
+            .Handle(Request((ProductId, 1), (SecondProductId, 1)), default);
+        Result<ExportFileResult> secondThenFirst = await Handler()
+            .Handle(Request((SecondProductId, 1), (ProductId, 1)), default);
+
+        Assert.True(firstThenSecond.IsSuccess);
+        Assert.True(secondThenFirst.IsSuccess);
+        Assert.NotEqual(firstThenSecond.Value.Content, secondThenFirst.Value.Content);
+    }
+
     /// <summary>The same product may appear more than once; the ids are still looked up in one deduplicated call.</summary>
     [Fact]
     public async Task Accepts_A_Repeated_Product_And_Looks_It_Up_Once()
