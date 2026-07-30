@@ -123,8 +123,9 @@ public sealed class Sale : Entity
 
     /// <summary>
     /// How the paid portion was received (Nağd/Kart) — meaningful even on a Nisyə sale with a cash/card
-    /// down-payment, since that money is real cash-drawer (or card-settlement) income the same day. On a
-    /// fully paid sale this always equals <see cref="PaymentType"/>.
+    /// down-payment, since that money is real cash-drawer (or card-settlement) income the same day. Never
+    /// Credit: an owing is not a way of receiving money. On a sale stored as Nağd/Kart (i.e. nothing remains)
+    /// this always equals <see cref="PaymentType"/>, so the same money is never counted under two methods.
     /// </summary>
     public PaymentType PaidVia { get; private set; }
 
@@ -165,8 +166,7 @@ public sealed class Sale : Entity
     {
         decimal subtotal = unitPrice * quantity;
         decimal profit = (unitPrice - costPerUnit) * quantity;
-        (decimal resolvedPaidAmount, PaymentType resolvedPaidVia) =
-            ResolvePayment(paymentType, subtotal, paidAmount, paidVia);
+        SalePaymentPlan payment = SalePaymentPlan.Resolve(paymentType, subtotal, paidAmount, paidVia);
 
         return new Sale(
             productId,
@@ -188,8 +188,8 @@ public sealed class Sale : Entity
             DateTime.UtcNow,
             // A catalogued sale takes its cost from the product, so it carries no free-form expense lines.
             Array.Empty<SaleExpenseItem>(),
-            resolvedPaidAmount,
-            resolvedPaidVia);
+            payment.PaidAmount,
+            payment.PaidVia);
     }
 
     /// <summary>
@@ -218,8 +218,7 @@ public sealed class Sale : Entity
         decimal? profit = costPerUnit is { } cost
             ? (unitPrice - cost) * quantity
             : null;
-        (decimal resolvedPaidAmount, PaymentType resolvedPaidVia) =
-            ResolvePayment(paymentType, subtotal, paidAmount, paidVia);
+        SalePaymentPlan payment = SalePaymentPlan.Resolve(paymentType, subtotal, paidAmount, paidVia);
 
         return new Sale(
             productId: null,
@@ -239,8 +238,8 @@ public sealed class Sale : Entity
             soldByName,
             DateTime.UtcNow,
             expenseItems ?? Array.Empty<SaleExpenseItem>(),
-            resolvedPaidAmount,
-            resolvedPaidVia);
+            payment.PaidAmount,
+            payment.PaidVia);
     }
 
     /// <summary>
@@ -275,7 +274,7 @@ public sealed class Sale : Entity
         PaymentType = paymentType;
         CustomerId = customerId;
         ExpenseItems = Array.Empty<SaleExpenseItem>();
-        (PaidAmount, PaidVia) = ResolvePayment(paymentType, TotalAmount, paidAmount, paidVia);
+        ApplyPayment(paymentType, paidAmount, paidVia);
     }
 
     /// <summary>
@@ -312,21 +311,20 @@ public sealed class Sale : Entity
         PaymentType = paymentType;
         CustomerId = customerId;
         ExpenseItems = expenseItems;
-        (PaidAmount, PaidVia) = ResolvePayment(paymentType, TotalAmount, paidAmount, paidVia);
+        ApplyPayment(paymentType, paidAmount, paidVia);
     }
 
     /// <summary>
-    /// Fills in <see cref="PaidAmount"/>/<see cref="PaidVia"/> when a factory/revise call does not supply them
-    /// explicitly (direct domain usage — the CreateSale/UpdateSale handlers always pass an explicit
-    /// <see cref="SalePaymentPlan"/> instead). Mirrors <see cref="SalePaymentPlan"/>'s AC2 default: a Credit
-    /// sale defaults to nothing paid, everything else to paid in full; the paid-via method defaults to Cash on
-    /// credit, otherwise to the sale's own payment type.
+    /// Sets <see cref="PaidAmount"/>/<see cref="PaidVia"/> through <see cref="SalePaymentPlan"/> — the same
+    /// rule the CreateSale/UpdateSale handlers resolve with, so a revise (or a factory call that omits the
+    /// fields) can never drift from it: a Credit sale defaults to nothing paid, everything else to paid in
+    /// full. Only the money is taken from the plan; <see cref="PaymentType"/> is the caller's already-resolved
+    /// decision and is never rewritten here.
     /// </summary>
-    private static (decimal PaidAmount, PaymentType PaidVia) ResolvePayment(
-        PaymentType paymentType, decimal total, decimal? paidAmount, PaymentType? paidVia)
+    private void ApplyPayment(PaymentType paymentType, decimal? paidAmount, PaymentType? paidVia)
     {
-        decimal resolvedPaidAmount = paidAmount ?? (paymentType == PaymentType.Credit ? 0m : total);
-        PaymentType resolvedPaidVia = paidVia ?? (paymentType == PaymentType.Credit ? PaymentType.Cash : paymentType);
-        return (resolvedPaidAmount, resolvedPaidVia);
+        SalePaymentPlan payment = SalePaymentPlan.Resolve(paymentType, TotalAmount, paidAmount, paidVia);
+        PaidAmount = payment.PaidAmount;
+        PaidVia = payment.PaidVia;
     }
 }

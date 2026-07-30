@@ -133,8 +133,9 @@ public sealed record CustomerSaleEntry(
 /// <para>
 /// BE#15 — qismən ödənişli satış: <see cref="PaidAmount"/> is how much was actually received and
 /// <see cref="PaidVia"/> (wire code) is how it was received — both null only for callers that construct this
-/// row directly without them (back-compat for existing tests); the Sales module always supplies them, so
-/// readers should fall back to <see cref="TotalAmount"/>/<see cref="PaymentType"/> when null.
+/// row directly without them (back-compat); the Sales module always supplies them. Read them through
+/// <see cref="ReceivedAmount"/>/<see cref="ReceivedVia"/>, which apply the "fall back to the full total paid
+/// by the sale's own payment type" rule in one place instead of at every call site.
 /// </para>
 /// </summary>
 public sealed record SalesReportRow(
@@ -148,4 +149,20 @@ public sealed record SalesReportRow(
     decimal UnitPrice,
     bool IsManual,
     decimal? PaidAmount = null,
-    string? PaidVia = null);
+    string? PaidVia = null)
+{
+    /// <summary>
+    /// The money actually received for this sale: <see cref="PaidAmount"/>, or — on a row that predates the
+    /// field — the same default the Sales module applies, i.e. nothing on a Nisyə sale and the whole
+    /// <see cref="TotalAmount"/> on a Nağd/Kart one.
+    /// </summary>
+    public decimal ReceivedAmount =>
+        PaidAmount ?? (PaymentType == WireFormat.PaymentTypes.Credit ? 0m : TotalAmount);
+
+    /// <summary>
+    /// The wire code of the method <see cref="ReceivedAmount"/> arrived by — <see cref="PaidVia"/>, falling
+    /// back to the sale's own <see cref="PaymentType"/>. On a Nisyə row this is the down-payment's method, so
+    /// cash/card totals must bucket by this rather than by <see cref="PaymentType"/>.
+    /// </summary>
+    public string ReceivedVia => PaidVia ?? PaymentType;
+}

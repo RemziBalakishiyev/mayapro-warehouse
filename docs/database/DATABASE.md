@@ -25,10 +25,10 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 - Timestamps UTC saxlanır; gün filtri Bakı günü UTC pəncərəsi ilə (ADR-0005).
 - Hər modulun ÖZ migration tarixçəsi: `__EFMigrationsHistory` cədvəli öz schema-sında. Migration-lar startup-da tətbiq olunur (3 cəhd).
 - Migration-lar əl ilə yazılır (nümunə pattern: mövcud migration + Designer + snapshot yenilənməsi birlikdə).
-- Data köçürən (backfill) migration-lar mövcud sətirləri korlamamalıdır: JSON oxunuşu `ISJSON`/`TRY_CAST` ilə müdafiə olunur, sıfıra bölmə və NULL halları açıq şəkildə idarə edilir, UPDATE yalnız hələ doldurulmamış sətirlərə vurur (təkrar icra təhlükəsiz). Nümunə: `20260726142954_AddSalePurchasePricePerUnit` — sərbəst satışların alış qiymətini mövcud mayadan bərpa edir, kataloq satışlarına toxunmur (onlarda NULL qalır). Testi: `tests/MayaPro.WarehouseApi.IntegrationTests/SalesMigrationTests.cs`.
+- Data köçürən (backfill) migration-lar mövcud sətirləri korlamamalıdır: JSON oxunuşu `ISJSON`/`TRY_CAST` ilə müdafiə olunur, sıfıra bölmə və NULL halları açıq şəkildə idarə edilir, UPDATE yalnız hələ doldurulmamış sətirlərə vurur (təkrar icra təhlükəsiz). Nümunə: `20260726142954_AddSalePurchasePricePerUnit` — sərbəst satışların alış qiymətini mövcud mayadan bərpa edir, kataloq satışlarına toxunmur (onlarda NULL qalır). `20260730142515_AddSalePaidAmount` — nağd/kart satışlara `PaidAmount = TotalAmount`, `PaidVia = PaymentType` yazır; nisyə sətirlər sütun default-larında (0 / Cash) qalır, yəni heç toxunulmur. UPDATE `WHERE PaymentType <> 'Credit' AND PaidAmount = 0` ilə qorunur — miqrasiyadan sonra yazılan heç bir sətir bu şərtə düşmür (qismən ödənilmiş satış həmişə Credit, saxlanan nağd/kart satış isə tam ödənilib), ona görə təkrar icra real ödəniş məlumatını silmir. Testi: `tests/MayaPro.WarehouseApi.IntegrationTests/SalesMigrationTests.cs`.
 - Soft delete YOXDUR — silmələr həqiqi DELETE-dir.
 - JSON sütunlar (value converter): `Product.Attributes`, `Product.Expenses`, `Sale.ExpenseItems`.
-- Enum-ların saxlanması: `User.Role` string ("Owner"/"Manager"/"Seller"); `Sale.PaymentType` — enum. `Expense.Category` artıq enum DEYİL — idarə olunan `ExpenseType.Name`-in sərbəst-string snapshot-u (`nvarchar(100)`, FK yoxdur). `Expense.Source` (general/product) — enum, string kimi saxlanır.
+- Enum-ların saxlanması: `User.Role` string ("Owner"/"Manager"/"Seller"); `Sale.PaymentType` və `Sale.PaidVia` — enum, string kimi (`nvarchar(20)`: "Cash"/"Card"/"Credit"). `Sale.PaidAmount` — `decimal(18,2)`, NOT NULL (BE#15; `RemainingAmount = TotalAmount − PaidAmount` sütun deyil, hesablanır). `Expense.Category` artıq enum DEYİL — idarə olunan `ExpenseType.Name`-in sərbəst-string snapshot-u (`nvarchar(100)`, FK yoxdur). `Expense.Source` (general/product) — enum, string kimi saxlanır.
 
 ## Vacib indekslər / məhdudiyyətlər
 
@@ -43,6 +43,8 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeeder, SupplierSeeder, ExpenseTypeSeeder (7 default xərc növü). Sales/Expenses boş başlayır. Referans: `docs/seed.ts` (frontend seed data-sı).
 
 ## Last Updated
+
+2026-07-30 — BE#15: `sales.Sales.PaidAmount` + `PaidVia` sütunları (migration `AddSalePaidAmount`, backfill + re-run qorunması).
 
 2026-07-27 — `expenses.ExpenseTypes` cədvəli, `Expense.Category` enum→string, `Expense.Source` sütunu (migration `ExpenseTypesAndSource`, BE#4); `suppliers.SupplierDebtAdjustments` cədvəli (`AddSupplierDebtAdjustments`).
 

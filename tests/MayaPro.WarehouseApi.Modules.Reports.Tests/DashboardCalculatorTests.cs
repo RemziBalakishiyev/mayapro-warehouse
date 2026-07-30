@@ -225,6 +225,21 @@ public sealed class DashboardCalculatorTests
     }
 
     [Fact]
+    public void ExpectedCash_Reads_Rows_That_Predate_PaidAmount_As_Before()
+    {
+        // AC11 back-compat: a row with no paid figures at all (built before BE#15) keeps its old meaning —
+        // a Nağd sale was cash in full, a Nisyə sale put nothing in the drawer.
+        var dto = Build(
+            sales:
+            [
+                Sale(Today, total: 80m, profit: 0m),
+                Sale(Today, total: 500m, profit: 0m, payment: WireFormat.PaymentTypes.Credit)
+            ]);
+
+        Assert.Equal(80m, dto.ExpectedCash);
+    }
+
+    [Fact]
     public void Top_Products_And_Low_Stock_Are_Ranked_And_Consistent()
     {
         Guid a = Guid.NewGuid(), b = Guid.NewGuid(), outOfStock = Guid.NewGuid();

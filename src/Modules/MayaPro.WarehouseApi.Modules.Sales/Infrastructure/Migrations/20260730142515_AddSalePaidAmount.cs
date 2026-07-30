@@ -31,14 +31,21 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Infrastructure.Migrations
 
             // Backfill existing rows (BE#15 — qismən ödənişli satış) so the new columns reflect what every
             // pre-existing sale already was in full: a Cash/Card sale was always paid in full at sale time
-            // (PaidAmount = TotalAmount, PaidVia = its own payment type); a Credit (Nisyə) sale predates any
-            // down-payment concept, so nothing was paid at sale time (PaidAmount = 0) — its PaidVia defaults
-            // to Cash (harmless: zero paid means nothing is attributed to either cash or card).
+            // (PaidAmount = TotalAmount, PaidVia = its own payment type). A Credit (Nisyə) sale predates any
+            // down-payment concept, so nothing was paid at sale time — it already has exactly what the new
+            // columns default to (0 / Cash, harmless since zero paid attributes nothing to either method), so
+            // it is deliberately left untouched rather than rewritten.
+            //
+            // Re-run safe (see docs/database/DATABASE.md): the WHERE clause only matches rows that still carry
+            // the freshly added default. A partially paid sale is always stored as Credit, and a stored
+            // Cash/Card sale is by definition paid in full, so no row written after this migration can be
+            // caught by it — replaying the statement can never wipe a real paid amount.
             migrationBuilder.Sql(
                 """
                 UPDATE sales.Sales
-                SET PaidAmount = CASE WHEN PaymentType = N'Credit' THEN 0 ELSE TotalAmount END,
-                    PaidVia = CASE WHEN PaymentType = N'Card' THEN N'Card' ELSE N'Cash' END;
+                SET PaidAmount = TotalAmount,
+                    PaidVia = PaymentType
+                WHERE PaymentType <> N'Credit' AND PaidAmount = 0;
                 """);
         }
 

@@ -856,6 +856,35 @@ public sealed class SalesApiTests : IAsyncLifetime
 
         Assert.Equal(0m, sale.RemainingAmount);
         Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
+        Assert.Equal("Nağd", sale.PaymentType); // nothing owed → not a Nisyə sale; no paidVia given → Nağd
+        Assert.Equal("Nağd", sale.PaidVia);
+    }
+
+    [Fact]
+    public async Task TC10b_Nisye_Request_Settled_In_Full_By_Card_Is_Stored_As_Kart()
+    {
+        // AC5: with nothing remaining the sale is booked "command-dakı seçimlə" — for a Nisyə request that
+        // choice is paidVia, so the money must land on the card side rather than in the cash drawer.
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var customer = await client.CreateCustomerAsync("BE15 TC10b müştəri", debt: 0m);
+
+        var sale = await CreateSaleAsync(client, new
+        {
+            productId = (Guid?)null,
+            productName = "BE15 TC10b mal",
+            quantity = 1,
+            salePrice = 400m,
+            paymentType = "Nisyə",
+            customerId = customer.Id,
+            paidAmount = 400m,
+            paidVia = "Kart"
+        });
+
+        Assert.Equal(400m, sale.PaidAmount);
+        Assert.Equal(0m, sale.RemainingAmount);
+        Assert.Equal("Kart", sale.PaymentType);
+        Assert.Equal("Kart", sale.PaidVia);
+        Assert.Equal(0m, (await client.GetCustomerAsync(customer.Id)).Debt);
     }
 
     private static async Task<IntegrationTestHelpers.SaleDto> CreateSaleAsync(HttpClient client, object body)

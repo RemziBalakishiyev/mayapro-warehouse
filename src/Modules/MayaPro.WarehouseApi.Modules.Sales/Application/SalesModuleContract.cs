@@ -26,19 +26,20 @@ internal sealed class SalesModuleContract(
         // cash/card down-payment (PaidVia). Credit is only what remains unpaid (TotalAmount − PaidAmount),
         // which by construction is positive on every stored Credit row (SalePaymentPlan never stores Credit
         // with a zero remaining balance).
-        IQueryable<Sale> daySales = db.Sales.AsNoTracking().Where(s => s.Date >= start && s.Date < end);
+        // One grouped round trip (conditional sums) rather than three passes over the same day's rows — the
+        // three figures then also come from a single consistent snapshot.
+        SalesDayTotals? totals = await db.Sales
+            .AsNoTracking()
+            .Where(s => s.Date >= start && s.Date < end)
+            .GroupBy(_ => 1)
+            .Select(g => new SalesDayTotals(
+                g.Sum(s => s.PaidVia == PaymentType.Cash ? s.PaidAmount : 0m),
+                g.Sum(s => s.PaidVia == PaymentType.Card ? s.PaidAmount : 0m),
+                g.Sum(s => s.PaymentType == PaymentType.Credit ? s.TotalAmount - s.PaidAmount : 0m)))
+            .FirstOrDefaultAsync(cancellationToken);
 
-        decimal cash = await daySales
-            .Where(s => s.PaidVia == PaymentType.Cash)
-            .SumAsync(s => s.PaidAmount, cancellationToken);
-        decimal card = await daySales
-            .Where(s => s.PaidVia == PaymentType.Card)
-            .SumAsync(s => s.PaidAmount, cancellationToken);
-        decimal credit = await daySales
-            .Where(s => s.PaymentType == PaymentType.Credit)
-            .SumAsync(s => s.TotalAmount - s.PaidAmount, cancellationToken);
-
-        return new SalesDayTotals(cash, card, credit);
+        // No sales that day → no group at all.
+        return totals ?? new SalesDayTotals(0m, 0m, 0m);
     }
 
     public async Task<IReadOnlyList<SalesReportRow>> GetSalesAsync(

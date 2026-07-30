@@ -111,4 +111,48 @@ public sealed class SalePaymentPlanTests
 
         Assert.Equal(PaymentType.Cash, plan.PaidVia);
     }
+
+    [Fact]
+    public void A_Nisye_Request_Settled_In_Full_By_Card_Is_Booked_As_Card_Not_Cash()
+    {
+        // AC5: nothing remains → the sale is stored as Nağd/Kart "command-dakı seçimlə". For a Nisyə request
+        // that choice can only be paidVia, so the money must land on the card side — booking it as cash would
+        // overstate the drawer (and the day-end count) by the whole total.
+        SalePaymentPlan plan = SalePaymentPlan.Resolve(
+            PaymentType.Credit, total: 400m, paidAmount: 400m, paidViaCode: "Kart");
+
+        Assert.Equal(0m, plan.Remaining);
+        Assert.Equal(PaymentType.Card, plan.PaymentType);
+        Assert.Equal(PaymentType.Card, plan.PaidVia);
+    }
+
+    [Fact]
+    public void A_Nisye_Request_Settled_In_Full_Without_A_PaidVia_Falls_Back_To_Cash()
+    {
+        SalePaymentPlan plan = SalePaymentPlan.Resolve(
+            PaymentType.Credit, total: 400m, paidAmount: 400m, paidViaCode: null);
+
+        Assert.Equal(PaymentType.Cash, plan.PaymentType);
+        Assert.Equal(PaymentType.Cash, plan.PaidVia);
+    }
+
+    [Fact]
+    public void A_Fully_Paid_Sale_Never_Splits_Its_Money_Across_Two_Methods()
+    {
+        // Invariant the cash/card day totals rely on: with nothing remaining, PaidVia == PaymentType, so the
+        // same amount can never be counted once under Nağd and once under Kart.
+        PaymentType[] requested = [PaymentType.Cash, PaymentType.Card, PaymentType.Credit];
+        string?[] viaCodes = [null, "Nağd", "Kart", "Nisyə", "garbage"];
+
+        foreach (PaymentType type in requested)
+        {
+            foreach (string? via in viaCodes)
+            {
+                SalePaymentPlan plan = SalePaymentPlan.Resolve(type, total: 100m, paidAmount: 100m, paidViaCode: via);
+
+                Assert.NotEqual(PaymentType.Credit, plan.PaymentType);
+                Assert.Equal(plan.PaymentType, plan.PaidVia);
+            }
+        }
+    }
 }

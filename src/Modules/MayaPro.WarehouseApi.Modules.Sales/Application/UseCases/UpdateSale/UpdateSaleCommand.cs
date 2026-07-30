@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Sales.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Sales.Application.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Sales.Application.UseCases.UpdateSale;
@@ -24,4 +25,4 @@ public sealed record UpdateSaleCommand(
     IReadOnlyList<SaleExpenseItemDto>? ExpenseItems = null,
     decimal? PurchasePricePerUnit = null,
     decimal? PaidAmount = null,
-    string? PaidVia = null);
+    string? PaidVia = null) : ISaleWriteCommand;

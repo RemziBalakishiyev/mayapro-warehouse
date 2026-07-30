@@ -1,4 +1,3 @@
-using System.Globalization;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using QuestPDF.Fluent;
@@ -177,9 +176,11 @@ public sealed class ExportSaleInvoicePdfHandler(
 
                 // BE#15 — qismən ödənişli satış: this sale's own paid/remaining split, shown only when a
                 // balance actually remains on it (fully paid Nisyə — an edge case — shows neither line).
+                // Money is printed like every other figure on the invoice: N2 + the store's own currency.
                 if (model.RemainingAmount > 0)
                     col.Item().AlignRight()
-                        .Text($"Ödənildi: {FormatAzMoney(model.PaidAmount)} · Qalıq borc: {FormatAzMoney(model.RemainingAmount)}")
+                        .Text($"Ödənildi: {FormatMoney(model.PaidAmount)} {model.Store.Currency} · " +
+                            $"Qalıq borc: {FormatMoney(model.RemainingAmount)} {model.Store.Currency}")
                         .Bold().FontSize(9);
 
                 if (model.Customer is { } customer)
@@ -208,16 +209,6 @@ public sealed class ExportSaleInvoicePdfHandler(
             .DefaultTextStyle(x => x.FontSize(9));
 
     private static string FormatMoney(decimal value) => value.ToString("N2");
-
-    // BE#15 — qismən ödənişli satış: the manat sign, comma decimal separator, fixed regardless of the
-    // machine's locale (unlike model.Store.Currency, which is whatever the store configured).
-    private static readonly NumberFormatInfo AzMoneyFormat = new()
-    {
-        NumberDecimalSeparator = ",",
-        NumberGroupSeparator = " "
-    };
-
-    private static string FormatAzMoney(decimal value) => $"{value.ToString("N2", AzMoneyFormat)} ₼";
 
     private sealed record InvoiceModel(
         StoreInfo Store,
