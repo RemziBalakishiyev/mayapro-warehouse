@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using ClosedXML.Excel;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
@@ -158,6 +159,35 @@ public sealed class ExportsApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Products_Template_Returns_Two_Sheet_Workbook_For_Any_Role()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.SellerPhone);
+
+        HttpResponseMessage response = await client.GetAsync("/api/exports/products-template.xlsx");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("mallar-sablon.xlsx", response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+        using var stream = new MemoryStream(bytes);
+        using var workbook = new XLWorkbook(stream);
+
+        Assert.Equal(2, workbook.Worksheets.Count);
+        IXLWorksheet sheet = workbook.Worksheet(1);
+
+        // Served file == the shared header contract the import preview validates against.
+        string[] headerRow = Enumerable
+            .Range(1, ProductImportTemplate.Headers.Count)
+            .Select(column => sheet.Cell(ProductImportTemplate.HeaderRow, column).GetString())
+            .ToArray();
+        Assert.Equal(ProductImportTemplate.Headers, headerRow);
+        Assert.Equal(3, sheet.LastRowUsed()!.RowNumber()); // header + 2 sample rows
     }
 
     [Fact]

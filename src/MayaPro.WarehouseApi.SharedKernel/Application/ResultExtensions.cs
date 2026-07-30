@@ -34,6 +34,11 @@ public static class ResultExtensions
     private static int StatusCodeFor(string code)
     {
         // Convention: error code suffix drives the HTTP status. Modules stay HTTP-agnostic.
+        // Checked before the generic "NotFound" rule below: "...TokenNotFound" also ends with
+        // "NotFound", but a stale/unknown import token is a 410 (Gone), not a 404.
+        if (code.EndsWith("TokenExpired", StringComparison.Ordinal) ||
+            code.EndsWith("TokenNotFound", StringComparison.Ordinal))
+            return StatusCodes.Status410Gone;
         if (code.EndsWith("NotFound", StringComparison.Ordinal))
             return StatusCodes.Status404NotFound;
         if (code.EndsWith("Conflict", StringComparison.Ordinal) ||
