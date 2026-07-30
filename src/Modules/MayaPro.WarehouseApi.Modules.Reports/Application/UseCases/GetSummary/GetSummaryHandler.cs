@@ -31,6 +31,11 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
             .Where(e => e.Source == WireFormat.ExpenseSources.Product).Sum(e => e.Amount);
         decimal generalExpenses = expensesTotal - productExpenses;
 
+        // BE#19: Cash/Card/Credit are the "real money received" split — the same formula the day-end/dashboard
+        // side applies (SalesModuleContract.GetDayTotalsAsync), factored into one shared helper so the two
+        // never drift again. Credit is only what remains unpaid, not the row's full total.
+        SalesDayTotals receivedTotals = salesRows.ComputeReceivedTotals();
+
         return Result.Success(new SummaryDto(
             Period: window.Code,
             From: window.From,
@@ -40,9 +45,9 @@ public sealed class GetSummaryHandler(ISalesModule sales, IExpensesModule expens
             Expenses: expensesTotal,
             SalesCount: salesRows.Count,
             NetProfit: profit - expensesTotal,
-            CashSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash).Sum(s => s.TotalAmount),
-            CardSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Card).Sum(s => s.TotalAmount),
-            CreditSales: salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Credit).Sum(s => s.TotalAmount),
+            CashSales: receivedTotals.Cash,
+            CardSales: receivedTotals.Card,
+            CreditSales: receivedTotals.Credit,
             UnknownProfitSalesCount: salesRows.Count(s => s.Profit is null),
             UnknownProfitAmount: salesRows.Where(s => s.Profit is null).Sum(s => s.TotalAmount),
             GeneralExpenses: generalExpenses,

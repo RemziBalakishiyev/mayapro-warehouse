@@ -139,11 +139,59 @@ public sealed class GetSummaryHandlerTests
         Assert.Equal("month", result.Value.Period);
     }
 
+    /// <summary>
+    /// BE#19: Cash/Card/Credit must be the "real money received" split (<see cref="SalesReportRowTotals"/>),
+    /// not the pre-BE#15 "TotalAmount of sales whose PaymentType is X" formula — same repro numbers as
+    /// <c>SalesModuleContractTests.TC12_Mixed_Day_Splits_Cash_Card_And_Credit_Correctly</c> and
+    /// <c>SalesModuleContractTests.TC_Reports_Path_Matches_The_Day_End_Path_For_The_Same_Mixed_Day</c>, which
+    /// compares this same split directly against <c>SalesModuleContract.GetDayTotalsAsync</c>.
+    /// </summary>
+    [Fact]
+    public async Task BE19_Mixed_Day_Cash_Card_Credit_Is_The_Real_Received_Split()
+    {
+        var sales = new FakeSalesModule(
+            Sale(Today, total: 200m, profit: 50m, WireFormat.PaymentTypes.Cash, paidAmount: 200m, paidVia: WireFormat.PaymentTypes.Cash),
+            Sale(Today, total: 150m, profit: 30m, WireFormat.PaymentTypes.Card, paidAmount: 150m, paidVia: WireFormat.PaymentTypes.Card),
+            Sale(Today, total: 500m, profit: 100m, WireFormat.PaymentTypes.Credit, paidAmount: 300m, paidVia: WireFormat.PaymentTypes.Cash),
+            Sale(Today, total: 100m, profit: 20m, WireFormat.PaymentTypes.Credit, paidAmount: 0m, paidVia: null));
+        var handler = new GetSummaryHandler(sales, new FakeExpensesModule(), new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        SummaryDto summary = result.Value;
+        Assert.Equal(500m, summary.CashSales);   // 200 (Nağd) + 300 (Nisyə's Nağd down-payment)
+        Assert.Equal(150m, summary.CardSales);
+        Assert.Equal(300m, summary.CreditSales); // 200 + 100 remaining, never the 600 full totals
+        Assert.Equal(950m, summary.SalesTotal);  // unaffected — still the plain sum of every row's total
+    }
+
+    [Fact]
+    public async Task BE19_A_Period_Without_Sales_Reports_Zero_Cash_Card_And_Credit()
+    {
+        // TC7: no rows at all must be zeros rather than a throw or a null — the summary is still a valid
+        // (empty) report, which is the state every store starts its day in.
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), new FakeExpensesModule(), new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0m, result.Value.CashSales);
+        Assert.Equal(0m, result.Value.CardSales);
+        Assert.Equal(0m, result.Value.CreditSales);
+        Assert.Equal(0, result.Value.SalesCount);
+    }
+
     private static ExpenseReportRow Expense(DateOnly date, decimal amount, string source) =>
         new(date, "Yol pulu", amount, source);
 
     private static SalesReportRow Sale(DateOnly date, decimal total, decimal? profit) =>
         new(date, total, profit, WireFormat.PaymentTypes.Cash, null, "P", 1, total, IsManual: false);
+
+    private static SalesReportRow Sale(
+        DateOnly date, decimal total, decimal? profit, string paymentType, decimal? paidAmount, string? paidVia) =>
+        new(date, total, profit, paymentType, null, "P", 1, total, IsManual: false, paidAmount, paidVia);
 
     private sealed class FakeExpensesModule(params ExpenseReportRow[] rows) : IExpensesModule
     {
