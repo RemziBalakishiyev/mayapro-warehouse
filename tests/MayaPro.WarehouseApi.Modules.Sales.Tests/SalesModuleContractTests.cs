@@ -44,6 +44,40 @@ public sealed class SalesModuleContractTests
         Assert.Equal(300m, totals.Credit); // 200 + 100 remaining
     }
 
+    /// <summary>
+    /// BE#19: the Reports/Exports side (<see cref="SalesReportRowTotals.ComputeReceivedTotals"/>, applied to
+    /// <see cref="SalesModuleContract.GetSalesAsync"/>'s rows) must land on exactly the same Cash/Card/Credit
+    /// figures as the dashboard/day-end side (<see cref="SalesModuleContract.GetDayTotalsAsync"/>) for the
+    /// identical mixed day — the two paths are compared directly here rather than pinned to the same
+    /// hard-coded numbers independently, which is how BE#19's drift slipped through undetected.
+    /// </summary>
+    [Fact]
+    public async Task TC_Reports_Path_Matches_The_Day_End_Path_For_The_Same_Mixed_Day()
+    {
+        await using SalesDbContext db = NewDb();
+
+        db.Sales.Add(Manual(total: 200m, PaymentType.Cash, customerId: null));
+        db.Sales.Add(Manual(total: 150m, PaymentType.Card, customerId: null));
+        db.Sales.Add(Manual(total: 500m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 300m, paidVia: PaymentType.Cash));
+        db.Sales.Add(Manual(total: 100m, PaymentType.Credit, customerId: Guid.NewGuid(), paidAmount: 0m));
+        await db.SaveChangesAsync();
+
+        SalesModuleContract contract = NewContract(db);
+
+        SalesDayTotals dayEndTotals = await contract.GetDayTotalsAsync(DateProvider.Today, default);
+        IReadOnlyList<SalesReportRow> reportRows = await contract.GetSalesAsync(DateProvider.Today, DateProvider.Today, default);
+        SalesDayTotals reportsTotals = reportRows.ComputeReceivedTotals();
+
+        // Pinned figures (same as TC12) …
+        Assert.Equal(500m, reportsTotals.Cash);
+        Assert.Equal(150m, reportsTotals.Card);
+        Assert.Equal(300m, reportsTotals.Credit);
+        // … and, the point of this test, identical to the dashboard/day-end result for the same day.
+        Assert.Equal(dayEndTotals.Cash, reportsTotals.Cash);
+        Assert.Equal(dayEndTotals.Card, reportsTotals.Card);
+        Assert.Equal(dayEndTotals.Credit, reportsTotals.Credit);
+    }
+
     [Fact]
     public async Task Sales_Outside_The_Requested_Day_Are_Excluded()
     {

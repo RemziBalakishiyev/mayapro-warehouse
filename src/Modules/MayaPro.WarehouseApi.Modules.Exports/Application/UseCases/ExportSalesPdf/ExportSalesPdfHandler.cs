@@ -37,9 +37,13 @@ public sealed class ExportSalesPdfHandler(
         decimal profitKnown = salesRows.Sum(s => s.Profit ?? 0m);
         int unknownProfitCount = salesRows.Count(s => s.Profit is null);
         decimal expensesTotal = expenseRows.Sum(e => e.Amount);
-        decimal cash = salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash).Sum(s => s.TotalAmount);
-        decimal card = salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Card).Sum(s => s.TotalAmount);
-        decimal credit = salesRows.Where(s => s.PaymentType == WireFormat.PaymentTypes.Credit).Sum(s => s.TotalAmount);
+        // BE#19: Cash/Card/Credit are the "real money received" split — the same formula the day-end/dashboard
+        // side applies (SalesModuleContract.GetDayTotalsAsync), via the shared helper so the summary endpoint
+        // and this PDF never drift again. Credit is only what remains unpaid, not the row's full total.
+        SalesDayTotals receivedTotals = salesRows.ComputeReceivedTotals();
+        decimal cash = receivedTotals.Cash;
+        decimal card = receivedTotals.Card;
+        decimal credit = receivedTotals.Credit;
 
         var model = new SalesPdfModel(
             StoreName: storeName,
@@ -153,11 +157,28 @@ public sealed class ExportSalesPdfHandler(
                 table.Cell().Element(BodyCell).AlignRight().Text(row.Quantity.ToString());
                 table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.UnitPrice));
                 table.Cell().Element(BodyCell).AlignRight().Text(FormatMoney(row.TotalAmount));
-                table.Cell().Element(BodyCell).Text(row.PaymentType);
+                table.Cell().Element(BodyCell).Text(PaymentLabel(row));
                 table.Cell().Element(BodyCell).AlignRight().Text(
                     row.Profit is { } p ? FormatMoney(p) : "—");
             }
         });
+    }
+
+    /// <summary>
+    /// BE#19: a Nisyə row's "Ödəniş" cell shows its paid/remaining split when partially paid — e.g.
+    /// "Nisyə (300.00 / 200.00 qalıq)" — so the reader does not have to infer it from the down-payment
+    /// alone; a fully-unpaid or fully-paid Nisyə row (and every Nağd/Kart row) keeps the plain payment type.
+    /// </summary>
+    private static string PaymentLabel(SalesReportRow row)
+    {
+        if (row.PaymentType != WireFormat.PaymentTypes.Credit)
+            return row.PaymentType;
+
+        decimal remaining = row.TotalAmount - row.ReceivedAmount;
+        if (row.ReceivedAmount <= 0m || remaining <= 0m)
+            return row.PaymentType;
+
+        return $"{row.PaymentType} ({FormatMoney(row.ReceivedAmount)} / {FormatMoney(remaining)} qalıq)";
     }
 
     private static IContainer HeaderCell(IContainer container) =>
