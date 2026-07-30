@@ -1,3 +1,4 @@
+using System.Globalization;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using QuestPDF.Fluent;
@@ -35,6 +36,10 @@ public sealed class ExportSaleInvoicePdfHandler(
         DateTime issuedAt = dateProvider.ToLocalDateTime(sale.Date);
         string invoiceNumber = BuildInvoiceNumber(sale.Id, issuedAt);
 
+        // BE#15 — qismən ödənişli satış: the remaining balance is this specific sale's, not the customer's
+        // running total (already shown separately below when the sale is Nisyə).
+        decimal remaining = sale.TotalAmount - sale.PaidAmount;
+
         var model = new InvoiceModel(
             store,
             invoiceNumber,
@@ -42,7 +47,9 @@ public sealed class ExportSaleInvoicePdfHandler(
             sale.PaymentType,
             customer,
             Lines: new[] { new InvoiceLine(sale.ProductName, sale.Category, sale.Quantity, sale.UnitPrice, sale.TotalAmount) },
-            Total: sale.TotalAmount);
+            Total: sale.TotalAmount,
+            PaidAmount: sale.PaidAmount,
+            RemainingAmount: remaining);
 
         ExportFonts.EnsureRegistered();
 
@@ -167,6 +174,14 @@ public sealed class ExportSaleInvoicePdfHandler(
             if (model.PaymentType == WireFormat.PaymentTypes.Credit)
             {
                 col.Item().PaddingTop(6).AlignRight().Text("Ödəniş: Nisyə").FontSize(9);
+
+                // BE#15 — qismən ödənişli satış: this sale's own paid/remaining split, shown only when a
+                // balance actually remains on it (fully paid Nisyə — an edge case — shows neither line).
+                if (model.RemainingAmount > 0)
+                    col.Item().AlignRight()
+                        .Text($"Ödənildi: {FormatAzMoney(model.PaidAmount)} · Qalıq borc: {FormatAzMoney(model.RemainingAmount)}")
+                        .Bold().FontSize(9);
+
                 if (model.Customer is { } customer)
                     col.Item().AlignRight()
                         .Text($"Ümumi qalıq borc: {FormatMoney(customer.Debt)} {model.Store.Currency}")
@@ -194,6 +209,16 @@ public sealed class ExportSaleInvoicePdfHandler(
 
     private static string FormatMoney(decimal value) => value.ToString("N2");
 
+    // BE#15 — qismən ödənişli satış: the manat sign, comma decimal separator, fixed regardless of the
+    // machine's locale (unlike model.Store.Currency, which is whatever the store configured).
+    private static readonly NumberFormatInfo AzMoneyFormat = new()
+    {
+        NumberDecimalSeparator = ",",
+        NumberGroupSeparator = " "
+    };
+
+    private static string FormatAzMoney(decimal value) => $"{value.ToString("N2", AzMoneyFormat)} ₼";
+
     private sealed record InvoiceModel(
         StoreInfo Store,
         string InvoiceNumber,
@@ -201,7 +226,9 @@ public sealed class ExportSaleInvoicePdfHandler(
         string PaymentType,
         CustomerInfo? Customer,
         IReadOnlyList<InvoiceLine> Lines,
-        decimal Total);
+        decimal Total,
+        decimal PaidAmount,
+        decimal RemainingAmount);
 
     private sealed record InvoiceLine(
         string ProductName,

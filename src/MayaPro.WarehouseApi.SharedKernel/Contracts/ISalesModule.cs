@@ -69,6 +69,8 @@ public interface ISalesModule
 /// <summary>
 /// A sale as printed on its invoice. <see cref="Date"/> is the UTC sale instant (callers localise it);
 /// <see cref="PaymentType"/> is the wire code; <see cref="CustomerId"/> is set only for credit sales.
+/// <see cref="PaidAmount"/> (BE#15 — qismən ödənişli satış) is how much was actually received; the invoice
+/// shows the "Ödənildi / Qalıq borc" line only when <c>TotalAmount − PaidAmount</c> is positive.
 /// </summary>
 public sealed record SaleInvoiceInfo(
     Guid Id,
@@ -80,7 +82,8 @@ public sealed record SaleInvoiceInfo(
     decimal Subtotal,
     decimal TotalAmount,
     string PaymentType,
-    Guid? CustomerId);
+    Guid? CustomerId,
+    decimal PaidAmount);
 
 /// <summary>A day's net sales split by payment type.</summary>
 public sealed record SalesDayTotals(decimal Cash, decimal Card, decimal Credit);
@@ -127,6 +130,12 @@ public sealed record CustomerSaleEntry(
 /// <see cref="Profit"/> is null when the sale's cost is unknown (a free-form sale with no cost) — reports
 /// exclude it from profit sums instead of counting it as zero. <see cref="ProductId"/> is null for a
 /// free-form sale, which keeps such sales out of per-product aggregates (top products, frozen stock).
+/// <para>
+/// BE#15 — qismən ödənişli satış: <see cref="PaidAmount"/> is how much was actually received and
+/// <see cref="PaidVia"/> (wire code) is how it was received — both null only for callers that construct this
+/// row directly without them (back-compat for existing tests); the Sales module always supplies them, so
+/// readers should fall back to <see cref="TotalAmount"/>/<see cref="PaymentType"/> when null.
+/// </para>
 /// </summary>
 public sealed record SalesReportRow(
     DateOnly Date,
@@ -137,4 +146,6 @@ public sealed record SalesReportRow(
     string ProductName,
     int Quantity,
     decimal UnitPrice,
-    bool IsManual);
+    bool IsManual,
+    decimal? PaidAmount = null,
+    string? PaidVia = null);

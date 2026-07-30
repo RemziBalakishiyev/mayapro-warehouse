@@ -72,6 +72,12 @@ public static class DashboardCalculator
     /// <summary>
     /// Expected cash in the drawer: the cash counted at the last close, plus cash sales and minus expenses
     /// booked since then. With no prior close we sum from the beginning of time.
+    /// <para>
+    /// BE#15 — qismən ödənişli satış: "cash sales" is the REAL cash received, not <c>TotalAmount</c> of every
+    /// Nağd sale — <see cref="SalesReportRow.PaidVia"/> also picks up a Nisyə sale's cash down-payment, and
+    /// only <see cref="SalesReportRow.PaidAmount"/> of it counts. <c>PaidVia</c>/<c>PaidAmount</c> fall back to
+    /// <c>PaymentType</c>/<c>TotalAmount</c> when null (rows built before this field existed).
+    /// </para>
     /// </summary>
     private static decimal ExpectedCash(
         IReadOnlyList<SalesReportRow> allSales,
@@ -83,8 +89,9 @@ public static class DashboardCalculator
         decimal openingCash = lastClosing?.ActualCash ?? 0m;
 
         decimal cashSince = allSales
-            .Where(s => s.PaymentType == WireFormat.PaymentTypes.Cash && (since is null || s.Date >= since))
-            .Sum(s => s.TotalAmount);
+            .Where(s => (s.PaidVia ?? s.PaymentType) == WireFormat.PaymentTypes.Cash
+                && (since is null || s.Date >= since))
+            .Sum(s => s.PaidAmount ?? s.TotalAmount);
         decimal expensesSince = allExpenses
             .Where(e => (since is null || e.Date >= since) && e.Date <= today)
             .Sum(e => e.Amount);

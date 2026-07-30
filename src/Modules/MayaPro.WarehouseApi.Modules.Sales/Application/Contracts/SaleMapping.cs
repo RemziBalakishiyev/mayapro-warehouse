@@ -24,7 +24,10 @@ public static class SaleMapping
             sale.SoldByName,
             sale.Date,
             sale.IsManual,
-            sale.ToExpenseItemDtos());
+            sale.ToExpenseItemDtos(),
+            sale.PaidAmount,
+            sale.RemainingAmount,
+            sale.PaidVia.ToCode());
 
     /// <summary>
     /// Full single-sale detail: every <see cref="SaleDto"/> field plus the customer's name (resolved for
@@ -52,7 +55,10 @@ public static class SaleMapping
             sale.SoldByName,
             sale.Date,
             sale.IsManual,
-            sale.ToExpenseItemDtos());
+            sale.ToExpenseItemDtos(),
+            sale.PaidAmount,
+            sale.RemainingAmount,
+            sale.PaidVia.ToCode());
 
     private static IReadOnlyList<SaleExpenseItemDto> ToExpenseItemDtos(this Sale sale) =>
         sale.ExpenseItems.Select(e => new SaleExpenseItemDto(e.Name, e.Amount)).ToList();

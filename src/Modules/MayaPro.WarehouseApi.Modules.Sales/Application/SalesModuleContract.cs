@@ -21,16 +21,24 @@ internal sealed class SalesModuleContract(
     {
         (DateTime start, DateTime end) = dateProvider.LocalDayRangeUtc(date);
 
-        var byType = await db.Sales
-            .AsNoTracking()
-            .Where(s => s.Date >= start && s.Date < end)
-            .GroupBy(s => s.PaymentType)
-            .Select(g => new { Type = g.Key, Total = g.Sum(s => s.TotalAmount) })
-            .ToListAsync(cancellationToken);
+        // BE#15 — qismən ödənişli satış: Cash/Card are no longer "TotalAmount of sales whose PaymentType is
+        // Cash/Card" — they are the REAL amount received via each method, which also picks up a Nisyə sale's
+        // cash/card down-payment (PaidVia). Credit is only what remains unpaid (TotalAmount − PaidAmount),
+        // which by construction is positive on every stored Credit row (SalePaymentPlan never stores Credit
+        // with a zero remaining balance).
+        IQueryable<Sale> daySales = db.Sales.AsNoTracking().Where(s => s.Date >= start && s.Date < end);
 
-        decimal Total(PaymentType type) => byType.FirstOrDefault(x => x.Type == type)?.Total ?? 0m;
+        decimal cash = await daySales
+            .Where(s => s.PaidVia == PaymentType.Cash)
+            .SumAsync(s => s.PaidAmount, cancellationToken);
+        decimal card = await daySales
+            .Where(s => s.PaidVia == PaymentType.Card)
+            .SumAsync(s => s.PaidAmount, cancellationToken);
+        decimal credit = await daySales
+            .Where(s => s.PaymentType == PaymentType.Credit)
+            .SumAsync(s => s.TotalAmount - s.PaidAmount, cancellationToken);
 
-        return new SalesDayTotals(Total(PaymentType.Cash), Total(PaymentType.Card), Total(PaymentType.Credit));
+        return new SalesDayTotals(cash, card, credit);
     }
 
     public async Task<IReadOnlyList<SalesReportRow>> GetSalesAsync(
@@ -57,7 +65,9 @@ internal sealed class SalesModuleContract(
                 s.ProductName,
                 s.Quantity,
                 s.UnitPrice,
-                s.IsManual))
+                s.IsManual,
+                s.PaidAmount,
+                s.PaidVia.ToCode()))
             .ToList();
     }
 
@@ -175,7 +185,8 @@ internal sealed class SalesModuleContract(
             sale.Subtotal,
             sale.TotalAmount,
             sale.PaymentType.ToCode(),
-            sale.CustomerId);
+            sale.CustomerId,
+            sale.PaidAmount);
     }
 
     public async Task<Guid?> GetSaleIdByInvoiceTokenAsync(

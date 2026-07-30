@@ -51,6 +51,17 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        // BE#15 — qismən ödənişli satış: how much was actually received and via which method (same
+        // readable, reorder-safe string conversion as PaymentType).
+        builder.Property(s => s.PaidAmount)
+            .IsRequired()
+            .HasColumnType("decimal(18,2)");
+
+        builder.Property(s => s.PaidVia)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         // Public invoice-link token: Base64Url of 32 random bytes (43 chars); 64 leaves headroom.
         builder.Property(s => s.InvoiceToken).HasMaxLength(64);
 

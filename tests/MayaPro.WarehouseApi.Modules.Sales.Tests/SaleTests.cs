@@ -309,4 +309,94 @@ public sealed class SaleTests
         Assert.Equal(100m, dto.PurchasePricePerUnit);
         Assert.Equal(100m, detail.PurchasePricePerUnit);
     }
+
+    // ── Qismən ödənişli satış (BE#15) ───────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_Without_PaidAmount_Defaults_To_Fully_Paid_On_Cash()
+    {
+        // Back-compat (AC-11): omitting paidAmount on a Cash/Card sale behaves exactly like before —
+        // paid in full, no remaining balance.
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Mal", category: "K", quantity: 2, unitPrice: 25m,
+            costPerUnit: 10m, purchasePricePerUnit: 8m, paymentType: PaymentType.Cash,
+            customerId: null, soldByUserId: null, soldByName: "Satıcı");
+
+        Assert.Equal(50m, sale.PaidAmount);
+        Assert.Equal(0m, sale.RemainingAmount);
+        Assert.Equal(PaymentType.Cash, sale.PaidVia);
+    }
+
+    [Fact]
+    public void Create_Without_PaidAmount_Defaults_To_Unpaid_On_Credit()
+    {
+        // Back-compat (AC-11): omitting paidAmount on a Nisyə sale behaves exactly like before —
+        // nothing paid, the whole total remains as debt.
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Mal", category: "K", quantity: 2, unitPrice: 25m,
+            costPerUnit: 10m, purchasePricePerUnit: 8m, paymentType: PaymentType.Credit,
+            customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı");
+
+        Assert.Equal(0m, sale.PaidAmount);
+        Assert.Equal(50m, sale.RemainingAmount);
+        Assert.Equal(PaymentType.Cash, sale.PaidVia); // default paid-via, harmless since nothing was paid
+    }
+
+    [Fact]
+    public void Create_With_Explicit_Partial_PaidAmount_Computes_Remaining()
+    {
+        // TC1: Total 500, Nisyə, paid 300 via Nağd → remaining 200.
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Mal", category: "K", quantity: 1, unitPrice: 500m,
+            costPerUnit: 300m, purchasePricePerUnit: 250m, paymentType: PaymentType.Credit,
+            customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı",
+            paidAmount: 300m, paidVia: PaymentType.Cash);
+
+        Assert.Equal(300m, sale.PaidAmount);
+        Assert.Equal(200m, sale.RemainingAmount);
+        Assert.Equal(PaymentType.Cash, sale.PaidVia);
+    }
+
+    [Fact]
+    public void ReviseCatalogued_Carries_The_New_Paid_Amount_And_Via()
+    {
+        // TC9: an update from a partially paid sale to a fully paid one drops the remaining balance to zero
+        // and switches PaidVia to match the (now fully paid) stored payment type.
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Mal", category: "K", quantity: 1, unitPrice: 500m,
+            costPerUnit: 300m, purchasePricePerUnit: 250m, paymentType: PaymentType.Credit,
+            customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı",
+            paidAmount: 300m, paidVia: PaymentType.Cash);
+        Assert.Equal(200m, sale.RemainingAmount);
+
+        sale.ReviseCatalogued(
+            sale.ProductId!.Value, "Mal", "K", quantity: 1, unitPrice: 500m,
+            costPerUnit: 300m, purchasePricePerUnit: 250m, paymentType: PaymentType.Cash, customerId: null,
+            paidAmount: 500m, paidVia: PaymentType.Cash);
+
+        Assert.Equal(500m, sale.PaidAmount);
+        Assert.Equal(0m, sale.RemainingAmount);
+        Assert.Equal(PaymentType.Cash, sale.PaidVia);
+        Assert.Equal(PaymentType.Cash, sale.PaymentType);
+    }
+
+    [Fact]
+    public void ToDto_And_ToDetailDto_Carry_PaidAmount_RemainingAmount_And_PaidVia()
+    {
+        Sale sale = Sale.Create(
+            productId: Guid.NewGuid(), productName: "Mal", category: "K", quantity: 1, unitPrice: 500m,
+            costPerUnit: 300m, purchasePricePerUnit: 250m, paymentType: PaymentType.Credit,
+            customerId: Guid.NewGuid(), soldByUserId: null, soldByName: "Satıcı",
+            paidAmount: 300m, paidVia: PaymentType.Cash);
+
+        SaleDto dto = sale.ToDto();
+        SaleDetailDto detail = sale.ToDetailDto(customerName: "Müştəri", currentProductName: null);
+
+        Assert.Equal(300m, dto.PaidAmount);
+        Assert.Equal(200m, dto.RemainingAmount);
+        Assert.Equal("Nağd", dto.PaidVia);
+        Assert.Equal(300m, detail.PaidAmount);
+        Assert.Equal(200m, detail.RemainingAmount);
+        Assert.Equal("Nağd", detail.PaidVia);
+    }
 }

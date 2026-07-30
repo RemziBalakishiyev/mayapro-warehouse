@@ -335,6 +335,6 @@ public sealed class CustomersApiTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
-        Assert.Equal("Nisyə satış üçün müştəri seçilməlidir", error.Message);
+        Assert.Equal("Qalıq borc üçün müştəri seçilməlidir", error.Message);
     }
 }

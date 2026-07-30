@@ -30,4 +30,7 @@ public sealed record SaleDetailDto(
     string SoldByName,
     DateTime CreatedAt,
     bool IsManual,
-    IReadOnlyList<SaleExpenseItemDto> ExpenseItems);
+    IReadOnlyList<SaleExpenseItemDto> ExpenseItems,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    string PaidVia);

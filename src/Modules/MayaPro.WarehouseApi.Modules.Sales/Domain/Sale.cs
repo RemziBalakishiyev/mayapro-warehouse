@@ -32,7 +32,9 @@ public sealed class Sale : Entity
         Guid? soldByUserId,
         string soldByName,
         DateTime date,
-        IReadOnlyList<SaleExpenseItem> expenseItems)
+        IReadOnlyList<SaleExpenseItem> expenseItems,
+        decimal paidAmount,
+        PaymentType paidVia)
     {
         ProductId = productId;
         IsManual = isManual;
@@ -51,6 +53,8 @@ public sealed class Sale : Entity
         SoldByName = soldByName;
         Date = date;
         ExpenseItems = expenseItems;
+        PaidAmount = paidAmount;
+        PaidVia = paidVia;
     }
 
     /// <summary>
@@ -107,8 +111,27 @@ public sealed class Sale : Entity
     public PaymentType PaymentType { get; private set; }
 
     /// <summary>
-    /// The buying customer, optional on every payment type (mandatory only on credit — validator's rule).
-    /// Only a credit sale touches the customer's debt; on cash/card this is purchase-history bookkeeping.
+    /// How much was actually received at sale time (BE#15 — qismən ödənişli satış). Equals
+    /// <see cref="TotalAmount"/> when the sale was paid in full; less than it — down to zero — when a Nisyə
+    /// sale carries a partial (or no) down-payment. Never negative, never above <see cref="TotalAmount"/>
+    /// (validator's rule).
+    /// </summary>
+    public decimal PaidAmount { get; private set; }
+
+    /// <summary><see cref="TotalAmount"/> − <see cref="PaidAmount"/>. Zero on a fully paid sale.</summary>
+    public decimal RemainingAmount => TotalAmount - PaidAmount;
+
+    /// <summary>
+    /// How the paid portion was received (Nağd/Kart) — meaningful even on a Nisyə sale with a cash/card
+    /// down-payment, since that money is real cash-drawer (or card-settlement) income the same day. On a
+    /// fully paid sale this always equals <see cref="PaymentType"/>.
+    /// </summary>
+    public PaymentType PaidVia { get; private set; }
+
+    /// <summary>
+    /// The buying customer, optional on every payment type (mandatory only when <see cref="RemainingAmount"/>
+    /// is positive — validator's rule). Only a sale with a remaining balance touches the customer's debt, and
+    /// only by that remaining amount; on a fully paid sale this is purchase-history bookkeeping.
     /// </summary>
     public Guid? CustomerId { get; private set; }
 
@@ -136,10 +159,14 @@ public sealed class Sale : Entity
         PaymentType paymentType,
         Guid? customerId,
         Guid? soldByUserId,
-        string soldByName)
+        string soldByName,
+        decimal? paidAmount = null,
+        PaymentType? paidVia = null)
     {
         decimal subtotal = unitPrice * quantity;
         decimal profit = (unitPrice - costPerUnit) * quantity;
+        (decimal resolvedPaidAmount, PaymentType resolvedPaidVia) =
+            ResolvePayment(paymentType, subtotal, paidAmount, paidVia);
 
         return new Sale(
             productId,
@@ -154,13 +181,15 @@ public sealed class Sale : Entity
             purchasePricePerUnit,
             profit,
             paymentType,
-            // Any payment type may carry a customer; only credit affects their debt (handler's rule).
+            // Any payment type may carry a customer; only a remaining balance affects their debt (handler's rule).
             customerId,
             soldByUserId,
             soldByName,
             DateTime.UtcNow,
             // A catalogued sale takes its cost from the product, so it carries no free-form expense lines.
-            Array.Empty<SaleExpenseItem>());
+            Array.Empty<SaleExpenseItem>(),
+            resolvedPaidAmount,
+            resolvedPaidVia);
     }
 
     /// <summary>
@@ -181,12 +210,16 @@ public sealed class Sale : Entity
         Guid? soldByUserId,
         string soldByName,
         IReadOnlyList<SaleExpenseItem>? expenseItems = null,
-        decimal? purchasePricePerUnit = null)
+        decimal? purchasePricePerUnit = null,
+        decimal? paidAmount = null,
+        PaymentType? paidVia = null)
     {
         decimal subtotal = unitPrice * quantity;
         decimal? profit = costPerUnit is { } cost
             ? (unitPrice - cost) * quantity
             : null;
+        (decimal resolvedPaidAmount, PaymentType resolvedPaidVia) =
+            ResolvePayment(paymentType, subtotal, paidAmount, paidVia);
 
         return new Sale(
             productId: null,
@@ -205,7 +238,9 @@ public sealed class Sale : Entity
             soldByUserId,
             soldByName,
             DateTime.UtcNow,
-            expenseItems ?? Array.Empty<SaleExpenseItem>());
+            expenseItems ?? Array.Empty<SaleExpenseItem>(),
+            resolvedPaidAmount,
+            resolvedPaidVia);
     }
 
     /// <summary>
@@ -222,7 +257,9 @@ public sealed class Sale : Entity
         decimal costPerUnit,
         decimal purchasePricePerUnit,
         PaymentType paymentType,
-        Guid? customerId)
+        Guid? customerId,
+        decimal? paidAmount = null,
+        PaymentType? paidVia = null)
     {
         ProductId = productId;
         IsManual = false;
@@ -238,6 +275,7 @@ public sealed class Sale : Entity
         PaymentType = paymentType;
         CustomerId = customerId;
         ExpenseItems = Array.Empty<SaleExpenseItem>();
+        (PaidAmount, PaidVia) = ResolvePayment(paymentType, TotalAmount, paidAmount, paidVia);
     }
 
     /// <summary>
@@ -256,7 +294,9 @@ public sealed class Sale : Entity
         PaymentType paymentType,
         Guid? customerId,
         IReadOnlyList<SaleExpenseItem> expenseItems,
-        decimal? purchasePricePerUnit)
+        decimal? purchasePricePerUnit,
+        decimal? paidAmount = null,
+        PaymentType? paidVia = null)
     {
         ProductId = null;
         IsManual = true;
@@ -272,5 +312,21 @@ public sealed class Sale : Entity
         PaymentType = paymentType;
         CustomerId = customerId;
         ExpenseItems = expenseItems;
+        (PaidAmount, PaidVia) = ResolvePayment(paymentType, TotalAmount, paidAmount, paidVia);
+    }
+
+    /// <summary>
+    /// Fills in <see cref="PaidAmount"/>/<see cref="PaidVia"/> when a factory/revise call does not supply them
+    /// explicitly (direct domain usage — the CreateSale/UpdateSale handlers always pass an explicit
+    /// <see cref="SalePaymentPlan"/> instead). Mirrors <see cref="SalePaymentPlan"/>'s AC2 default: a Credit
+    /// sale defaults to nothing paid, everything else to paid in full; the paid-via method defaults to Cash on
+    /// credit, otherwise to the sale's own payment type.
+    /// </summary>
+    private static (decimal PaidAmount, PaymentType PaidVia) ResolvePayment(
+        PaymentType paymentType, decimal total, decimal? paidAmount, PaymentType? paidVia)
+    {
+        decimal resolvedPaidAmount = paidAmount ?? (paymentType == PaymentType.Credit ? 0m : total);
+        PaymentType resolvedPaidVia = paidVia ?? (paymentType == PaymentType.Credit ? PaymentType.Cash : paymentType);
+        return (resolvedPaidAmount, resolvedPaidVia);
     }
 }

@@ -139,7 +139,10 @@ internal static class IntegrationTestHelpers
         decimal? Profit,
         string PaymentType,
         Guid? CustomerId,
-        bool IsManual);
+        bool IsManual,
+        decimal PaidAmount,
+        decimal RemainingAmount,
+        string PaidVia);
 
     /// <summary>Wire shape of <c>GET /api/sales</c> — SharedKernel <c>PagedResult&lt;SaleDto&gt;</c> (items/total/skip/take).</summary>
     internal sealed record PagedSalesDto(List<SaleDto> Items, int Total, int Skip, int Take);
@@ -160,7 +163,10 @@ internal static class IntegrationTestHelpers
         Guid? CustomerId,
         string? CustomerName,
         bool IsManual,
-        List<SaleExpenseItemDto> ExpenseItems);
+        List<SaleExpenseItemDto> ExpenseItems,
+        decimal PaidAmount,
+        decimal RemainingAmount,
+        string PaidVia);
 
     internal sealed record CustomerPaymentDto(Guid Id, Guid CustomerId, decimal Amount);
 

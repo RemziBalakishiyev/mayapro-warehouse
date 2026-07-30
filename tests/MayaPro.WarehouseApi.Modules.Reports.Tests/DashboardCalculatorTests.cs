@@ -193,6 +193,38 @@ public sealed class DashboardCalculatorTests
     }
 
     [Fact]
+    public void ExpectedCash_Counts_A_Credit_Sales_Cash_Down_Payment_Not_Its_Full_Total()
+    {
+        // BE#15 / AC8: a 500 AZN sale with only 300 received in cash (the rest owed) must add 300 to the
+        // drawer, not the full 500 — and the still-owed 200 must not be double counted.
+        var dto = Build(
+            sales:
+            [
+                new SalesReportRow(
+                    Today, TotalAmount: 500m, Profit: 0m, PaymentType: WireFormat.PaymentTypes.Credit,
+                    ProductId: null, ProductName: "Nisyə mal", Quantity: 1, UnitPrice: 500m, IsManual: true,
+                    PaidAmount: 300m, PaidVia: Cash)
+            ]);
+
+        Assert.Equal(300m, dto.ExpectedCash); // no prior close → opening 0, no expenses
+    }
+
+    [Fact]
+    public void ExpectedCash_Ignores_A_Credit_Sales_Down_Payment_Received_By_Card()
+    {
+        var dto = Build(
+            sales:
+            [
+                new SalesReportRow(
+                    Today, TotalAmount: 500m, Profit: 0m, PaymentType: WireFormat.PaymentTypes.Credit,
+                    ProductId: null, ProductName: "Nisyə mal", Quantity: 1, UnitPrice: 500m, IsManual: true,
+                    PaidAmount: 300m, PaidVia: Card)
+            ]);
+
+        Assert.Equal(0m, dto.ExpectedCash); // the 300 went to the card settlement, not the cash drawer
+    }
+
+    [Fact]
     public void Top_Products_And_Low_Stock_Are_Ranked_And_Consistent()
     {
         Guid a = Guid.NewGuid(), b = Guid.NewGuid(), outOfStock = Guid.NewGuid();
