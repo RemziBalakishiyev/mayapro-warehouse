@@ -8,28 +8,35 @@ public enum ImportTokenState
     /// <summary>Live: the caller may commit it.</summary>
     Found,
 
-    /// <summary>Was issued, but its TTL has passed (or it was already committed once and consumed).</summary>
+    /// <summary>Was issued, but its TTL has passed.</summary>
     Expired,
 
-    /// <summary>Never issued, or not a token this cache recognises.</summary>
+    /// <summary>Never issued, already committed, or not a token this cache recognises.</summary>
     NotFound
 }
 
 /// <summary>
 /// Server-side cache of preview parse results, keyed by <c>importToken</c> — a "simple in-memory cache" per
 /// the task, not a distributed one: a single API instance is assumed. Entries live for
-/// <see cref="ImportTemplate.TokenTtl"/> and are consumed (removed) on a successful commit, so a second
-/// commit with the same token comes back <see cref="ImportTokenState.Expired"/>/<see cref="ImportTokenState.NotFound"/>
-/// rather than re-applying the import.
+/// <see cref="ImportTemplate.TokenTtl"/>.
+/// <para>
+/// A commit <see cref="Claim"/>s its token, which hands the result over and removes it in one atomic step:
+/// two commits racing on the same token cannot both apply the import, and a replayed token comes back
+/// <see cref="ImportTokenState.NotFound"/>. <see cref="Restore"/> exists only for the failure path — when a
+/// commit transaction rolls back, the entry goes back so the user can retry without re-uploading the file.
+/// </para>
 /// </summary>
 public interface IImportTokenCache
 {
     /// <summary>Stores a fresh parse result and returns the token that claims it.</summary>
     string Store(CachedImportResult result);
 
-    /// <summary>Looks up a token. See <see cref="ImportTokenState"/> for what each outcome means.</summary>
-    (ImportTokenState State, CachedImportResult? Result) TryGet(string token);
+    /// <summary>
+    /// Atomically takes the entry out of the cache. See <see cref="ImportTokenState"/> for the outcomes; the
+    /// result is non-null only for <see cref="ImportTokenState.Found"/>.
+    /// </summary>
+    (ImportTokenState State, CachedImportResult? Result) Claim(string token);
 
-    /// <summary>Removes a token — called once a commit has applied it, so it cannot be replayed.</summary>
-    void Remove(string token);
+    /// <summary>Puts a claimed entry back (same token, fresh TTL) after a commit failed to apply it.</summary>
+    void Restore(string token, CachedImportResult result);
 }

@@ -2,7 +2,7 @@ using ClosedXML.Excel;
 using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Products.Application.Imports;
 using MayaPro.WarehouseApi.SharedKernel.Application;
-using Microsoft.AspNetCore.Http;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.PreviewProductsImport;
@@ -12,22 +12,36 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.PreviewProd
 /// as <c>create</c>/<c>update</c>/<c>error</c>, and flags categories that do not exist yet. Nothing is
 /// written to the database; the parse result is cached under a fresh <c>importToken</c> for
 /// <see cref="Application.UseCases.CommitProductsImport.CommitProductsImportHandler"/> to apply later.
+/// <para>
+/// Takes a plain <see cref="Stream"/> rather than an <c>IFormFile</c>: the multipart details belong to the
+/// endpoint, and the use case stays HTTP-agnostic (and trivially unit-testable from a byte array).
+/// </para>
 /// </summary>
-public sealed class PreviewProductsImportHandler(IProductsDbContext db, IImportTokenCache cache)
+public sealed class PreviewProductsImportHandler(
+    IProductsDbContext db,
+    IImportTokenCache cache,
+    ICurrentUser currentUser)
 {
-    public async Task<Result<ImportPreviewResponse>> Handle(IFormFile? file, CancellationToken ct)
+    public async Task<Result<ImportPreviewResponse>> Handle(
+        Stream? content,
+        long lengthBytes,
+        CancellationToken ct)
     {
-        if (file is null || file.Length == 0)
+        if (content is null || lengthBytes <= 0)
             return Result.Failure<ImportPreviewResponse>(ImportErrors.EmptyFile);
 
-        using var stream = new MemoryStream();
-        await file.CopyToAsync(stream, ct);
-        stream.Position = 0;
+        // Checked before a single byte is buffered: an oversized workbook never reaches memory.
+        if (lengthBytes > ImportTemplate.MaxFileBytes)
+            return Result.Failure<ImportPreviewResponse>(ImportErrors.FileTooLarge);
+
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, ct);
+        buffer.Position = 0;
 
         XLWorkbook workbook;
         try
         {
-            workbook = new XLWorkbook(stream);
+            workbook = new XLWorkbook(buffer);
         }
         catch
         {
@@ -41,87 +55,116 @@ public sealed class PreviewProductsImportHandler(IProductsDbContext db, IImportT
             if (sheet is null || !HeadersMatch(sheet))
                 return Result.Failure<ImportPreviewResponse>(ImportErrors.InvalidTemplate);
 
-            List<IXLRow> dataRows = sheet.RowsUsed().Skip(1).ToList();
+            // One past the limit is enough to reject the file, so an oversized sheet is never materialised.
+            List<IXLRow> dataRows = sheet.RowsUsed()
+                .Where(r => r.RowNumber() > ProductImportTemplate.HeaderRow && !ImportRowParser.IsBlank(r))
+                .Take(ProductImportTemplate.MaxDataRows + 1)
+                .ToList();
 
             if (dataRows.Count == 0)
                 return Result.Failure<ImportPreviewResponse>(ImportErrors.EmptyFile);
 
-            if (dataRows.Count > ImportTemplate.MaxDataRows)
+            if (dataRows.Count > ProductImportTemplate.MaxDataRows)
                 return Result.Failure<ImportPreviewResponse>(ImportErrors.TooManyRows);
 
-            var existingProducts = await db.Products
-                .Where(p => p.Barcode != "")
-                .Select(p => new { p.Barcode, p.Id })
-                .ToListAsync(ct);
-            Dictionary<string, Guid> existingByBarcode = existingProducts
-                .ToDictionary(p => p.Barcode, p => p.Id, StringComparer.OrdinalIgnoreCase);
-
+            Dictionary<string, Guid> existingByBarcode = await LoadBarcodeIndexAsync(ct);
             var existingCategories = new HashSet<string>(
                 await db.Categories.Select(c => c.Name).ToListAsync(ct),
                 StringComparer.OrdinalIgnoreCase);
 
-            var cachedRows = new List<CachedImportRow>();
-            var responseRows = new List<ImportRowResult>();
+            var rows = new List<CachedImportRow>(dataRows.Count);
             var newCategories = new List<string>();
-            var seenNewBarcodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenBarcodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (IXLRow row in dataRows)
             {
-                int rowNumber = row.RowNumber();
-                (string? error, ImportRowData? data) = ImportRowParser.Parse(row);
-
-                if (error is not null || data is null)
-                {
-                    cachedRows.Add(new CachedImportRow(rowNumber, ImportRowStatus.Error, null, error, null));
-                    responseRows.Add(new ImportRowResult(rowNumber, ImportRowStatus.Error, null, error));
-                    continue;
-                }
-
-                bool hasBarcode = !string.IsNullOrWhiteSpace(data.Barcode);
-                Guid existingId = Guid.Empty;
-                bool isUpdate = hasBarcode && existingByBarcode.TryGetValue(data.Barcode, out existingId);
-
-                // A brand-new barcode repeated within the same file would otherwise create two products
-                // that collide on the unique barcode index at commit time — caught here instead.
-                if (!isUpdate && hasBarcode && !seenNewBarcodes.Add(data.Barcode))
-                {
-                    const string duplicateError = "Barkod bu fayl daxilində təkrarlanır";
-                    cachedRows.Add(new CachedImportRow(rowNumber, ImportRowStatus.Error, null, duplicateError, null));
-                    responseRows.Add(new ImportRowResult(rowNumber, ImportRowStatus.Error, null, duplicateError));
-                    continue;
-                }
-
-                string status = isUpdate ? ImportRowStatus.Update : ImportRowStatus.Create;
-                Guid? existingProductId = isUpdate ? existingId : null;
-
-                if (!string.IsNullOrWhiteSpace(data.Category) &&
-                    !existingCategories.Contains(data.Category) &&
-                    !newCategories.Contains(data.Category, StringComparer.OrdinalIgnoreCase))
-                {
-                    newCategories.Add(data.Category);
-                }
-
-                cachedRows.Add(new CachedImportRow(rowNumber, status, data, null, existingProductId));
-                responseRows.Add(new ImportRowResult(rowNumber, status, data, null));
+                rows.Add(Classify(row, existingByBarcode, seenBarcodes, existingCategories, newCategories));
             }
 
-            int creates = cachedRows.Count(r => r.Status == ImportRowStatus.Create);
-            int updates = cachedRows.Count(r => r.Status == ImportRowStatus.Update);
-            int errors = cachedRows.Count(r => r.Status == ImportRowStatus.Error);
+            var summary = new ImportSummary(
+                rows.Count(r => r.Status == ImportRowStatus.Create),
+                rows.Count(r => r.Status == ImportRowStatus.Update),
+                rows.Count(r => r.Status == ImportRowStatus.Error),
+                newCategories);
 
-            string token = cache.Store(new CachedImportResult(cachedRows, newCategories));
-            var summary = new ImportSummary(creates, updates, errors, newCategories);
+            string token = cache.Store(new CachedImportResult(rows, newCategories, currentUser.UserId));
+
+            IReadOnlyList<ImportRowResult> responseRows = rows
+                .Select(r => new ImportRowResult(r.RowNumber, r.Status, r.Data, r.Error))
+                .ToList();
 
             return Result.Success(new ImportPreviewResponse(token, responseRows, summary));
         }
     }
 
+    /// <summary>
+    /// Classifies one row: an error, an update of the product that already owns the barcode, or a create.
+    /// Any category name that is neither in the database nor already flagged is appended to
+    /// <paramref name="newCategories"/> (the list the commit will create).
+    /// </summary>
+    private static CachedImportRow Classify(
+        IXLRow row,
+        Dictionary<string, Guid> existingByBarcode,
+        HashSet<string> seenBarcodes,
+        HashSet<string> existingCategories,
+        List<string> newCategories)
+    {
+        int rowNumber = row.RowNumber();
+        (string? error, ImportRowData? data) = ImportRowParser.Parse(row);
+
+        if (error is not null || data is null)
+            return ErrorRow(rowNumber, error ?? "Sətir oxunmadı");
+
+        bool hasBarcode = !string.IsNullOrWhiteSpace(data.Barcode);
+
+        // One barcode, one row. Repeated in the file it is always a mistake: two new rows would collide on
+        // the unique barcode index at commit time, and two update rows would silently let the last one win.
+        if (hasBarcode && !seenBarcodes.Add(data.Barcode))
+            return ErrorRow(rowNumber, "Barkod bu fayl daxilində təkrarlanır");
+
+        Guid existingId = Guid.Empty;
+        bool isUpdate = hasBarcode && existingByBarcode.TryGetValue(data.Barcode, out existingId);
+
+        if (!string.IsNullOrWhiteSpace(data.Category) &&
+            !existingCategories.Contains(data.Category) &&
+            !newCategories.Contains(data.Category, StringComparer.OrdinalIgnoreCase))
+        {
+            newCategories.Add(data.Category);
+        }
+
+        return isUpdate
+            ? new CachedImportRow(rowNumber, ImportRowStatus.Update, data, null, existingId)
+            : new CachedImportRow(rowNumber, ImportRowStatus.Create, data, null, null);
+    }
+
+    private static CachedImportRow ErrorRow(int rowNumber, string error) =>
+        new(rowNumber, ImportRowStatus.Error, null, error, null);
+
+    /// <summary>
+    /// Barcode → product id for every product that has a barcode. Built with <c>TryAdd</c> rather than
+    /// <c>ToDictionary</c>: barcodes are unique under SQL Server's case-insensitive collation, but a
+    /// case-sensitive store would otherwise turn two look-alike barcodes into a duplicate-key crash.
+    /// </summary>
+    private async Task<Dictionary<string, Guid>> LoadBarcodeIndexAsync(CancellationToken ct)
+    {
+        var rows = await db.Products
+            .Where(p => p.Barcode != "")
+            .Select(p => new { p.Barcode, p.Id })
+            .ToListAsync(ct);
+
+        var index = new Dictionary<string, Guid>(rows.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+            index.TryAdd(row.Barcode.Trim(), row.Id);
+
+        return index;
+    }
+
     private static bool HeadersMatch(IXLWorksheet sheet)
     {
-        for (int i = 0; i < ImportTemplate.Headers.Length; i++)
+        for (int i = 0; i < ProductImportTemplate.Headers.Count; i++)
         {
-            string actual = sheet.Cell(ImportTemplate.HeaderRow, i + 1).GetString().Trim();
-            if (!string.Equals(actual, ImportTemplate.Headers[i], StringComparison.Ordinal))
+            string actual = sheet.Cell(ProductImportTemplate.HeaderRow, i + 1).GetString().Trim();
+            if (!string.Equals(actual, ProductImportTemplate.Headers[i], StringComparison.Ordinal))
                 return false;
         }
 

@@ -1,9 +1,13 @@
 using ClosedXML.Excel;
-using MayaPro.WarehouseApi.Modules.Products.Application.Imports;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Tests;
 
-/// <summary>Builds the byte[] of a small .xlsx the import preview tests "upload" as a <see cref="FakeFormFile"/>.</summary>
+/// <summary>
+/// Builds the byte[] of a small .xlsx the import tests upload. Headers come from the shared
+/// <see cref="ProductImportTemplate"/> contract, so a test file is always exactly what the Exports module's
+/// template endpoint hands the user.
+/// </summary>
 internal static class ImportWorkbookBuilder
 {
     /// <summary>A full 13-column, correctly-ordered row: Ad, Kateqoriya, Barkod, Alış, Satış, Miqdar, Min
@@ -28,17 +32,24 @@ internal static class ImportWorkbookBuilder
             warehouse, store, shelf, box, attributes, note
         ];
 
-    public static byte[] Build(IEnumerable<object?[]> rows, string[]? headers = null)
+    /// <summary>
+    /// A row Excel still counts as "used" (the cells exist) but that carries no value in any template
+    /// column — what is left behind when a user clears a filled row instead of deleting it.
+    /// </summary>
+    public static object?[] BlankRow() =>
+        Enumerable.Repeat<object?>(" ", ProductImportTemplate.Headers.Count).ToArray();
+
+    public static byte[] Build(IEnumerable<object?[]> rows, IReadOnlyList<string>? headers = null)
     {
-        headers ??= ImportTemplate.Headers;
+        headers ??= ProductImportTemplate.Headers;
 
         using var workbook = new XLWorkbook();
         IXLWorksheet sheet = workbook.Worksheets.Add("Mallar");
 
-        for (int i = 0; i < headers.Length; i++)
-            sheet.Cell(1, i + 1).Value = headers[i];
+        for (int i = 0; i < headers.Count; i++)
+            sheet.Cell(ProductImportTemplate.HeaderRow, i + 1).Value = headers[i];
 
-        int rowIndex = 2;
+        int rowIndex = ProductImportTemplate.HeaderRow + 1;
         foreach (object?[] row in rows)
         {
             for (int c = 0; c < row.Length; c++)
@@ -51,7 +62,7 @@ internal static class ImportWorkbookBuilder
         return stream.ToArray();
     }
 
-    public static byte[] BuildHeaderOnly(string[]? headers = null) => Build([], headers);
+    public static byte[] BuildHeaderOnly(IReadOnlyList<string>? headers = null) => Build([], headers);
 
     private static void SetCell(IXLCell cell, object? value)
     {

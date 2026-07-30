@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using MayaPro.WarehouseApi.Modules.Exports.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsTemplate;
 
@@ -7,31 +8,13 @@ namespace MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProduc
 /// Builds the blank Excel template a store uploads to <c>POST /api/imports/products/preview</c> (Products
 /// module). Two sample rows show the expected shape; a second sheet spells out the rules in Azerbaijani.
 /// <para>
-/// The header list here <b>must stay byte-for-byte identical</b> to the one the Products module's import
-/// preview validates against (see <c>ImportTemplate.Headers</c> there) — the two live in different
-/// modules on purpose (no cross-module project reference), so a header edit here needs the same edit
-/// there.
+/// Headers and the row limit come from the shared <see cref="ProductImportTemplate"/> contract, which the
+/// Products module's import preview validates against — one source of truth, so the file this module writes
+/// and the file that module accepts can never drift apart.
 /// </para>
 /// </summary>
 public sealed class ExportProductsTemplateHandler
 {
-    private static readonly string[] Headers =
-    [
-        "Ad*",
-        "Kateqoriya",
-        "Barkod",
-        "Alış qiyməti*",
-        "Satış qiyməti*",
-        "Miqdar*",
-        "Min stok",
-        "Anbar",
-        "Mağaza",
-        "Rəf",
-        "Qutu",
-        "Xüsusiyyətlər",
-        "Qeyd"
-    ];
-
     private static readonly string[][] SampleRows =
     [
         [
@@ -49,10 +32,10 @@ public sealed class ExportProductsTemplateHandler
         using var workbook = new XLWorkbook();
 
         IXLWorksheet dataSheet = workbook.Worksheets.Add("Mallar");
-        for (int i = 0; i < Headers.Length; i++)
+        for (int i = 0; i < ProductImportTemplate.Headers.Count; i++)
         {
-            IXLCell header = dataSheet.Cell(1, i + 1);
-            header.Value = Headers[i];
+            IXLCell header = dataSheet.Cell(ProductImportTemplate.HeaderRow, i + 1);
+            header.Value = ProductImportTemplate.Headers[i];
             header.Style.Font.Bold = true;
         }
 
@@ -74,8 +57,8 @@ public sealed class ExportProductsTemplateHandler
             "Barkod mövcud bir mala uyğundursa, həmin sətir YENİ mal deyil, mövcud malın " +
             "yenilənməsi kimi tətbiq olunur (ad/qiymət/stok yenilənir).",
             "Xüsusiyyətlər sütunu \"Ad: Dəyər; Ad: Dəyər\" formatında yazılır, məsələn: " +
-            "\"Ölçü: M; Rəng: Qara\".",
-            "Bir faylda ən çoxu 1000 sətir ola bilər.",
+            $"\"{ProductImportTemplate.AttributesExample}\".",
+            $"Bir faylda ən çoxu {ProductImportTemplate.MaxDataRows} sətir ola bilər.",
             "Faylı yükləməzdən əvvəl bu şablonu doldurun — sütun başlıqlarını dəyişməyin."
         ];
 

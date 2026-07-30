@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using ClosedXML.Excel;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
@@ -10,20 +11,14 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 /// result once). Mirrors BE#13's test cases TC-2 through TC-17 at the HTTP level; row-classification detail
 /// and the token cache's own behaviour are covered by the Products module's unit tests.
 /// <para>
-/// The header row here is a deliberate literal duplicate of the Products module's internal
-/// <c>ImportTemplate.Headers</c> / the Exports template — see the comment on either for why the three
-/// copies exist.
+/// The uploaded files are built from the shared <see cref="ProductImportTemplate"/> header contract — the
+/// same constant the downloadable template is written from — so these tests upload exactly what a real user
+/// would.
 /// </para>
 /// </summary>
 [Collection(ApiCollection.Name)]
 public sealed class ImportsApiTests : IAsyncLifetime
 {
-    private static readonly string[] Headers =
-    [
-        "Ad*", "Kateqoriya", "Barkod", "Alış qiyməti*", "Satış qiyməti*", "Miqdar*",
-        "Min stok", "Anbar", "Mağaza", "Rəf", "Qutu", "Xüsusiyyətlər", "Qeyd"
-    ];
-
     private readonly WarehouseApiFactory _factory;
 
     public ImportsApiTests(WarehouseApiFactory factory) => _factory = factory;
@@ -216,6 +211,73 @@ public sealed class ImportsApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task A_File_Built_On_The_Downloaded_Template_Is_Accepted_By_Preview()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        // The whole point of the two endpoints: what /api/exports hands out is what /api/imports accepts.
+        byte[] template = await client.GetByteArrayAsync("/api/exports/products-template.xlsx");
+        byte[] filled = FillDownloadedTemplate(template, [Row(name: "Şablondan mal", barcode: "IMP-TPL-1")]);
+
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/imports/products/preview", MultipartFile(filled));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<PreviewResponseDto>())!;
+        Assert.Equal(1, body.Summary.Creates);
+        Assert.Equal(0, body.Summary.Errors);
+    }
+
+    [Fact]
+    public async Task Preview_Without_A_File_Part_Returns_400_EmptyFile()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/imports/products/preview", new MultipartFormDataContent());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>();
+        Assert.Equal("Imports.EmptyFile", error!.Code);
+    }
+
+    [Fact]
+    public async Task Preview_With_A_Non_Multipart_Body_Is_Rejected_Without_A_Server_Error()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/imports/products/preview", new { file = "not a multipart upload" });
+
+        // The route declares multipart/form-data, so a JSON body never reaches the handler: 415, not a 500.
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+    }
+
+    /// <summary>Drops the template's two sample rows and writes the test's own rows in their place.</summary>
+    private static byte[] FillDownloadedTemplate(byte[] template, IEnumerable<object?[]> rows)
+    {
+        using var input = new MemoryStream(template);
+        using var workbook = new XLWorkbook(input);
+        IXLWorksheet sheet = workbook.Worksheet(1);
+
+        int firstDataRow = ProductImportTemplate.HeaderRow + 1;
+        while (sheet.LastRowUsed()!.RowNumber() >= firstDataRow)
+            sheet.Row(sheet.LastRowUsed()!.RowNumber()).Delete();
+
+        int rowIndex = firstDataRow;
+        foreach (object?[] row in rows)
+        {
+            for (int c = 0; c < row.Length; c++)
+                WriteCell(sheet.Cell(rowIndex, c + 1), row[c]);
+            rowIndex++;
+        }
+
+        using var output = new MemoryStream();
+        workbook.SaveAs(output);
+        return output.ToArray();
+    }
+
     private static MultipartFormDataContent MultipartFile(byte[] bytes)
     {
         var content = new MultipartFormDataContent();
@@ -240,42 +302,44 @@ public sealed class ImportsApiTests : IAsyncLifetime
             "Anbar A", "Mərkəz", "1", "1", "", ""
         ];
 
-    private static byte[] BuildWorkbook(IEnumerable<object?[]> rows, string[]? headers = null)
+    private static byte[] BuildWorkbook(IEnumerable<object?[]> rows, IReadOnlyList<string>? headers = null)
     {
-        headers ??= Headers;
+        headers ??= ProductImportTemplate.Headers;
         using var workbook = new XLWorkbook();
         IXLWorksheet sheet = workbook.Worksheets.Add("Mallar");
 
-        for (int i = 0; i < headers.Length; i++)
+        for (int i = 0; i < headers.Count; i++)
             sheet.Cell(1, i + 1).Value = headers[i];
 
         int rowIndex = 2;
         foreach (object?[] row in rows)
         {
             for (int c = 0; c < row.Length; c++)
-            {
-                switch (row[c])
-                {
-                    case null:
-                        break;
-                    case string s:
-                        sheet.Cell(rowIndex, c + 1).Value = s;
-                        break;
-                    case int i:
-                        sheet.Cell(rowIndex, c + 1).Value = i;
-                        break;
-                    default:
-                        sheet.Cell(rowIndex, c + 1).Value = row[c]!.ToString();
-                        break;
-                }
-            }
-
+                WriteCell(sheet.Cell(rowIndex, c + 1), row[c]);
             rowIndex++;
         }
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
+    }
+
+    private static void WriteCell(IXLCell cell, object? value)
+    {
+        switch (value)
+        {
+            case null:
+                break;
+            case string s:
+                cell.Value = s;
+                break;
+            case int i:
+                cell.Value = i;
+                break;
+            default:
+                cell.Value = value.ToString();
+                break;
+        }
     }
 
     private sealed record PreviewRowDto(int RowNumber, string Status, string? Error);

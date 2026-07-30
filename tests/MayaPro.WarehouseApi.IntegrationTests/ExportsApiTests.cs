@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using ClosedXML.Excel;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.IntegrationTests;
 
@@ -179,8 +180,13 @@ public sealed class ExportsApiTests : IAsyncLifetime
 
         Assert.Equal(2, workbook.Worksheets.Count);
         IXLWorksheet sheet = workbook.Worksheet(1);
-        Assert.Equal("Ad*", sheet.Cell(1, 1).GetString());
-        Assert.Equal("Miqdar*", sheet.Cell(1, 6).GetString());
+
+        // Served file == the shared header contract the import preview validates against.
+        string[] headerRow = Enumerable
+            .Range(1, ProductImportTemplate.Headers.Count)
+            .Select(column => sheet.Cell(ProductImportTemplate.HeaderRow, column).GetString())
+            .ToArray();
+        Assert.Equal(ProductImportTemplate.Headers, headerRow);
         Assert.Equal(3, sheet.LastRowUsed()!.RowNumber()); // header + 2 sample rows
     }
 

@@ -1,6 +1,7 @@
 using ClosedXML.Excel;
 using MayaPro.WarehouseApi.Modules.Exports.Application;
 using MayaPro.WarehouseApi.Modules.Exports.Application.UseCases.ExportProductsTemplate;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Exports.Tests;
 
@@ -34,19 +35,17 @@ public sealed class ExportProductsTemplateHandlerTests
         using var workbook = new XLWorkbook(stream);
         IXLWorksheet sheet = workbook.Worksheet(1);
 
-        Assert.Equal("Ad*", sheet.Cell(1, 1).GetString());
-        Assert.Equal("Kateqoriya", sheet.Cell(1, 2).GetString());
-        Assert.Equal("Barkod", sheet.Cell(1, 3).GetString());
-        Assert.Equal("Alış qiyməti*", sheet.Cell(1, 4).GetString());
-        Assert.Equal("Satış qiyməti*", sheet.Cell(1, 5).GetString());
-        Assert.Equal("Miqdar*", sheet.Cell(1, 6).GetString());
-        Assert.Equal("Min stok", sheet.Cell(1, 7).GetString());
-        Assert.Equal("Anbar", sheet.Cell(1, 8).GetString());
-        Assert.Equal("Mağaza", sheet.Cell(1, 9).GetString());
-        Assert.Equal("Rəf", sheet.Cell(1, 10).GetString());
-        Assert.Equal("Qutu", sheet.Cell(1, 11).GetString());
-        Assert.Equal("Xüsusiyyətlər", sheet.Cell(1, 12).GetString());
-        Assert.Equal("Qeyd", sheet.Cell(1, 13).GetString());
+        // The written header row is the shared contract the Products import validates against, verbatim —
+        // asserting against the constant is what keeps the produced file and the accepted file in step.
+        string[] written = Enumerable
+            .Range(1, ProductImportTemplate.Headers.Count)
+            .Select(column => sheet.Cell(ProductImportTemplate.HeaderRow, column).GetString())
+            .ToArray();
+
+        Assert.Equal(ProductImportTemplate.Headers, written);
+        Assert.Equal("Ad*", written[0]); // the caption itself is part of the contract, not just its slot
+        Assert.Equal("Qeyd", written[^1]);
+        Assert.Empty(sheet.Cell(ProductImportTemplate.HeaderRow, written.Length + 1).GetString());
         Assert.True(sheet.Cell(1, 1).Style.Font.Bold);
 
         int lastRow = sheet.LastRowUsed()!.RowNumber();

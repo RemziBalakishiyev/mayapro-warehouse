@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.Modules.Products.Application.Imports;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CommitProductsImport;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.PreviewProductsImport;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -21,11 +22,17 @@ internal static class ImportsEndpoints
             .RequireAuthorization(OwnerOrManager);
 
         group.MapPost("/products/preview", async (
-                IFormFile? file,
+                HttpContext http,
                 PreviewProductsImportHandler handler,
                 CancellationToken ct) =>
             {
-                var result = await handler.Handle(file, ct);
+                IFormFile? file = await ReadUploadedFileAsync(http, ct);
+                if (file is null)
+                    return Result.Failure<ImportPreviewResponse>(ImportErrors.EmptyFile).ToHttpResult();
+
+                // Unwrapping the multipart part is the endpoint's job; the use case only reads a stream.
+                await using Stream content = file.OpenReadStream();
+                var result = await handler.Handle(content, file.Length, ct);
                 return result.ToHttpResult();
             })
             // A form-file parameter makes ASP.NET Core require antiforgery middleware by default (CSRF
@@ -33,6 +40,7 @@ internal static class ImportsEndpoints
             // antiforgery infrastructure at all — the JWT itself is the CSRF defence — so it is disabled
             // explicitly here, the same way a SPA's API client uploads any other file.
             .DisableAntiforgery()
+            .Accepts<IFormFile>("multipart/form-data") // keeps the Swagger upload box despite the manual read
             .WithName("PreviewProductsImport");
 
         group.MapPost("/products/commit", async (
@@ -44,5 +52,27 @@ internal static class ImportsEndpoints
                 return result.ToHttpResult();
             })
             .WithName("CommitProductsImport");
+    }
+
+    /// <summary>
+    /// Pulls the uploaded file out of the multipart body, or returns null when there is nothing usable —
+    /// no file part, the wrong content type, or a body the form reader cannot parse. Read by hand rather
+    /// than through an <c>IFormFile</c> parameter because model binding turns an unreadable body into an
+    /// unhandled exception (a 500); for this endpoint "no usable file" is the plain 400 of AC-5.
+    /// </summary>
+    private static async Task<IFormFile?> ReadUploadedFileAsync(HttpContext http, CancellationToken ct)
+    {
+        if (!http.Request.HasFormContentType)
+            return null;
+
+        try
+        {
+            IFormFileCollection files = (await http.Request.ReadFormAsync(ct)).Files;
+            return files["file"] ?? files.FirstOrDefault();
+        }
+        catch (Exception ex) when (ex is InvalidDataException or BadHttpRequestException or IOException)
+        {
+            return null;
+        }
     }
 }

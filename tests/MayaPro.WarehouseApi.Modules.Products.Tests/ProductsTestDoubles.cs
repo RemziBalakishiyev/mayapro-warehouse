@@ -1,7 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Products.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
-using Microsoft.AspNetCore.Http;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Tests;
 
@@ -62,27 +61,4 @@ internal sealed class FakeDateProvider(DateTime? utcNow = null) : IDateProvider
 
     public (DateTime StartUtc, DateTime EndUtc) LocalDayRangeUtc(DateOnly localDate) =>
         (localDate.ToDateTime(TimeOnly.MinValue), localDate.AddDays(1).ToDateTime(TimeOnly.MinValue));
-}
-
-/// <summary>Wraps a byte array as the multipart-upload <see cref="IFormFile"/> the preview handler reads.</summary>
-internal sealed class FakeFormFile(byte[] content, string fileName = "mallar.xlsx") : IFormFile
-{
-    public string ContentType => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-
-    public string ContentDisposition => $"form-data; name=\"file\"; filename=\"{fileName}\"";
-
-    public IHeaderDictionary Headers { get; } = new HeaderDictionary();
-
-    public long Length => content.Length;
-
-    public string Name => "file";
-
-    public string FileName => fileName;
-
-    public Stream OpenReadStream() => new MemoryStream(content, writable: false);
-
-    public void CopyTo(Stream target) => OpenReadStream().CopyTo(target);
-
-    public Task CopyToAsync(Stream target, CancellationToken cancellationToken = default) =>
-        OpenReadStream().CopyToAsync(target, cancellationToken);
 }

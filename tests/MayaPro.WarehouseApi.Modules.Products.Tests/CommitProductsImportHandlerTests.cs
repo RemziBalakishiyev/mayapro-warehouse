@@ -1,16 +1,18 @@
+using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Products.Application.Imports;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CommitProductsImport;
 using MayaPro.WarehouseApi.Modules.Products.Application.UseCases.PreviewProductsImport;
 using MayaPro.WarehouseApi.Modules.Products.Domain;
 using MayaPro.WarehouseApi.Modules.Products.Infrastructure;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Tests;
 
 /// <summary>
 /// Unit tests for <see cref="CommitProductsImportHandler"/> — the happy path (new category + new product +
-/// updated product, one activity entry), that error rows are always skipped, and the three ways a token can
-/// fail to commit (unknown, expired, already consumed). Mirrors BE#13's AC-9 through AC-13.
+/// updated product, one activity entry), that error rows are always skipped, and the ways a token can fail
+/// to commit (unknown, expired, already consumed, issued to another user). Mirrors BE#13's AC-9 to AC-13.
 /// </summary>
 public sealed class CommitProductsImportHandlerTests
 {
@@ -23,22 +25,19 @@ public sealed class CommitProductsImportHandlerTests
         await db.SaveChangesAsync();
 
         var cache = new ImportTokenCache(new FakeDateProvider());
-        var preview = new PreviewProductsImportHandler(db, cache);
+        var user = new FakeCurrentUser();
 
         byte[] file = ImportWorkbookBuilder.Build([
             ImportWorkbookBuilder.Row(name: "Yeni mal", category: "Aksesuar", barcode: "NEW-1", purchasePrice: 15, salePrice: 25, quantity: 20),
             ImportWorkbookBuilder.Row(name: "Yenilənmiş mal", barcode: "EXIST-1", purchasePrice: 6, salePrice: 12, quantity: 40)
         ]);
 
-        var previewResult = await preview.Handle(new FakeFormFile(file), default);
-        Assert.True(previewResult.IsSuccess);
-        string token = previewResult.Value.ImportToken;
+        string token = await PreviewAsync(db, cache, user, file);
 
         var activityLogger = new FakeActivityLogger();
-        var commit = new CommitProductsImportHandler(
-            db, new FakeUnitOfWork(db), cache, activityLogger, new FakeCurrentUser());
+        CommitProductsImportHandler commit = NewCommitHandler(db, cache, user, activityLogger);
 
-        var commitResult = await commit.Handle(new CommitProductsImportCommand(token), default);
+        Result commitResult = await commit.Handle(new CommitProductsImportCommand(token), default);
 
         Assert.True(commitResult.IsSuccess);
 
@@ -67,22 +66,17 @@ public sealed class CommitProductsImportHandlerTests
     {
         await using ProductsDbContext db = NewDb();
         var cache = new ImportTokenCache(new FakeDateProvider());
-        var preview = new PreviewProductsImportHandler(db, cache);
+        var user = new FakeCurrentUser();
 
         byte[] file = ImportWorkbookBuilder.Build([
             ImportWorkbookBuilder.Row(name: "Sağlam sətir", barcode: "OK-1"),
             ImportWorkbookBuilder.Row(name: "Xətalı sətir", salePrice: -5)
         ]);
 
-        var previewResult = await preview.Handle(new FakeFormFile(file), default);
-        Assert.True(previewResult.IsSuccess);
-        Assert.Equal(1, previewResult.Value.Summary.Creates);
-        Assert.Equal(1, previewResult.Value.Summary.Errors);
+        string token = await PreviewAsync(db, cache, user, file);
 
-        var commit = new CommitProductsImportHandler(
-            db, new FakeUnitOfWork(db), cache, new FakeActivityLogger(), new FakeCurrentUser());
-
-        var commitResult = await commit.Handle(new CommitProductsImportCommand(previewResult.Value.ImportToken), default);
+        Result commitResult = await NewCommitHandler(db, cache, user)
+            .Handle(new CommitProductsImportCommand(token), default);
 
         Assert.True(commitResult.IsSuccess);
         Assert.Equal(1, await db.Products.CountAsync());
@@ -90,14 +84,68 @@ public sealed class CommitProductsImportHandlerTests
     }
 
     [Fact]
+    public async Task Update_Row_Whose_Product_Was_Deleted_Between_Preview_And_Commit_Is_Skipped()
+    {
+        await using ProductsDbContext db = NewDb();
+        Product existing = CreateProduct("Silinəcək mal", barcode: "GONE-1", purchasePrice: 5, salePrice: 10, quantity: 3);
+        db.Products.Add(existing);
+        await db.SaveChangesAsync();
+
+        var cache = new ImportTokenCache(new FakeDateProvider());
+        var user = new FakeCurrentUser();
+
+        byte[] file = ImportWorkbookBuilder.Build([
+            ImportWorkbookBuilder.Row(name: "Yenilənəcək idi", barcode: "GONE-1"),
+            ImportWorkbookBuilder.Row(name: "Yeni mal", barcode: "STILL-NEW-1")
+        ]);
+
+        string token = await PreviewAsync(db, cache, user, file);
+
+        db.Products.Remove(existing);
+        await db.SaveChangesAsync();
+
+        var activityLogger = new FakeActivityLogger();
+        Result result = await NewCommitHandler(db, cache, user, activityLogger)
+            .Handle(new CommitProductsImportCommand(token), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, await db.Products.CountAsync());
+        Assert.Equal("Excel import: 1 yeni, 0 yenilənmə", Assert.Single(activityLogger.Entries).Message);
+    }
+
+    [Fact]
+    public async Task A_Barcode_Taken_Between_Preview_And_Commit_Aborts_The_Whole_Import()
+    {
+        await using ProductsDbContext db = NewDb();
+        var cache = new ImportTokenCache(new FakeDateProvider());
+        var user = new FakeCurrentUser();
+
+        byte[] file = ImportWorkbookBuilder.Build([
+            ImportWorkbookBuilder.Row(name: "Idxal malı", barcode: "RACE-1")
+        ]);
+
+        string token = await PreviewAsync(db, cache, user, file);
+
+        // Someone adds that barcode by hand while the preview is on screen.
+        db.Products.Add(CreateProduct("Əl ilə əlavə", barcode: "RACE-1", purchasePrice: 1, salePrice: 2, quantity: 1));
+        await db.SaveChangesAsync();
+
+        Result result = await NewCommitHandler(db, cache, user)
+            .Handle(new CommitProductsImportCommand(token), default);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(ImportErrors.BarcodeConflict, result.Error);
+        Assert.Equal(1, await db.Products.CountAsync()); // only the hand-added one
+    }
+
+    [Fact]
     public async Task Unknown_Token_Returns_TokenNotFound_As_410()
     {
         await using ProductsDbContext db = NewDb();
         var cache = new ImportTokenCache(new FakeDateProvider());
-        var commit = new CommitProductsImportHandler(
-            db, new FakeUnitOfWork(db), cache, new FakeActivityLogger(), new FakeCurrentUser());
 
-        var result = await commit.Handle(new CommitProductsImportCommand("never-issued-token"), default);
+        Result result = await NewCommitHandler(db, cache, new FakeCurrentUser())
+            .Handle(new CommitProductsImportCommand("never-issued-token"), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(ImportErrors.TokenNotFound, result.Error);
@@ -109,21 +157,19 @@ public sealed class CommitProductsImportHandlerTests
         await using ProductsDbContext db = NewDb();
         var clock = new FakeDateProvider();
         var cache = new ImportTokenCache(clock);
-        var preview = new PreviewProductsImportHandler(db, cache);
+        var user = new FakeCurrentUser();
 
         byte[] file = ImportWorkbookBuilder.Build([ImportWorkbookBuilder.Row(barcode: "TTL-1")]);
-        var previewResult = await preview.Handle(new FakeFormFile(file), default);
-        Assert.True(previewResult.IsSuccess);
+        string token = await PreviewAsync(db, cache, user, file);
 
         // 10 dəqiqədən sonra — real vaxt gözləmədən, saatı irəli çəkirik.
         clock.UtcNow = clock.UtcNow.AddMinutes(11);
 
-        var commit = new CommitProductsImportHandler(
-            db, new FakeUnitOfWork(db), cache, new FakeActivityLogger(), new FakeCurrentUser());
-        var commitResult = await commit.Handle(new CommitProductsImportCommand(previewResult.Value.ImportToken), default);
+        Result result = await NewCommitHandler(db, cache, user)
+            .Handle(new CommitProductsImportCommand(token), default);
 
-        Assert.True(commitResult.IsFailure);
-        Assert.Equal(ImportErrors.TokenExpired, commitResult.Error);
+        Assert.True(result.IsFailure);
+        Assert.Equal(ImportErrors.TokenExpired, result.Error);
         Assert.Equal(0, await db.Products.CountAsync());
     }
 
@@ -132,21 +178,46 @@ public sealed class CommitProductsImportHandlerTests
     {
         await using ProductsDbContext db = NewDb();
         var cache = new ImportTokenCache(new FakeDateProvider());
-        var preview = new PreviewProductsImportHandler(db, cache);
+        var user = new FakeCurrentUser();
 
         byte[] file = ImportWorkbookBuilder.Build([ImportWorkbookBuilder.Row(barcode: "ONCE-1")]);
-        var previewResult = await preview.Handle(new FakeFormFile(file), default);
-        string token = previewResult.Value.ImportToken;
+        string token = await PreviewAsync(db, cache, user, file);
 
-        var commit = new CommitProductsImportHandler(
-            db, new FakeUnitOfWork(db), cache, new FakeActivityLogger(), new FakeCurrentUser());
+        CommitProductsImportHandler commit = NewCommitHandler(db, cache, user);
 
-        var first = await commit.Handle(new CommitProductsImportCommand(token), default);
+        Result first = await commit.Handle(new CommitProductsImportCommand(token), default);
         Assert.True(first.IsSuccess);
 
-        var second = await commit.Handle(new CommitProductsImportCommand(token), default);
+        Result second = await commit.Handle(new CommitProductsImportCommand(token), default);
         Assert.True(second.IsFailure);
+        Assert.Equal(ImportErrors.TokenNotFound, second.Error);
         Assert.Equal(1, await db.Products.CountAsync()); // not applied twice
+    }
+
+    [Fact]
+    public async Task Another_Users_Token_Cannot_Be_Committed_And_Stays_Usable_By_Its_Owner()
+    {
+        await using ProductsDbContext db = NewDb();
+        var cache = new ImportTokenCache(new FakeDateProvider());
+        var owner = new FakeCurrentUser();
+        var stranger = new FakeCurrentUser();
+
+        byte[] file = ImportWorkbookBuilder.Build([ImportWorkbookBuilder.Row(barcode: "MINE-1")]);
+        string token = await PreviewAsync(db, cache, owner, file);
+
+        Result stolen = await NewCommitHandler(db, cache, stranger)
+            .Handle(new CommitProductsImportCommand(token), default);
+
+        Assert.True(stolen.IsFailure);
+        Assert.Equal(ImportErrors.TokenNotFound, stolen.Error);
+        Assert.Equal(0, await db.Products.CountAsync());
+
+        // The rejection must not consume the token: its owner can still commit.
+        Result mine = await NewCommitHandler(db, cache, owner)
+            .Handle(new CommitProductsImportCommand(token), default);
+
+        Assert.True(mine.IsSuccess);
+        Assert.Equal(1, await db.Products.CountAsync());
     }
 
     [Fact]
@@ -154,14 +225,52 @@ public sealed class CommitProductsImportHandlerTests
     {
         await using ProductsDbContext db = NewDb();
         var cache = new ImportTokenCache(new FakeDateProvider());
-        var commit = new CommitProductsImportHandler(
-            db, new FakeUnitOfWork(db), cache, new FakeActivityLogger(), new FakeCurrentUser());
 
-        var result = await commit.Handle(new CommitProductsImportCommand(null), default);
+        Result result = await NewCommitHandler(db, cache, new FakeCurrentUser())
+            .Handle(new CommitProductsImportCommand(null), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(ImportErrors.TokenNotFound, result.Error);
     }
+
+    [Fact]
+    public async Task A_Failed_Transaction_Leaves_The_Token_Claimable_So_The_User_Can_Retry()
+    {
+        await using ProductsDbContext db = NewDb();
+        var cache = new ImportTokenCache(new FakeDateProvider());
+        var user = new FakeCurrentUser();
+
+        byte[] file = ImportWorkbookBuilder.Build([ImportWorkbookBuilder.Row(barcode: "RETRY-1")]);
+        string token = await PreviewAsync(db, cache, user, file);
+
+        var failing = new CommitProductsImportHandler(
+            db, new ThrowingUnitOfWork(), cache, new FakeActivityLogger(), user);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => failing.Handle(new CommitProductsImportCommand(token), default));
+
+        Result retry = await NewCommitHandler(db, cache, user)
+            .Handle(new CommitProductsImportCommand(token), default);
+
+        Assert.True(retry.IsSuccess);
+        Assert.Equal(1, await db.Products.CountAsync());
+    }
+
+    private static async Task<string> PreviewAsync(
+        ProductsDbContext db, IImportTokenCache cache, ICurrentUser user, byte[] file)
+    {
+        var preview = new PreviewProductsImportHandler(db, cache, user);
+        Result<ImportPreviewResponse> result = await preview.Handle(new MemoryStream(file), file.Length, default);
+        Assert.True(result.IsSuccess);
+        return result.Value.ImportToken;
+    }
+
+    private static CommitProductsImportHandler NewCommitHandler(
+        ProductsDbContext db,
+        IImportTokenCache cache,
+        ICurrentUser user,
+        FakeActivityLogger? activityLogger = null) =>
+        new(db, new FakeUnitOfWork(db), cache, activityLogger ?? new FakeActivityLogger(), user);
 
     private static Product CreateProduct(
         string name, string barcode, decimal purchasePrice, decimal salePrice, int quantity) =>
@@ -191,5 +300,12 @@ public sealed class CommitProductsImportHandlerTests
             .UseInMemoryDatabase($"products-import-commit-tests-{Guid.NewGuid()}")
             .Options;
         return new ProductsDbContext(options);
+    }
+
+    /// <summary>Stands in for a database that refuses the transaction — the rollback path.</summary>
+    private sealed class ThrowingUnitOfWork : IUnitOfWork
+    {
+        public Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("transaction could not be started");
     }
 }
