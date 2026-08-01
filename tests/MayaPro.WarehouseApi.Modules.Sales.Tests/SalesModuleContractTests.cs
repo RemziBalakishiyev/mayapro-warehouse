@@ -139,6 +139,37 @@ public sealed class SalesModuleContractTests
         Assert.All(outstanding, s => Assert.Equal("Test malı", s.ProductName));
     }
 
+    /// <summary>
+    /// Two owing sales stamped at the exact same instant must still come back in one fixed order — the
+    /// Id tiebreak — rather than whatever a plain <c>ORDER BY Date</c> happens to return, which a database
+    /// is not required to keep stable across executions when the sort column is not unique.
+    /// </summary>
+    [Fact]
+    public async Task GetOutstandingSales_Breaks_Ties_On_The_Same_Date_By_Id()
+    {
+        await using SalesDbContext db = NewDb();
+        Guid customerId = Guid.NewGuid();
+        DateTime tiedDate = new(2026, 1, 1, 9, 0, 0, DateTimeKind.Utc);
+
+        Sale higherId = Manual(total: 100m, PaymentType.Credit, customerId, paidAmount: 0m);
+        Sale lowerId = Manual(total: 200m, PaymentType.Credit, customerId, paidAmount: 0m);
+        db.Sales.AddRange(higherId, lowerId);
+        await db.SaveChangesAsync();
+        db.Entry(higherId).Property(s => s.Date).CurrentValue = tiedDate;
+        db.Entry(lowerId).Property(s => s.Date).CurrentValue = tiedDate;
+        await db.SaveChangesAsync();
+
+        // Whichever of the two rows was created first, the one with the smaller Id must sort first.
+        (Sale first, Sale second) = higherId.Id.CompareTo(lowerId.Id) < 0 ? (higherId, lowerId) : (lowerId, higherId);
+
+        SalesModuleContract contract = NewContract(db);
+        IReadOnlyList<CustomerOutstandingSale> outstanding = await contract.GetOutstandingSalesAsync(default);
+
+        Assert.Equal(2, outstanding.Count);
+        Assert.Equal(first.Id, outstanding[0].SaleId);
+        Assert.Equal(second.Id, outstanding[1].SaleId);
+    }
+
     // ── QA (BE#15) — a deleted sale must stop counting toward the day's totals ─────────────────────────
 
     [Fact]

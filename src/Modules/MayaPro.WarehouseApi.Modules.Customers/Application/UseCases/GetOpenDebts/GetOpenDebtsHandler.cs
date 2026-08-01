@@ -57,15 +57,18 @@ public sealed class GetOpenDebtsHandler(
         // their sales behind (CustomerId is a plain id, no FK), and such a row has nobody to bill.
         Dictionary<Guid, List<DebtSource>> sourcesByCustomer = adjustments
             .Select(a => new DebtSource(
-                a.CustomerId, CustomerHistoryEntryType.InitialDebt, a.Date, InitialDebtDescription, a.Amount))
+                a.Id, a.CustomerId, CustomerHistoryEntryType.InitialDebt, a.Date, InitialDebtDescription, a.Amount))
             .Concat(outstandingSales.Select(s => new DebtSource(
+                s.SaleId,
                 s.CustomerId,
                 CustomerHistoryEntryType.Sale,
                 s.Date,
                 $"{s.ProductName} × {s.Quantity}",
                 s.RemainingAmount)))
             .GroupBy(s => s.CustomerId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Date).ToList());
+            // The Id tiebreak keeps FIFO allocation deterministic when two sources of the same customer
+            // share the exact same instant (e.g. an opening balance and a same-day sale).
+            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Date).ThenBy(s => s.SourceId).ToList());
 
         DateOnly today = dateProvider.Today;
         var rows = new List<OpenDebtDto>();
@@ -109,10 +112,12 @@ public sealed class GetOpenDebtsHandler(
         }
 
         // Oldest debt first. Sorting by the instant (rather than by the whole-day DaysOld) keeps rows from
-        // the same day in a stable order; the customer name breaks ties between simultaneous sources.
+        // the same day in a stable order; the customer name breaks ties between simultaneous sources, and
+        // the customer id makes that final tiebreak deterministic even when two customers share a name.
         List<OpenDebtDto> ordered = rows
             .OrderBy(r => r.SourceDate)
             .ThenBy(r => r.CustomerName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(r => r.CustomerId)
             .ToList();
 
         return new OpenDebtsDto(ordered, ordered.Sum(r => r.Remaining));
@@ -142,8 +147,13 @@ public sealed class GetOpenDebtsHandler(
             customer.Debt);
     }
 
-    /// <summary>One debt source before FIFO allocation: what raised the debt, when, and by how much.</summary>
+    /// <summary>
+    /// One debt source before FIFO allocation: what raised the debt, when, and by how much.
+    /// <see cref="SourceId"/> (the adjustment's or sale's own id) is only a deterministic tiebreak for
+    /// sources that share the exact same <see cref="Date"/> — it never reaches the response.
+    /// </summary>
     private sealed record DebtSource(
+        Guid SourceId,
         Guid CustomerId,
         string Source,
         DateTime Date,

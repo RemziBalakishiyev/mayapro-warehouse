@@ -223,6 +223,38 @@ public sealed class GetOpenDebtsHandlerTests
         Assert.Equal(0m, result.TotalRemaining);
     }
 
+    /// <summary>
+    /// Two sources of the same customer stamped at the exact same instant (a rare but possible tie) must
+    /// still be written off in one fixed, reproducible order — not whatever order the sales happened to
+    /// arrive in from the Sales module — so the FIFO split can never flip between two identical requests.
+    /// </summary>
+    [Fact]
+    public async Task Sources_Tied_On_The_Same_Instant_Are_Allocated_In_A_Fixed_Deterministic_Order()
+    {
+        await using CustomersDbContext db = NewDb();
+        Customer customer = AddCustomer(db, "Eyni anlıq", debt: 300m);
+        AddPayment(db, customer.Id, 80m, Jan1.AddDays(5));
+        await db.SaveChangesAsync();
+
+        var lowerId = new Guid("00000000-0000-0000-0000-000000000001");
+        var higherId = new Guid("00000000-0000-0000-0000-000000000002");
+        CustomerOutstandingSale first = new(lowerId, customer.Id, Jan1, "Kabel", 1, RemainingAmount: 100m);
+        CustomerOutstandingSale second = new(higherId, customer.Id, Jan1, "Rozetka", 1, RemainingAmount: 200m);
+
+        // Feed the two tied sources in reverse (higher id first) — the allocation must not depend on that.
+        GetOpenDebtsHandler handler = NewHandler(db, second, first);
+
+        OpenDebtsDto result = await handler.Handle(default);
+
+        Assert.Equal(2, result.Items.Count);
+        OpenDebtDto lowerIdRow = Assert.Single(result.Items, r => r.Description == "Kabel × 1");
+        OpenDebtDto higherIdRow = Assert.Single(result.Items, r => r.Description == "Rozetka × 1");
+        Assert.Equal(80m, lowerIdRow.PaidSoFar);
+        Assert.Equal(20m, lowerIdRow.Remaining);
+        Assert.Equal(0m, higherIdRow.PaidSoFar);
+        Assert.Equal(200m, higherIdRow.Remaining);
+    }
+
     private static CustomerOutstandingSale Sale(
         Guid customerId, DateTime date, string productName, int quantity, decimal remaining) =>
         new(Guid.NewGuid(), customerId, date, productName, quantity, remaining);
