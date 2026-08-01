@@ -26,4 +26,11 @@ public static class ExpenseErrors
     /// <summary>An unrecognised <c>source</c> query filter (must be "general" or "product").</summary>
     public static readonly Error InvalidSource =
         new("Expenses.InvalidSource", "Yanlış xərc mənbəyi");
+
+    /// <summary>
+    /// A <c>from</c>/<c>to</c> query filter that is malformed (not <c>yyyy-MM-dd</c>) or where
+    /// <c>from</c> is later than <c>to</c>.
+    /// </summary>
+    public static readonly Error InvalidDateRange =
+        new("Expenses.InvalidDateRange", "Yanlış tarix aralığı");
 }
