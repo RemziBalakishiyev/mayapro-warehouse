@@ -104,6 +104,43 @@ public sealed class GetExpensesHandlerTests
     }
 
     [Fact]
+    public async Task From_And_To_Filter_Returns_Only_Expenses_In_The_Inclusive_Range()
+    {
+        await using ExpensesDbContext db = NewDb();
+        Seed(db,
+            (ExpenseSource.General, null, new DateTime(2026, 7, 4)),  // before range
+            (ExpenseSource.General, null, new DateTime(2026, 7, 5)),  // range start (inclusive)
+            (ExpenseSource.General, null, new DateTime(2026, 7, 10)), // inside range
+            (ExpenseSource.General, null, new DateTime(2026, 7, 15)), // range end (inclusive)
+            (ExpenseSource.General, null, new DateTime(2026, 7, 16))); // after range
+        await db.SaveChangesAsync();
+
+        var handler = new GetExpensesHandler(db);
+        var result = await handler.Handle(month: null, source: null, default, from: "2026-07-05", to: "2026-07-15");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.Count);
+        Assert.All(result.Value, e => Assert.InRange(e.Date, new DateTime(2026, 7, 5), new DateTime(2026, 7, 15)));
+    }
+
+    [Fact]
+    public async Task From_Or_To_Present_Ignores_The_Month_Filter()
+    {
+        await using ExpensesDbContext db = NewDb();
+        Seed(db,
+            (ExpenseSource.General, null, InMonth),      // July — matches month filter too
+            (ExpenseSource.General, null, OtherMonth));  // June — outside month filter, inside from/to range
+        await db.SaveChangesAsync();
+
+        var handler = new GetExpensesHandler(db);
+        // month=2026-07 would normally exclude the June row, but from/to spans both months.
+        var result = await handler.Handle(month: "2026-07", source: null, default, from: "2026-06-01", to: "2026-07-31");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.Count);
+    }
+
+    [Fact]
     public async Task Rows_Are_Newest_First_And_Carry_The_Category_Snapshot()
     {
         await using ExpensesDbContext db = NewDb();
