@@ -150,6 +150,35 @@ internal sealed class SalesModuleContract(
             .ToList();
     }
 
+    public async Task<IReadOnlyList<CustomerOutstandingSale>> GetOutstandingSalesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        // One round trip over every customer's still-owing sales. RemainingAmount is a computed property
+        // (not a column), so the remaining balance is expressed with the mapped fields to stay translatable.
+        // The Id tiebreak makes the order deterministic across executions when two sales share a Date (a
+        // plain ORDER BY on a non-unique column is not guaranteed stable by the database).
+        var rows = await db.Sales
+            .AsNoTracking()
+            .Where(s => s.CustomerId != null && s.TotalAmount - s.PaidAmount > 0m)
+            .OrderBy(s => s.Date)
+            .ThenBy(s => s.Id)
+            .Select(s => new
+            {
+                s.Id,
+                CustomerId = s.CustomerId!.Value,
+                s.Date,
+                s.ProductName,
+                s.Quantity,
+                Remaining = s.TotalAmount - s.PaidAmount
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new CustomerOutstandingSale(
+                r.Id, r.CustomerId, r.Date, r.ProductName, r.Quantity, r.Remaining))
+            .ToList();
+    }
+
     public async Task<Result> DeleteCreditSaleAsync(
         Guid saleId,
         Guid customerId,

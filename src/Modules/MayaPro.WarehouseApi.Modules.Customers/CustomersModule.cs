@@ -8,6 +8,7 @@ using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomer
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetOpenDebts;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.UpdateCustomer;
 using MayaPro.WarehouseApi.Modules.Customers.Endpoints;
 using MayaPro.WarehouseApi.Modules.Customers.Infrastructure;
@@ -56,6 +57,7 @@ public sealed class CustomersModule : IModule
         services.AddScoped<CreateCustomerHandler>();
         services.AddScoped<GetCustomerPaymentsHandler>();
         services.AddScoped<GetCustomerHistoryHandler>();
+        services.AddScoped<GetOpenDebtsHandler>();
         services.AddScoped<AddCustomerPaymentHandler>();
         services.AddScoped<UpdateCustomerHandler>();
         services.AddScoped<DeleteCustomerHandler>();

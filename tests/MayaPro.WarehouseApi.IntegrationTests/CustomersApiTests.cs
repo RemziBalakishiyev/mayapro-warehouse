@@ -318,6 +318,106 @@ public sealed class CustomersApiTests : IAsyncLifetime
         Assert.Equal(30m, saleEntry.Amount);
     }
 
+    // ── BE#21 — açıq borclar siyahısı (FIFO bölgü) ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// TC1 end-to-end: two credit sales (200 then 300) and a 150 payment — FIFO writes the payment off
+    /// against the oldest sale, so it is left owing 50 while the newer one still owes its full 300, and the
+    /// customer's remaining rows add back up to their stored debt.
+    /// </summary>
+    [Fact]
+    public async Task Open_Debts_Write_A_Payment_Off_Against_The_Oldest_Source_First()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("OPEN-DEBT-FIFO", quantity: 20, salePrice: 100m);
+        var customer = await client.CreateCustomerAsync("Açıq borclu", debt: 0m);
+
+        await CreditSaleAsync(client, product.Id, customer.Id, quantity: 2, salePrice: 100m); // 200
+        await CreditSaleAsync(client, product.Id, customer.Id, quantity: 3, salePrice: 100m); // 300
+
+        HttpResponseMessage payment = await client.PostAsJsonAsync(
+            $"/api/customers/{customer.Id}/payments", new { amount = 150m, note = (string?)null });
+        payment.EnsureSuccessStatusCode();
+
+        var openDebts = (await client.GetFromJsonAsync<IntegrationTestHelpers.OpenDebtsDto>(
+            "/api/customers/open-debts"))!;
+        List<IntegrationTestHelpers.OpenDebtDto> rows =
+            openDebts.Items.Where(r => r.CustomerId == customer.Id).ToList();
+
+        Assert.Equal(2, rows.Count);
+
+        Assert.Equal("sale", rows[0].Source);
+        Assert.Equal($"{product.Name} × 2", rows[0].Description);
+        Assert.Equal(200m, rows[0].OriginalAmount);
+        Assert.Equal(150m, rows[0].PaidSoFar);
+        Assert.Equal(50m, rows[0].Remaining);
+        Assert.Equal(0, rows[0].DaysOld);
+
+        Assert.Equal($"{product.Name} × 3", rows[1].Description);
+        Assert.Equal(300m, rows[1].OriginalAmount);
+        Assert.Equal(0m, rows[1].PaidSoFar);
+        Assert.Equal(300m, rows[1].Remaining);
+
+        // Oldest first, Σ remaining = the customer's debt, and the total covers every row in the response.
+        Assert.True(rows[0].SourceDate <= rows[1].SourceDate);
+        Assert.Equal((await client.GetCustomerAsync(customer.Id)).Debt, rows.Sum(r => r.Remaining));
+        Assert.Equal(openDebts.Items.Sum(r => r.Remaining), openDebts.TotalRemaining);
+    }
+
+    /// <summary>
+    /// TC2/TC3 end-to-end: the opening balance is its own source and is written off first — once a payment
+    /// covers it exactly, it disappears from the list while the later sale stays untouched.
+    /// </summary>
+    [Fact]
+    public async Task Open_Debts_Drop_A_Fully_Paid_Source_And_List_The_Opening_Balance()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("OPEN-DEBT-SETTLED", quantity: 20, salePrice: 100m);
+        var customer = await client.CreateCustomerAsync("İlkin borclu, sonra nisyə", debt: 100m);
+
+        await CreditSaleAsync(client, product.Id, customer.Id, quantity: 3, salePrice: 100m); // 300
+
+        // Before any payment: the opening balance leads, the sale follows.
+        var before = (await client.GetFromJsonAsync<IntegrationTestHelpers.OpenDebtsDto>(
+            "/api/customers/open-debts"))!;
+        List<IntegrationTestHelpers.OpenDebtDto> beforeRows =
+            before.Items.Where(r => r.CustomerId == customer.Id).ToList();
+        Assert.Equal(2, beforeRows.Count);
+        Assert.Equal("initialDebt", beforeRows[0].Source);
+        Assert.Equal("İlkin borc", beforeRows[0].Description);
+        Assert.Equal(100m, beforeRows[0].Remaining);
+
+        HttpResponseMessage payment = await client.PostAsJsonAsync(
+            $"/api/customers/{customer.Id}/payments", new { amount = 100m, note = (string?)null });
+        payment.EnsureSuccessStatusCode();
+
+        var after = (await client.GetFromJsonAsync<IntegrationTestHelpers.OpenDebtsDto>(
+            "/api/customers/open-debts"))!;
+        List<IntegrationTestHelpers.OpenDebtDto> afterRows =
+            after.Items.Where(r => r.CustomerId == customer.Id).ToList();
+
+        // The settled opening balance is gone; only the sale remains, still owing everything.
+        IntegrationTestHelpers.OpenDebtDto row = Assert.Single(afterRows);
+        Assert.Equal("sale", row.Source);
+        Assert.Equal(300m, row.Remaining);
+        Assert.Equal(0m, row.PaidSoFar);
+        Assert.Equal((await client.GetCustomerAsync(customer.Id)).Debt, afterRows.Sum(r => r.Remaining));
+    }
+
+    private static async Task CreditSaleAsync(
+        HttpClient client, Guid productId, Guid customerId, int quantity, decimal salePrice)
+    {
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId,
+            quantity,
+            salePrice,
+            paymentType = "Nisyə",
+            customerId
+        });
+        sale.EnsureSuccessStatusCode();
+    }
+
     [Fact]
     public async Task Credit_Sale_Still_Requires_Customer()
     {

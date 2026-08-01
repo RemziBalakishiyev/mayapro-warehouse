@@ -4,7 +4,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
-## Endpoint-lər (47)
+## Endpoint-lər (48)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
@@ -42,11 +42,14 @@ POST/PUT `/api/sales` optional `purchasePricePerUnit` (nullable decimal) qəbul 
 | Verb | Route | Auth |
 |---|---|---|
 | GET / POST | `/api/customers` | auth |
+| GET | `/api/customers/open-debts` | auth |
 | GET | `/api/customers/{id}/payments` · `/{id}/history` | auth |
 | POST | `/api/customers/{id}/payments` (`{amount, note}`) | auth |
 | PUT | `/api/customers/{id}` | O+M |
 | DELETE | `/api/customers/{id}/credits/{saleId}` | O+M |
 | DELETE | `/api/customers/{id}` | O |
+
+`GET /api/customers/open-debts` (BE#21) — bütün müştərilərin hələ bağlanmamış borc mənbələri: `{items[], totalRemaining}`. Hər sətir: `customerId`, `customerName`, `phone`, `source` (`"sale"` | `"initialDebt"`), `sourceDate` (UTC), `description` (satışda `«mal adı × say»`, ilkin borcda `«İlkin borc»`), `originalAmount` (satışda borc yaradan QALIQ, ilkin borcda məbləğ), `paidSoFar`, `remaining`, `daysOld` (Asia/Baku tam günləri). Ödənişlər FIFO — ən köhnə mənbədən başlayaraq — silinir; tam ödənilmiş mənbə siyahıya DÜŞMÜR. Sıralama: ən köhnə borc əvvəldə. Hesablama sorğu anında aparılır (ayrıca cədvəl yoxdur, dörd sorğu: müştərilər + ilkin borclar + qruplaşdırılmış ödəniş cəmləri + `ISalesModule.GetOutstandingSalesAsync`). Bir müştərinin `remaining` cəmi onun `Debt` sahəsi ilə üst-üstə düşməlidir — düşmürsə sorğu uğurla cavab verir, uyğunsuzluq yalnız warning kimi log-a yazılır. Silinmiş müştəriyə aid qalıqlı satış sətirləri siyahıya düşmür.
 
 ### Suppliers (`/api/suppliers`)
 | Verb | Route | Auth |

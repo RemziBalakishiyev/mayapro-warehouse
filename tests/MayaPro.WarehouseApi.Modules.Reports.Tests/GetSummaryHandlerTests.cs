@@ -240,6 +240,9 @@ public sealed class GetSummaryHandlerTests
         public Task<IReadOnlyList<CustomerSaleEntry>> GetSalesByCustomerAsync(
             Guid customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        public Task<IReadOnlyList<CustomerOutstandingSale>> GetOutstandingSalesAsync(
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<Result> DeleteCreditSaleAsync(
             Guid saleId, Guid customerId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
