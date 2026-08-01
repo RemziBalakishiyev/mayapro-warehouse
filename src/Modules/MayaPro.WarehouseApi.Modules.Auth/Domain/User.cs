@@ -34,6 +34,12 @@ public sealed class User : Entity
 
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>
+    /// The employee's agreed monthly salary (BE#28). Zero means "not set yet" — never null, so the
+    /// summary maths never has to special-case it. Changed only through <see cref="SetMonthlySalary"/>.
+    /// </summary>
+    public decimal MonthlySalary { get; private set; }
+
     public static User Create(
         string fullName,
         string phone,
@@ -46,4 +52,7 @@ public sealed class User : Entity
     public void Activate() => IsActive = true;
 
     public void Deactivate() => IsActive = false;
+
+    /// <summary>Sets the agreed monthly salary. The caller validates the amount (never negative).</summary>
+    public void SetMonthlySalary(decimal monthlySalary) => MonthlySalary = monthlySalary;
 }

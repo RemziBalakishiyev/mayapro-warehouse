@@ -13,6 +13,7 @@ public sealed class GetDashboardHandler(
     IProductsModule products,
     ISalesModule sales,
     IExpensesModule expenses,
+    ISalaryModule salary,
     ICustomersModule customers,
     ISuppliersModule suppliers,
     IDayEndModule dayEnd,
@@ -28,6 +29,10 @@ public sealed class GetDashboardHandler(
         IReadOnlyList<SalesReportRow> allSales = await sales.GetSalesAsync(null, null, ct);
         IReadOnlyList<ProductLastSale> lastSales = await sales.GetLastSaleDatesAsync(ct);
         IReadOnlyList<ExpenseReportRow> allExpenses = await expenses.GetExpensesAsync(null, null, ct);
+        // Salary payments are cash out of the drawer; the calculator folds them into today's expenses and
+        // into expected cash. Fetched over the full range for the same reason expenses are — expected cash
+        // works from the last closing, not from a single day.
+        IReadOnlyList<SalaryPaymentRow> allSalaryPayments = await salary.GetPaymentsAsync(null, null, ct);
         IReadOnlyList<RecentSaleInfo> recentSales = await sales.GetRecentSalesAsync(RecentCount, ct);
         IReadOnlyList<RecentPaymentInfo> recentPayments = await customers.GetRecentPaymentsAsync(RecentCount, ct);
         decimal totalCustomerDebt = await customers.GetTotalDebtAsync(ct);
@@ -45,6 +50,7 @@ public sealed class GetDashboardHandler(
             allSales,
             lastSales,
             allExpenses,
+            allSalaryPayments,
             recentSales,
             recentPayments,
             customerNames,

@@ -8,7 +8,8 @@ Rollar: **Owner** (`sahib`), **Manager** (`menecer`), **Seller** (`satici`). JWT
 
 - Seller edə bilər: satış (yaratma), müştəri yaratma/ödəniş qəbulu, stok korreksiyası, kateqoriya əlavəsi, baxış/export.
 - Yalnız Owner+Manager: məhsul CRUD, satış düzəlişi/silinməsi, təchizatçı yazıları, xərclər, müştəri düzəlişi, nisyə sətri silmə.
-- Yalnız Owner: gün bağlama, settings dəyişmə, müştəri/təchizatçı silmə.
+- Yalnız Owner: gün bağlama, settings dəyişmə, müştəri/təchizatçı silmə, işçinin aylıq maaşını təyin etmə, maaş sətri silmə.
+- Owner+Manager (əlavə): maaş sətri yazma və maaş xülasəsinə baxış.
 
 Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
@@ -72,12 +73,21 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
 ## Gün sonu qaydaları
 
-- `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`.
+- `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash`. BE#28-dən sonra `Expenses` günün xərcləri PLUS günün işçi maaş ÖDƏNİŞLƏRİdir (tutulmalar daxil deyil) — `ClosingDto`-ya yeni sahə əlavə edilmədi.
 - **`CashSales` = REAL alınan nağd** (BE#15): `PaidVia = Nağd` olan satışların `PaidAmount` cəmi — buraya nisyə satışın nağd ilkin ödənişi də daxildir, tam yekun isə YOX. `CardSales` eyni məntiqlə `PaidVia = Kart`. `CreditSales` = nisyə satışların QALIQLARININ cəmi (ödənilməmiş hissə). Nisyənin ödənilməmiş hissəsi kassa üzləşdirməsinə daxil deyil. Dashboard "kassada olmalı" göstəricisi eyni düsturla hesablanır (`SalesReportRow.ReceivedAmount`/`ReceivedVia`), ona görə gün sonu ilə uyğun gəlir.
 - ⚠️ `GET /api/reports/summary`-dəki `cashSales`/`cardSales`/`creditSales` HƏLƏ köhnə məntiqlə (ödəniş növü üzrə `TotalAmount` cəmi) hesablanır — BE#15 scope-una daxil deyil; qismən ödənişli satış olanda summary ilə gün sonu rəqəmləri fərqlənə bilər (ayrıca task).
 - Satış/xərc totalları HƏMİŞƏ server hesablayır; client yalnız kassa rəqəmlərini göndərir.
 - Bir günə bir bağlanış: `DayEnd.AlreadyClosed` (409); real qoruma `Date` üzərində unique index-dir.
 - "Bu gün" = Asia/Baku günü (ADR-0005).
+
+## İşçi maaşı qaydaları (BE#28)
+
+- Hər işçinin razılaşdırılmış aylıq maaşı var (`monthlySalary`, default `0` — «hələ təyin edilməyib»). Yalnız Owner dəyişir; mənfi ola bilməz.
+- Maaş hesabına iki cür sətir düşür: **ödəniş** (`payment` — maaş/avans, kassadan real pul çıxır) və **tutulma** (`deduction` — yemək, yol, cərimə; pul çıxmır, işçinin hesabından tutulur). Sətir yazmaq Owner+Manager, silmək yalnız Owner işidir.
+- Sətrin İKİ tarixi var və bir-birini əvəz etmir: **`date`** pulun kassadan çıxdığı andır, **`month`** (`yyyy-MM`) hansı ayın hesabına yazıldığıdır. Keçən ayın maaşını bu gün ödəmək = bugünkü `date` + keçən ayın `month`-u.
+- Aylıq hesab: `remaining = monthlySalary − paidTotal − deductionTotal`. MƏNFİ dəyər normaldır — «artıq ödənilib» deməkdir, kəsilmir və xəta vermir. Heç bir sətri olmayan işçi də xülasədə görünür.
+- Kassa təsiri: **yalnız ödənişlər** gün sonu xərc cəminə (`ExpectedCash` düsturunun `Expenses` hissəsinə) və dashboard-un `todayExpenses`/`expectedCash` göstəricilərinə düşür — `date` üzrə, Bakı günü ilə. Tutulmalar heç bir kassa rəqəminə TOXUNMUR.
+- Bütün işçilərin maaş siyahısı hazırda hər autentifikasiya olunmuş rola açıqdır (`GET /api/employees`) — maskalanma ayrıca task mövzusudur.
 
 ## Digər
 
@@ -87,6 +97,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
+
+2026-08-01 — BE#28: işçi maaşı qaydaları ayrıca bölmə oldu (aylıq maaş, ödəniş/tutulma, date≠month, mənfi qalıq, gün sonu təsiri); rol matrisi və gün sonu düsturu yeniləndi.
 
 2026-08-01 — BE#21: açıq borclar siyahısı (FIFO bölgü) müştəri borcu qaydalarına əlavə olundu.
 

@@ -7,7 +7,15 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 internal static class IntegrationTestHelpers
 {
     public const string OwnerPhone = "0501112233";   // Sahibkar
+    public const string ManagerPhone = "0552223344"; // Menecer
     public const string SellerPhone = "0553334455";  // Satıcı
+
+    /// <summary>
+    /// The second seeded seller (Günel Quliyeva). No other test touches her, so salary tests can assert
+    /// exact figures on her row even though the integration database is shared.
+    /// </summary>
+    public const string SecondSellerPhone = "0554445566";
+
     public const string DemoPassword = "demo123";
 
     public static async Task<HttpClient> AuthenticatedClientAsync(
@@ -203,6 +211,32 @@ internal static class IntegrationTestHelpers
         decimal Difference);
 
     internal sealed record ActivityDto(Guid Id, Guid? EmployeeId, string Action, string Detail);
+
+    /// <summary>Wire shape of one row of <c>GET /api/employees</c> — <c>monthlySalary</c> added by BE#28.</summary>
+    internal sealed record EmployeeDto(
+        Guid Id, string FullName, string Phone, string Role, bool IsActive, decimal MonthlySalary);
+
+    /// <summary>Wire shape of one row of <c>GET /api/employees/{id}/salary-entries</c> (BE#28).</summary>
+    internal sealed record SalaryEntryDto(
+        Guid Id,
+        Guid UserId,
+        string Type,
+        decimal Amount,
+        string? Note,
+        DateTime Date,
+        string Month,
+        Guid? CreatedByUserId,
+        DateTime CreatedAt);
+
+    /// <summary>Wire shape of one row of <c>GET /api/employees/salary-summary</c> (BE#28).</summary>
+    internal sealed record SalarySummaryDto(
+        Guid UserId,
+        string FullName,
+        string Role,
+        decimal MonthlySalary,
+        decimal PaidTotal,
+        decimal DeductionTotal,
+        decimal Remaining);
 
     internal sealed record SettingsDto(
         string StoreName,

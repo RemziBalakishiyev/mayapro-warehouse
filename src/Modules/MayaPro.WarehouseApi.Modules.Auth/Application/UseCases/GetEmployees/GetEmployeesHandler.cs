@@ -14,11 +14,11 @@ public sealed class GetEmployeesHandler(IAuthDbContext db)
         var users = await db.Users
             .AsNoTracking()
             .OrderByDescending(u => u.CreatedAt)
-            .Select(u => new { u.Id, u.FullName, u.Phone, u.Role, u.IsActive })
+            .Select(u => new { u.Id, u.FullName, u.Phone, u.Role, u.IsActive, u.MonthlySalary })
             .ToListAsync(ct);
 
         return users
-            .Select(u => new EmployeeDto(u.Id, u.FullName, u.Phone, u.Role.ToCode(), u.IsActive))
+            .Select(u => new EmployeeDto(u.Id, u.FullName, u.Phone, u.Role.ToCode(), u.IsActive, u.MonthlySalary))
             .ToList();
     }
 }

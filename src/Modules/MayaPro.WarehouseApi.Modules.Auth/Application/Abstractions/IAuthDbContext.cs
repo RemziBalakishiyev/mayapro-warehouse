@@ -8,5 +8,8 @@ public interface IAuthDbContext
 {
     DbSet<User> Users { get; }
 
+    /// <summary>Employee salary account lines (payments and deductions) — BE#28.</summary>
+    DbSet<SalaryEntry> SalaryEntries { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

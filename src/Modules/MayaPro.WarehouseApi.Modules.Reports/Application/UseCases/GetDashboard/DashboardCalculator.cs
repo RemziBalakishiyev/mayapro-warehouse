@@ -20,6 +20,7 @@ public static class DashboardCalculator
         IReadOnlyList<SalesReportRow> allSales,
         IReadOnlyList<ProductLastSale> lastSales,
         IReadOnlyList<ExpenseReportRow> allExpenses,
+        IReadOnlyList<SalaryPaymentRow> allSalaryPayments,
         IReadOnlyList<RecentSaleInfo> recentSales,
         IReadOnlyList<RecentPaymentInfo> recentPayments,
         IReadOnlyDictionary<Guid, string> customerNames,
@@ -43,11 +44,14 @@ public static class DashboardCalculator
             TodayProfit: todaySales.Sum(s => s.Profit ?? 0m),
             UnknownProfitSalesCount: todaySales.Count(s => s.Profit is null),
             UnknownProfitAmount: todaySales.Where(s => s.Profit is null).Sum(s => s.TotalAmount),
-            TodayExpenses: allExpenses.Where(e => e.Date == today).Sum(e => e.Amount),
+            // BE#28: a salary payment is money out of the drawer on the day it was handed over, so it counts
+            // as a day expense exactly like a store expense does (deductions never reach this list).
+            TodayExpenses: allExpenses.Where(e => e.Date == today).Sum(e => e.Amount)
+                           + allSalaryPayments.Where(p => p.Date == today).Sum(p => p.Amount),
             TodaySalesCount: todaySales.Count,
             TotalCustomerDebt: totalCustomerDebt,
             TotalSupplierDebt: totalSupplierDebt,
-            ExpectedCash: ExpectedCash(allSales, allExpenses, lastClosing, today),
+            ExpectedCash: ExpectedCash(allSales, allExpenses, allSalaryPayments, lastClosing, today),
             FrozenProducts: BuildFrozen(snapshots, lastSales, today),
             TopProducts: BuildTopProducts(allSales),
             LowStock: snapshots
@@ -83,6 +87,7 @@ public static class DashboardCalculator
     private static decimal ExpectedCash(
         IReadOnlyList<SalesReportRow> allSales,
         IReadOnlyList<ExpenseReportRow> allExpenses,
+        IReadOnlyList<SalaryPaymentRow> allSalaryPayments,
         ClosingSnapshot? lastClosing,
         DateOnly today)
     {
@@ -95,8 +100,13 @@ public static class DashboardCalculator
         decimal expensesSince = allExpenses
             .Where(e => (since is null || e.Date >= since) && e.Date <= today)
             .Sum(e => e.Amount);
+        // BE#28: same window as the expenses above — a payment made on an already-closed day is baked into
+        // that closing's counted cash and must not be subtracted a second time.
+        decimal salaryPaidSince = allSalaryPayments
+            .Where(p => (since is null || p.Date >= since) && p.Date <= today)
+            .Sum(p => p.Amount);
 
-        return openingCash + cashSince - expensesSince;
+        return openingCash + cashSince - expensesSince - salaryPaidSince;
     }
 
     private static FrozenProductsDto BuildFrozen(

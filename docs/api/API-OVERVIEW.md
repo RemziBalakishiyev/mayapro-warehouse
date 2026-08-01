@@ -4,14 +4,29 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
 
-## Endpoint-lər (48)
+## Endpoint-lər (53)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
 |---|---|---|---|
 | POST | `/api/auth/login` | anon | `{phone, password}` → `{token, user}` |
 | GET | `/api/auth/me` | auth | Cari istifadəçi |
-| GET | `/api/employees` | auth | İşçi siyahısı |
+| GET | `/api/employees` | auth | İşçi siyahısı (`monthlySalary` daxil) |
+| PUT | `/api/employees/{id}/salary` | O | `{monthlySalary}` → yenilənmiş işçi sətri |
+| GET | `/api/employees/salary-summary?month=` | O+M | Hər işçi üzrə aylıq maaş hesabı |
+| POST | `/api/employees/{id}/salary-entries` | O+M | `{type, amount, note?, month?}` → 201 |
+| GET | `/api/employees/{id}/salary-entries?month=` | auth | Ayın maaş sətirləri (ən yenisi əvvəldə) |
+| DELETE | `/api/employees/{id}/salary-entries/{entryId}` | O | Maaş sətrini silir |
+
+**Maaş sistemi (BE#28).** `GET /api/employees` cavabına additiv `monthlySalary` sahəsi əlavə olundu (təyin edilməyibsə `0`, heç vaxt null); mövcud sahələr dəyişməyib.
+
+`type` dondurulmuş wire dəyəridir: `"payment"` (maaş/avans ödənişi — kassadan real pul çıxır) və ya `"deduction"` (yemək/yol/cərimə — yalnız işçinin hesabından tutulur, kassaya TOXUNMUR). `month` `yyyy-MM` formatındadır və göndərilmirsə cari Bakı ayı (ADR-0005) götürülür. Sətrin `date` sahəsi (pulun çıxdığı an) və `month` sahəsi (hansı ayın hesabına) AYRIDIR: keçən ayın maaşını bu gün ödəmək `date = bu gün`, `month = keçən ay` deməkdir — gün sonu/dashboard `date`-ə, maaş xülasəsi `month`-a baxır.
+
+`salary-summary` hər işçi üçün bir sətir qaytarır (`userId, fullName, role, monthlySalary, paidTotal, deductionTotal, remaining`); sətri olmayan işçi də `0/0/monthlySalary` ilə görünür. `remaining = monthlySalary − paidTotal − deductionTotal` MƏNFİ ola bilər — «artıq ödənilib» deməkdir, xəta deyil.
+
+Kassa təsiri: `payment` sətirləri gün sonu bağlanışında mövcud `expenses` rəqəminin İÇİNƏ əlavə olunur (`ClosingDto` wire formatı dəyişmir — ADR-0006) və dashboard-un `todayExpenses`/`expectedCash` sahələrinə düşür. `deduction` heç birinə düşmür.
+
+400 halları: `Salary.InvalidType` («Maaş əməliyyatının növü yanlışdır»), `Salary.InvalidMonth` («Ay formatı yanlışdır (yyyy-MM)»), «Məbləğ sıfırdan böyük olmalıdır», «Qeyd 500 simvoldan uzun ola bilməz», «Maaş mənfi ola bilməz». 404 halları: `Auth.UserNotFound`, `Salary.EntryNotFound` (sətir yoxdursa VƏ YA route-dakı işçiyə aid deyilsə — cross-user sızma yoxdur).
 
 ### Products (`/api/products`, `/api/categories`)
 | Verb | Route | Auth |
@@ -107,6 +122,8 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-08-01 — BE#28: işçi maaş sistemi — `PUT /api/employees/{id}/salary` (O), `POST`/`GET`/`DELETE /api/employees/{id}/salary-entries` və `GET /api/employees/salary-summary`; `GET /api/employees` cavabına additiv `monthlySalary`. Maaş ödənişləri gün sonu `expenses` və dashboard `todayExpenses`/`expectedCash` rəqəmlərinə daxil oldu; tutulmalar kassaya toxunmur.
 
 2026-07-30 — BE#15: POST/PUT `/api/sales` üzərinə `paidAmount`/`paidVia`, cavab DTO-larına `paidAmount`/`remainingAmount`/`paidVia`; «Nisyə satış üçün müştəri seçilməlidir» mesajı «Qalıq borc üçün müştəri seçilməlidir» ilə əvəz olundu.
 

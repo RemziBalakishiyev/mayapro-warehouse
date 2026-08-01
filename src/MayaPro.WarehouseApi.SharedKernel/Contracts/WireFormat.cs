@@ -26,6 +26,17 @@ public static class WireFormat
         public const string Product = "product";
     }
 
+    /// <summary>
+    /// Salary entry kind as the frontend sends/reads it in <c>type</c>: <c>"payment"</c> is money actually
+    /// leaving the drawer (salary/advance), <c>"deduction"</c> is only charged against the employee's
+    /// account (meals, transport, fines) and never touches the cash.
+    /// </summary>
+    public static class SalaryEntryTypes
+    {
+        public const string Payment = "payment";
+        public const string Deduction = "deduction";
+    }
+
     /// <summary>User roles as the frontend reads them in the <c>role</c> field.</summary>
     public static class Roles
     {

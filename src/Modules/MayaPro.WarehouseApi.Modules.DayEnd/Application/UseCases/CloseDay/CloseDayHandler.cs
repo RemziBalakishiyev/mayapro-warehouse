@@ -12,12 +12,20 @@ namespace MayaPro.WarehouseApi.Modules.DayEnd.Application.UseCases.CloseDay;
 /// Closes the day. The day's sales (by payment type) and expense total are computed server-side from the
 /// Sales/Expenses modules; the client sends only the cash figures. A day can be closed once — a unique
 /// index on Date guards against the race, surfaced as the "already closed" business error.
+/// <para>
+/// BE#28: salary <b>payments</b> made today are cash that left the same drawer, so they are added to the
+/// expense total before the closing is built — expected cash then reads
+/// <c>opening + cash sales − (expenses + salary payments)</c>. They are folded into the existing
+/// <c>Expenses</c> figure rather than a new field, because the closing's wire format is frozen (ADR-0006).
+/// Salary <b>deductions</b> move no cash and are deliberately not fetched at all.
+/// </para>
 /// </summary>
 public sealed class CloseDayHandler(
     IDayEndDbContext db,
     IUnitOfWork unitOfWork,
     ISalesModule sales,
     IExpensesModule expenses,
+    ISalaryModule salary,
     IValidator<CloseDayCommand> validator,
     IActivityLogger activityLogger,
     ICurrentUser currentUser,
@@ -37,6 +45,7 @@ public sealed class CloseDayHandler(
 
         SalesDayTotals totals = await sales.GetDayTotalsAsync(date, ct);
         decimal expenseTotal = await expenses.GetDayTotalAsync(date, ct);
+        decimal salaryPaid = await salary.GetDayPaymentsTotalAsync(date, ct);
 
         var closing = Closing.Create(
             date,
@@ -44,7 +53,7 @@ public sealed class CloseDayHandler(
             totals.Cash,
             totals.Card,
             totals.Credit,
-            expenseTotal,
+            expenseTotal + salaryPaid,
             command.ActualCash,
             currentUser.UserId,
             command.Note);

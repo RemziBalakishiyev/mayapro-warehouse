@@ -16,6 +16,7 @@ public sealed class DashboardCalculatorTests
         IReadOnlyList<SalesReportRow>? sales = null,
         IReadOnlyList<ProductLastSale>? lastSales = null,
         IReadOnlyList<ExpenseReportRow>? expenses = null,
+        IReadOnlyList<SalaryPaymentRow>? salaryPayments = null,
         IReadOnlyList<RecentSaleInfo>? recentSales = null,
         IReadOnlyList<RecentPaymentInfo>? recentPayments = null,
         IReadOnlyDictionary<Guid, string>? customerNames = null,
@@ -27,6 +28,7 @@ public sealed class DashboardCalculatorTests
             sales ?? [],
             lastSales ?? [],
             expenses ?? [],
+            salaryPayments ?? [],
             recentSales ?? [],
             recentPayments ?? [],
             customerNames ?? new Dictionary<Guid, string>(),
@@ -43,6 +45,9 @@ public sealed class DashboardCalculatorTests
 
     private static ExpenseReportRow Exp(DateOnly date, decimal amount) =>
         new(date, "Yol pulu", amount, WireFormat.ExpenseSources.General);
+
+    private static SalaryPaymentRow Salary(DateOnly date, decimal amount) =>
+        new(date, Guid.NewGuid(), "Günel Quliyeva", amount);
 
     [Fact]
     public void Today_Aggregates_Only_Todays_Rows()
@@ -237,6 +242,48 @@ public sealed class DashboardCalculatorTests
             ]);
 
         Assert.Equal(80m, dto.ExpectedCash);
+    }
+
+    /// <summary>BE#28 / TC29: with no salary rows at all, every figure is exactly what it was before BE#28.</summary>
+    [Fact]
+    public void No_Salary_Rows_Leave_Today_Expenses_And_Expected_Cash_Untouched()
+    {
+        var dto = Build(
+            sales: [Sale(Today, total: 30, profit: 0)],
+            expenses: [Exp(Today, 5)],
+            salaryPayments: []);
+
+        Assert.Equal(5m, dto.TodayExpenses);
+        Assert.Equal(25m, dto.ExpectedCash);
+    }
+
+    /// <summary>BE#28 / AC12: a salary payment is cash out — it joins today's expenses and leaves the drawer.</summary>
+    [Fact]
+    public void Today_Salary_Payment_Counts_As_A_Day_Expense_And_Leaves_The_Drawer()
+    {
+        var dto = Build(
+            sales: [Sale(Today, total: 300, profit: 0)],
+            expenses: [Exp(Today, 40)],
+            salaryPayments: [Salary(Today, 200), Salary(Today.AddDays(-1), 50)]);
+
+        Assert.Equal(240m, dto.TodayExpenses);            // 40 store expense + 200 paid out today
+        Assert.Equal(10m, dto.ExpectedCash);              // 300 cash − 40 − (200 + 50), no prior close
+    }
+
+    /// <summary>BE#28 / TC30: a payment on an already-closed day is baked into that close, never subtracted twice.</summary>
+    [Fact]
+    public void ExpectedCash_Subtracts_Only_Salary_Payments_Made_Since_The_Last_Close()
+    {
+        var dto = Build(
+            salaryPayments:
+            [
+                Salary(Today.AddDays(-1), 100),   // the closed day → already counted in ActualCash
+                Salary(Today, 200)                // since the close → still to leave the drawer
+            ],
+            lastClosing: new ClosingSnapshot(Today.AddDays(-1), ActualCash: 500));
+
+        Assert.Equal(300m, dto.ExpectedCash);     // 500 − 200, the 100 is not subtracted again
+        Assert.Equal(200m, dto.TodayExpenses);    // "today" is unaffected by the closing anchor
     }
 
     [Fact]
