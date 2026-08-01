@@ -56,6 +56,7 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - İlkin borc `CustomerDebtAdjustment` sətri kimi tarixçəyə düşür.
 - Müştəri tarixçəsi = ilkin borc + BÜTÜN satışlar (hər ödəniş növü, Sales kontraktından; `paymentType` sahəsi fərqləndirir — borcu yalnız Nisyə sətirləri artırıb) + ödənişlər, xronoloji birləşdirilir.
 - Müştəri statistikaları bütün satış növlərini əhatə edir: `lastPurchaseDate` son İSTƏNİLƏN satış, `totalPurchases`/`purchaseCount` ömürlük cəm/say (qruplaşdırılmış tək sorğu).
+- **Açıq borclar (FIFO)**: borc mənbələri = ilkin borc sətirləri + qalıqlı satışlar (mənbənin məbləği satışın yekunu deyil, borc yaradan qalığıdır). Müştərinin ödənişləri mənbələr üzərində ən köhnədən başlayaraq silinir; tam bağlanmış mənbə açıq borclar siyahısına düşmür və bir müştərinin qalıqlarının cəmi onun `Debt` sahəsinə bərabər olmalıdır (fərq → yalnız warning log, sorğu uğurlu qalır). Hesablama sorğu anındadır; ayrıca cədvəl saxlanmır.
 - Müştəri silinəndə ödəniş/ilkin borc tarixçəsi də silinir (borc qalsa belə); köhnə satışlar `CustomerId` saxlayır — frontend "Silinmiş müştəri" göstərir.
 
 ## Təchizatçı borcu qaydaları
@@ -86,6 +87,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
+
+2026-08-01 — BE#21: açıq borclar siyahısı (FIFO bölgü) müştəri borcu qaydalarına əlavə olundu.
 
 2026-07-30 — BE#15: qismən ödənişli satış (paidAmount/paidVia, qalıq borc, borc yalnız qalıq qədər, gün sonu/dashboard nağd hesabı real alınan pula keçdi).
 

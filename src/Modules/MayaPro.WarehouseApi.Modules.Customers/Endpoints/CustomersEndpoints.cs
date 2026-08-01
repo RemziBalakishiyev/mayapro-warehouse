@@ -5,6 +5,7 @@ using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.DeleteCustomer
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerHistory;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomerPayments;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetCustomers;
+using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.GetOpenDebts;
 using MayaPro.WarehouseApi.Modules.Customers.Application.UseCases.UpdateCustomer;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
@@ -39,6 +40,12 @@ internal static class CustomersEndpoints
                 return result.ToCreatedResult(location);
             })
             .WithName("CreateCustomer");
+
+        // BE#21 — açıq borclar: every customer's unpaid debt sources (FIFO), oldest first. The literal
+        // segment cannot collide with the {id:guid} routes below, which only match a real Guid.
+        group.MapGet("/open-debts", async (GetOpenDebtsHandler handler, CancellationToken ct) =>
+                Results.Ok(await handler.Handle(ct)))
+            .WithName("GetOpenDebts");
 
         group.MapGet("/{id:guid}/payments", async (
                 Guid id,

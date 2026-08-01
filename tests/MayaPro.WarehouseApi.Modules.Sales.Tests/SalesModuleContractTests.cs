@@ -99,6 +99,46 @@ public sealed class SalesModuleContractTests
         Assert.Equal(0m, totals.Credit);
     }
 
+    // ── BE#21 — the open-debt list's source of still-owing sales ──────────────────────────────────────
+
+    /// <summary>
+    /// Only sales that both belong to a customer and still owe money are debt sources, and they come back
+    /// oldest first carrying the remaining (not the total) amount — that is what raised the debt.
+    /// </summary>
+    [Fact]
+    public async Task GetOutstandingSales_Returns_Only_Customer_Sales_With_A_Remaining_Balance()
+    {
+        await using SalesDbContext db = NewDb();
+        Guid customerId = Guid.NewGuid();
+
+        // Nisyə 500, paid 300 → 200 remaining (a debt source).
+        Sale partiallyPaid = Manual(total: 500m, PaymentType.Credit, customerId, paidAmount: 300m, paidVia: PaymentType.Cash);
+        // Nağd 150, fully paid, with a customer → no remaining balance, not a debt source.
+        Sale settled = Manual(total: 150m, PaymentType.Cash, customerId);
+        // Nisyə 100 with no customer at all (never happens via the handler) → nobody to bill.
+        Sale customerless = Manual(total: 100m, PaymentType.Credit, customerId: null, paidAmount: 0m);
+        db.Sales.AddRange(partiallyPaid, settled, customerless);
+        await db.SaveChangesAsync();
+
+        // Force a deterministic order: the partially paid sale is the older of the two owing rows.
+        Sale olderOwing = Manual(total: 80m, PaymentType.Credit, customerId, paidAmount: 0m);
+        db.Sales.Add(olderOwing);
+        db.Entry(olderOwing).Property(s => s.Date).CurrentValue = DateTime.UtcNow.AddDays(-2);
+        await db.SaveChangesAsync();
+
+        SalesModuleContract contract = NewContract(db);
+
+        IReadOnlyList<CustomerOutstandingSale> outstanding = await contract.GetOutstandingSalesAsync(default);
+
+        Assert.Equal(2, outstanding.Count);
+        Assert.Equal(olderOwing.Id, outstanding[0].SaleId);
+        Assert.Equal(80m, outstanding[0].RemainingAmount);
+        Assert.Equal(partiallyPaid.Id, outstanding[1].SaleId);
+        Assert.Equal(200m, outstanding[1].RemainingAmount); // remaining, not the 500 total
+        Assert.All(outstanding, s => Assert.Equal(customerId, s.CustomerId));
+        Assert.All(outstanding, s => Assert.Equal("Test malı", s.ProductName));
+    }
+
     // ── QA (BE#15) — a deleted sale must stop counting toward the day's totals ─────────────────────────
 
     [Fact]

@@ -22,7 +22,7 @@
 |---|---|---|
 | `IProductsModule` | Products | Sales (`TryDecreaseStockAsync`, `IncreaseStockAsync`), Expenses (`AddExpenseToProductAsync`, `GetSnapshotAsync`), Reports, Exports |
 | `ICustomersModule` | Customers | Sales (`IncreaseDebtAsync`, `DecreaseDebtAsync`), Reports (`GetTotalDebtAsync`, `GetNamesAsync`, `GetRecentPaymentsAsync`), Exports (`GetCustomerInfoAsync`) |
-| `ISalesModule` | Sales | DayEnd (`GetDayTotalsAsync`), Reports (`GetSalesAsync`, `GetLastSaleDatesAsync`, `GetRecentSalesAsync`), Customers (`GetCreditSalesByCustomerAsync`, `DeleteCreditSaleAsync`, `GetLastCreditSaleDatesByCustomerAsync`), Exports (`GetInvoiceSaleAsync`) |
+| `ISalesModule` | Sales | DayEnd (`GetDayTotalsAsync`), Reports (`GetSalesAsync`, `GetLastSaleDatesAsync`, `GetRecentSalesAsync`), Customers (`GetSalesByCustomerAsync`, `GetPurchaseStatsByCustomerAsync`, `GetOutstandingSalesAsync`, `DeleteCreditSaleAsync`), Exports (`GetInvoiceSaleAsync`, `GetSaleIdByInvoiceTokenAsync`) |
 | `IExpensesModule` | Expenses | DayEnd (`GetDayTotalAsync`), Reports, Exports |
 | `ISuppliersModule` | Suppliers | Reports (ümumi borc, itemCount) |
 | `IDayEndModule` | DayEnd | Reports (`GetLastClosingAsync` — ExpectedCash lövbəri), Sales (`ClosingExistsAsync` — bağlı gün qoruması) |

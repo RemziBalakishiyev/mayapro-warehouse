@@ -118,6 +118,9 @@ internal sealed class StubSalesModule(
     public Task<IReadOnlyList<CustomerSaleEntry>> GetSalesByCustomerAsync(
         Guid customerId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+    public Task<IReadOnlyList<CustomerOutstandingSale>> GetOutstandingSalesAsync(
+        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
     public Task<Result> DeleteCreditSaleAsync(
         Guid saleIdToDelete, Guid customerId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();

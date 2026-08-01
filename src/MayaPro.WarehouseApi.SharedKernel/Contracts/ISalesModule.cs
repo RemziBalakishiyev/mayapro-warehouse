@@ -44,6 +44,16 @@ public interface ISalesModule
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns every sale that still carries an unpaid balance and belongs to a customer, oldest first —
+    /// one grouped-free, single round trip over all customers (never a query per customer). Used by the
+    /// Customers module's open-debt list (BE#21) to lay out each customer's debt sources without querying
+    /// the sales table directly. A sale appears here whatever its payment type: what makes it an open debt
+    /// source is a positive remaining balance (<c>TotalAmount − PaidAmount</c>), not the Nisyə label.
+    /// </summary>
+    Task<IReadOnlyList<CustomerOutstandingSale>> GetOutstandingSalesAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Removes a credit (Nisyə) sale that belongs to <paramref name="customerId"/> — the same business chain as
     /// deleting a sale (stock returns, debt unwinds), exposed for the Customers module's debt UI. Fails if the
     /// sale is missing, not credit, or belongs to another customer.
@@ -124,6 +134,20 @@ public sealed record CustomerSaleEntry(
     int Quantity,
     decimal TotalAmount,
     string PaymentType);
+
+/// <summary>
+/// A sale that still owes money: the debt source the customer's open-debt list starts from.
+/// <see cref="Date"/> is the UTC sale instant (callers localise it) and <see cref="RemainingAmount"/> is
+/// what was left unpaid at sale time (<c>TotalAmount − PaidAmount</c>) — i.e. exactly the amount that was
+/// added to the customer's debt, before any later payment is allocated against it.
+/// </summary>
+public sealed record CustomerOutstandingSale(
+    Guid SaleId,
+    Guid CustomerId,
+    DateTime Date,
+    string ProductName,
+    int Quantity,
+    decimal RemainingAmount);
 
 /// <summary>
 /// A single sale as seen by reports: date, net amount, profit, payment code and product line.

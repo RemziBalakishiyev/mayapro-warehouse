@@ -173,6 +173,21 @@ internal static class IntegrationTestHelpers
     internal sealed record CustomerHistoryEntryDto(
         DateTime Date, string Type, decimal Amount, string? Note, Guid? SaleId, string? PaymentType);
 
+    /// <summary>Wire shape of one row of <c>GET /api/customers/open-debts</c> (BE#21).</summary>
+    internal sealed record OpenDebtDto(
+        Guid CustomerId,
+        string CustomerName,
+        string? Phone,
+        string Source,
+        DateTime SourceDate,
+        string Description,
+        decimal OriginalAmount,
+        decimal PaidSoFar,
+        decimal Remaining,
+        int DaysOld);
+
+    internal sealed record OpenDebtsDto(List<OpenDebtDto> Items, decimal TotalRemaining);
+
     internal sealed record SupplierPaymentDto(Guid Id, Guid SupplierId, decimal Amount);
 
     internal sealed record SupplierHistoryEntryDto(DateTime Date, string Type, decimal Amount, string? Note);
