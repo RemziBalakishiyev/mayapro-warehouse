@@ -285,4 +285,181 @@ public sealed class ReportsApiTests : IAsyncLifetime
         var d = (await client.GetFromJsonAsync<IntegrationTestHelpers.DashboardDto>("/api/reports/dashboard"))!;
         Assert.True(d.TodaySales >= 500m);
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // BE#27 — page KPI endpoints (products-kpi / sales-kpi / debts-kpi). The shared database
+    // accumulates across the whole run, so every test asserts a delta around its own action (before
+    // vs. after) rather than an absolute figure — the same pattern the BE#19 test above uses.
+    // ---------------------------------------------------------------------------------------------
+
+    private static Task<IntegrationTestHelpers.ProductsKpiDto> ProductsKpiAsync(HttpClient client) =>
+        client.GetFromJsonAsync<IntegrationTestHelpers.ProductsKpiDto>("/api/reports/products-kpi")!;
+
+    private static Task<IntegrationTestHelpers.SalesKpiDto> SalesKpiAsync(HttpClient client) =>
+        client.GetFromJsonAsync<IntegrationTestHelpers.SalesKpiDto>("/api/reports/sales-kpi")!;
+
+    private static Task<IntegrationTestHelpers.DebtsKpiDto> DebtsKpiAsync(HttpClient client) =>
+        client.GetFromJsonAsync<IntegrationTestHelpers.DebtsKpiDto>("/api/reports/debts-kpi")!;
+
+    [Fact]
+    public async Task ProductsKpi_PK_I1_Reflects_New_Product_Sale_And_Positive_Adjustment()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var before = await ProductsKpiAsync(client);
+
+        // New product: opening stock 10 (real cost 5, sale price 10) → +10 stock units, +50 cost, +100 sale value.
+        var product = await client.CreateProductAsync("PK-I1", quantity: 10, salePrice: 10m, purchasePrice: 5m);
+        await SellAsync(client, product.Id, quantity: 3, "Nağd");          // -3 stock, +3 soldUnits
+        HttpResponseMessage adjust = await client.AdjustStockAsync(product.Id, delta: 5);  // +5 purchasedUnits
+        adjust.EnsureSuccessStatusCode();
+
+        var after = await ProductsKpiAsync(client);
+
+        Assert.Equal(1, after.ProductCount - before.ProductCount);
+        Assert.Equal(12, after.TotalStockUnits - before.TotalStockUnits);   // 10 - 3 + 5
+        Assert.Equal(3, after.SoldUnits - before.SoldUnits);
+        Assert.Equal(15, after.PurchasedUnits - before.PurchasedUnits);     // 10 (opening) + 5 (adjustment)
+    }
+
+    [Fact]
+    public async Task ProductsKpi_PK_I2_Explicit_Range_Excludes_Movements_Outside_It_But_Not_Snapshot_Fields()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var product = await client.CreateProductAsync("PK-I2", quantity: 10, salePrice: 10m, purchasePrice: 5m);
+        await SellAsync(client, product.Id, quantity: 2, "Nağd");
+
+        var beforeSnapshot = await ProductsKpiAsync(client); // "as of now" snapshot fields, unbounded call
+
+        // A range strictly in the future (relative to this run) sees none of the movements above.
+        DateOnly future = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(1);
+        var future1 = await client.GetFromJsonAsync<IntegrationTestHelpers.ProductsKpiDto>(
+            $"/api/reports/products-kpi?from={future:yyyy-MM-dd}&to={future:yyyy-MM-dd}");
+
+        Assert.NotNull(future1);
+        Assert.Equal(0, future1!.SoldUnits);
+        Assert.Equal(0, future1.PurchasedUnits);
+        // Snapshot fields never move with from/to — same "as of now" totals as the unbounded call.
+        Assert.Equal(beforeSnapshot.ProductCount, future1.ProductCount);
+        Assert.Equal(beforeSnapshot.TotalStockUnits, future1.TotalStockUnits);
+    }
+
+    [Fact]
+    public async Task ProductsKpi_PK_I3_Reversed_Range_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/products-kpi?from=2026-08-10&to=2026-08-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidDateRange", error.Code);
+    }
+
+    [Fact]
+    public async Task ProductsKpi_PK_I4_Without_Auth_Returns_401()
+    {
+        HttpClient client = _factory.CreateClient();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/products-kpi");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task SalesKpi_SK_I1_Reflects_A_Cash_Sale_In_Revenue_Profit_And_ByPayment()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var before = await SalesKpiAsync(client);
+
+        // SellAsync always sells at 10m/unit regardless of the product's own sale price (see its body
+        // below); with the default 5m purchase price/real cost, one unit is total 10, profit 5.
+        var product = await client.CreateProductAsync("SK-I1", quantity: 10);
+        await SellAsync(client, product.Id, quantity: 1, "Nağd");
+
+        var after = await SalesKpiAsync(client);
+
+        Assert.Equal(1, after.SalesCount - before.SalesCount);
+        Assert.Equal(10m, after.TotalRevenue - before.TotalRevenue);
+        Assert.Equal(5m, after.TotalProfit - before.TotalProfit);
+
+        decimal cashRevenueBefore = before.ByPayment.Single(p => p.Type == "Nağd").Revenue;
+        decimal cashRevenueAfter = after.ByPayment.Single(p => p.Type == "Nağd").Revenue;
+        Assert.Equal(10m, cashRevenueAfter - cashRevenueBefore);
+    }
+
+    [Fact]
+    public async Task SalesKpi_SK_I2_Reversed_Range_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/sales-kpi?from=2026-08-10&to=2026-08-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidDateRange", error.Code);
+    }
+
+    [Fact]
+    public async Task SalesKpi_SK_I3_Without_Auth_Returns_401()
+    {
+        HttpClient client = _factory.CreateClient();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/sales-kpi");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DebtsKpi_DK_I1_Reflects_A_Credit_Sale_And_A_Payment()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+        var before = await DebtsKpiAsync(client);
+
+        var product = await client.CreateProductAsync("DK-I1", quantity: 10, salePrice: 100m);
+        var customer = await client.CreateCustomerAsync("BE27 borclu");
+
+        HttpResponseMessage sale = await client.PostAsJsonAsync("/api/sales", new
+        {
+            productId = product.Id,
+            quantity = 1,
+            salePrice = 100m,
+            paymentType = "Nisyə",
+            customerId = (Guid?)customer.Id
+        });
+        sale.EnsureSuccessStatusCode(); // +100 debt
+
+        HttpResponseMessage payment = await client.PostAsJsonAsync(
+            $"/api/customers/{customer.Id}/payments", new { amount = 40m, note = (string?)null });
+        payment.EnsureSuccessStatusCode();
+
+        var after = await DebtsKpiAsync(client);
+
+        Assert.Equal(60m, after.TotalOutstanding - before.TotalOutstanding);   // 100 - 40
+        Assert.True(after.DebtorCount >= before.DebtorCount);
+        Assert.Equal(100m, after.PeriodNewDebt - before.PeriodNewDebt);
+        Assert.Equal(40m, after.PeriodCollected - before.PeriodCollected);
+        Assert.NotNull(after.TopDebtor);
+    }
+
+    [Fact]
+    public async Task DebtsKpi_DK_I3_Reversed_Range_Returns_400()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/debts-kpi?from=2026-08-10&to=2026-08-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidDateRange", error.Code);
+    }
+
+    [Fact]
+    public async Task DebtsKpi_DK_I4_Without_Auth_Returns_401()
+    {
+        HttpClient client = _factory.CreateClient();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/debts-kpi");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
 }

@@ -81,6 +81,10 @@ internal sealed class UnusedProductsModule : IProductsModule
     public Task<IReadOnlyList<ProductLabelInfo>> GetLabelInfoAsync(
         IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+
+    public Task<IReadOnlyList<StockAdjustmentRow>> GetStockAdjustmentsAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
 }
 
 /// <summary>Unused by <see cref="Application.SalesModuleContract.GetDayTotalsAsync"/> — every member throws if hit.</summary>
@@ -104,5 +108,12 @@ internal sealed class UnusedCustomersModule : ICustomersModule
         throw new NotSupportedException();
 
     public Task<CustomerInfo?> GetCustomerInfoAsync(Guid customerId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<CustomerDebtRow>> GetDebtorsAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<CustomerPaymentRow>> GetPaymentsAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }

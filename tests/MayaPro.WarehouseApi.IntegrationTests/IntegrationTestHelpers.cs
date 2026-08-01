@@ -83,6 +83,10 @@ internal static class IntegrationTestHelpers
         return (await response.Content.ReadFromJsonAsync<CustomerDto>())!;
     }
 
+    public static async Task<HttpResponseMessage> AdjustStockAsync(
+        this HttpClient client, Guid productId, int delta, string? note = null) =>
+        await client.PostAsJsonAsync($"/api/products/{productId}/adjust-stock", new { delta, note });
+
     public static async Task<ProductDto> GetProductAsync(this HttpClient client, Guid id) =>
         (await client.GetFromJsonAsync<ProductDto>($"/api/products/{id}"))!;
 
@@ -271,4 +275,38 @@ internal static class IntegrationTestHelpers
         decimal ProductExpenses);
 
     internal sealed record ErrorDto(string Code, string Message);
+
+    /// <summary>Wire shape of <c>GET /api/reports/products-kpi</c> (BE#27).</summary>
+    internal sealed record ProductsKpiDto(
+        int ProductCount,
+        int TotalStockUnits,
+        decimal TotalCostValue,
+        decimal TotalSaleValue,
+        decimal PotentialProfit,
+        int LowStockCount,
+        int SoldUnits,
+        int PurchasedUnits);
+
+    /// <summary>Wire shape of <c>GET /api/reports/sales-kpi</c> (BE#27).</summary>
+    internal sealed record SalesKpiDto(
+        int SalesCount,
+        decimal TotalRevenue,
+        decimal TotalProfit,
+        int UnknownProfitSalesCount,
+        decimal UnknownProfitAmount,
+        List<PaymentTypeKpiDto> ByPayment,
+        decimal AvgSale);
+
+    internal sealed record PaymentTypeKpiDto(string Type, decimal Revenue, decimal Profit);
+
+    /// <summary>Wire shape of <c>GET /api/reports/debts-kpi</c> (BE#27).</summary>
+    internal sealed record DebtsKpiDto(
+        decimal TotalOutstanding,
+        int DebtorCount,
+        TopDebtorDto? TopDebtor,
+        decimal PeriodNewDebt,
+        decimal PeriodCollected,
+        int? OldestDebtDays);
+
+    internal sealed record TopDebtorDto(string Name, decimal Amount);
 }

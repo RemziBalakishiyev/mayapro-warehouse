@@ -71,6 +71,10 @@ internal sealed class RecordingProductsModule : IProductsModule
     public Task<IReadOnlyList<ProductLabelInfo>> GetLabelInfoAsync(
         IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+
+    public Task<IReadOnlyList<StockAdjustmentRow>> GetStockAdjustmentsAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
 }
 
 /// <summary>A unit of work over a single in-memory context: save flushes it, commit/rollback are no-ops.</summary>

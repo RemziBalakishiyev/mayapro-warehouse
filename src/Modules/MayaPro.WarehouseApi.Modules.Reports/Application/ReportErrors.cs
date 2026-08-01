@@ -8,4 +8,8 @@ public static class ReportErrors
     // The code does not end in NotFound/Conflict, so the host maps it to 400 Bad Request.
     public static readonly Error InvalidPeriod =
         new("Reports.InvalidPeriod", "Yanlış hesabat dövrü");
+
+    /// <summary>BE#27: the from/to KPI endpoints reject a reversed range (from &gt; to) rather than coercing it.</summary>
+    public static readonly Error InvalidDateRange =
+        new("Reports.InvalidDateRange", "Yanlış tarix aralığı");
 }

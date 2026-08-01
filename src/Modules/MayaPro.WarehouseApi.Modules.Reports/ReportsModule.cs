@@ -1,4 +1,7 @@
 using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetDashboard;
+using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetDebtsKpi;
+using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetProductsKpi;
+using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetSalesKpi;
 using MayaPro.WarehouseApi.Modules.Reports.Application.UseCases.GetSummary;
 using MayaPro.WarehouseApi.Modules.Reports.Endpoints;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
@@ -20,6 +23,9 @@ public sealed class ReportsModule : IModule
     {
         services.AddScoped<GetDashboardHandler>();
         services.AddScoped<GetSummaryHandler>();
+        services.AddScoped<GetProductsKpiHandler>();
+        services.AddScoped<GetSalesKpiHandler>();
+        services.AddScoped<GetDebtsKpiHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

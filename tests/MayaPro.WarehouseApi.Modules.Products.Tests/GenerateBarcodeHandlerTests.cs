@@ -184,6 +184,8 @@ public sealed class GenerateBarcodeHandlerTests
 
         public DbSet<Category> Categories => inner.Categories;
 
+        public DbSet<StockAdjustment> StockAdjustments => inner.StockAdjustments;
+
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             SaveAttempts++;

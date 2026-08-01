@@ -10,5 +10,7 @@ public interface IProductsDbContext
 
     DbSet<Category> Categories { get; }
 
+    DbSet<StockAdjustment> StockAdjustments { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

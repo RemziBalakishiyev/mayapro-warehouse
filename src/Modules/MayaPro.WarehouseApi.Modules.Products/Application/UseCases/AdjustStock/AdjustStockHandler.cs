@@ -31,6 +31,11 @@ public sealed class AdjustStockHandler(
 
         product.AdjustStock(command.Delta);
 
+        // BE#27: a structured, queryable record of the correction (date + signed delta) alongside the
+        // free-text activity log below — the Reports module's products-kpi endpoint reads this back via
+        // IProductsModule.GetStockAdjustmentsAsync to compute purchasedUnits for a period.
+        db.StockAdjustments.Add(StockAdjustment.Create(product.Id, command.Delta));
+
         // Transaction so the stock change and its activity log commit together.
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 

@@ -11,7 +11,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Application;
 /// the decrement is part of the caller's unit of work), applies the domain rule, and returns a snapshot —
 /// without saving.
 /// </summary>
-internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsModule
+internal sealed class ProductsModuleContract(IProductsDbContext db, IDateProvider dateProvider) : IProductsModule
 {
     public async Task<Result<ProductStockSnapshot>> TryDecreaseStockAsync(
         Guid productId,
@@ -75,7 +75,9 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         product.Quantity,
         product.MinStock,
         product.RealCostPerUnit,
-        product.SalePrice);
+        product.SalePrice,
+        product.InitialQuantity,
+        product.CreatedAt);
 
     public async Task<Result> AddExpenseToProductAsync(
         Guid productId,
@@ -169,4 +171,23 @@ internal sealed class ProductsModuleContract(IProductsDbContext db) : IProductsM
         string.Join("; ", attributes
             .Where(a => !string.IsNullOrWhiteSpace(a.Name) && !string.IsNullOrWhiteSpace(a.Value))
             .Select(a => $"{a.Name.Trim()}: {a.Value.Trim()}"));
+
+    public async Task<IReadOnlyList<StockAdjustmentRow>> GetStockAdjustmentsAsync(
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<StockAdjustment> query = db.StockAdjustments.AsNoTracking();
+
+        if (from is { } f)
+            query = query.Where(a => a.Date >= dateProvider.LocalDayRangeUtc(f).StartUtc);
+        if (to is { } t)
+            query = query.Where(a => a.Date < dateProvider.LocalDayRangeUtc(t).EndUtc);
+
+        List<StockAdjustment> adjustments = await query.OrderBy(a => a.Date).ToListAsync(cancellationToken);
+
+        return adjustments
+            .Select(a => new StockAdjustmentRow(a.ProductId, a.Delta, dateProvider.ToLocalDate(a.Date)))
+            .ToList();
+    }
 }
