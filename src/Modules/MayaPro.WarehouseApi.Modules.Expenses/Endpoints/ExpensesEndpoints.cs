@@ -20,8 +20,14 @@ internal static class ExpensesEndpoints
             .WithTags("Expenses")
             .RequireAuthorization(); // viewing is open to every authenticated role
 
-        group.MapGet("/", async (string? month, string? source, GetExpensesHandler handler, CancellationToken ct) =>
-                (await handler.Handle(month, source, ct)).ToHttpResult())
+        group.MapGet("/", async (
+                string? month,
+                string? source,
+                string? from,
+                string? to,
+                GetExpensesHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(month, source, ct, from, to)).ToHttpResult())
             .WithName("GetExpenses");
 
         group.MapPost("/", async (
