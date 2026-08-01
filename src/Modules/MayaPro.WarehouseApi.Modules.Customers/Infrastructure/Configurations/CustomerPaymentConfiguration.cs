@@ -17,5 +17,9 @@ public sealed class CustomerPaymentConfiguration : IEntityTypeConfiguration<Cust
         builder.Property(p => p.Date).IsRequired();
 
         builder.HasIndex(p => p.CustomerId);
+
+        // BE#27: ICustomersModule.GetPaymentsAsync filters by this column for the debts-kpi endpoint's
+        // periodCollected figure — same reasoning as Expenses' index on its own Date column.
+        builder.HasIndex(p => p.Date);
     }
 }
