@@ -1,10 +1,18 @@
 using FluentValidation;
+using MayaPro.WarehouseApi.Modules.Auth.Application;
 using MayaPro.WarehouseApi.Modules.Auth.Application.Abstractions;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.CreateSalaryEntry;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.DeleteSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetEmployees;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetMe;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalaryEntries;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalarySummary;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.Login;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.SetEmployeeSalary;
 using MayaPro.WarehouseApi.Modules.Auth.Endpoints;
 using MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
+using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -28,23 +36,40 @@ public sealed class AuthModule : IModule
             .Validate(o => o.Secret.Length >= 32, "Jwt:Secret ən azı 32 simvol olmalıdır")
             .ValidateOnStart();
 
+        // Scoped options so each scope binds the shared connection from IDbConnectionFactory. BE#28 moved
+        // this off its own connection string: a salary entry and its activity log have to commit in one
+        // transaction, which is only possible while every participating context shares one connection.
         services.AddDbContext<AuthDbContext>((sp, options) =>
         {
+            var connection = sp.GetRequiredService<IDbConnectionFactory>().GetConnection();
             options.UseSqlServer(
-                configuration.GetConnectionString("Default"),
+                connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
-        });
+        }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<AuthDbContext>());
+        services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<AuthDbContext>());
+
+        // Cross-module contract: salary payments are cash out of the drawer, so day-end and the dashboard
+        // read them the same way they read expenses.
+        services.AddScoped<ISalaryModule, SalaryModuleContract>();
 
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<UserSeeder>();
 
         services.AddScoped<IValidator<LoginCommand>, LoginValidator>();
+        services.AddScoped<IValidator<SetEmployeeSalaryCommand>, SetEmployeeSalaryValidator>();
+        services.AddScoped<IValidator<CreateSalaryEntryCommand>, CreateSalaryEntryValidator>();
+
         services.AddScoped<LoginHandler>();
         services.AddScoped<GetMeHandler>();
         services.AddScoped<GetEmployeesHandler>();
+        services.AddScoped<SetEmployeeSalaryHandler>();
+        services.AddScoped<CreateSalaryEntryHandler>();
+        services.AddScoped<GetSalaryEntriesHandler>();
+        services.AddScoped<DeleteSalaryEntryHandler>();
+        services.AddScoped<GetSalarySummaryHandler>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

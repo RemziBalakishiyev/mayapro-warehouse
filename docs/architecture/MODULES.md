@@ -4,7 +4,7 @@
 
 | Modul | Məsuliyyət | Cədvəl sahibi? |
 |---|---|---|
-| **Auth** | Login, JWT, istifadəçilər/işçilər, rollar | `identity.Users` |
+| **Auth** | Login, JWT, istifadəçilər/işçilər, rollar, işçi maaş hesabı | `identity.Users`, `identity.SalaryEntries` |
 | **Products** | Məhsul kataloqu, stok, real maya, kateqoriyalar | `products.*` |
 | **Sales** | Satış zənciri (create/update/delete), satış tarixçəsi | `sales.Sales` |
 | **Customers** | Müştərilər, borc, ödənişlər, borc tarixçəsi | `customers.*` |
@@ -24,6 +24,7 @@
 | `ICustomersModule` | Customers | Sales (`IncreaseDebtAsync`, `DecreaseDebtAsync`), Reports (`GetTotalDebtAsync`, `GetNamesAsync`, `GetRecentPaymentsAsync`), Exports (`GetCustomerInfoAsync`) |
 | `ISalesModule` | Sales | DayEnd (`GetDayTotalsAsync`), Reports (`GetSalesAsync`, `GetLastSaleDatesAsync`, `GetRecentSalesAsync`), Customers (`GetSalesByCustomerAsync`, `GetPurchaseStatsByCustomerAsync`, `GetOutstandingSalesAsync`, `DeleteCreditSaleAsync`), Exports (`GetInvoiceSaleAsync`, `GetSaleIdByInvoiceTokenAsync`) |
 | `IExpensesModule` | Expenses | DayEnd (`GetDayTotalAsync`), Reports, Exports |
+| `ISalaryModule` | Auth | DayEnd (`GetDayPaymentsTotalAsync` — günün maaş ödənişləri xərc cəminə), Reports (`GetPaymentsAsync` — dashboard `todayExpenses`/`expectedCash`). `IExpensesModule` ilə qəsdən simmetrikdir; hər iki metod YALNIZ `payment` sətirlərini qaytarır (tutulma kassaya toxunmur). |
 | `ISuppliersModule` | Suppliers | Reports (ümumi borc, itemCount) |
 | `IDayEndModule` | DayEnd | Reports (`GetLastClosingAsync` — ExpectedCash lövbəri), Sales (`ClosingExistsAsync` — bağlı gün qoruması) |
 | `ISettingsModule` | Settings | Exports (`GetStoreNameAsync`, `GetStoreInfoAsync`) |
@@ -34,6 +35,8 @@ Yeni kontrakt metodu əlavə edəndə: interfeys `SharedKernel/Contracts/`-da, i
 Kontrakt record-una sahə əlavə etmək də kontrakt dəyişikliyidir: satışın alış qiyməti snapshot-u üçün `ProductStockSnapshot`-a `PurchasePrice` əlavə olundu (provider: Products, istehlakçı: Sales create/update) — modul sərhədini keçən yeganə yol budur, Sales heç vaxt `products` cədvəlini oxumur.
 
 ## Last Updated
+
+2026-08-01 — BE#28: yeni `ISalaryModule` kontraktı (provider: Auth; istehlakçılar: DayEnd, Reports); Auth modulu `identity.SalaryEntries` cədvəlinin də sahibidir və `AuthDbContext` artıq paylaşılan transaction-a enlist olur.
 
 2026-07-26 — `ProductStockSnapshot.PurchasePrice` kontrakt genişlənməsi.
 

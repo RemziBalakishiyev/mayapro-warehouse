@@ -24,10 +24,12 @@ Eyni schema daxilində, sahib entity-nin Id-si ilə. Konfiqurasiyalarda navigati
 - `CustomerDebtAdjustment.CustomerId` → Customer (ilkin borc tarixçəsi)
 - `SupplierPayment.SupplierId` → Supplier
 - `SupplierDebtAdjustment.SupplierId` → Supplier (ilkin borc tarixçəsi)
+- `SalaryEntry.UserId` → User (işçinin maaş hesabı; `(UserId, Month)` üzərində index)
 
 ## Entity-lərin qısa xəritəsi
 
-- **User**: FullName, Phone (unique), Email, PasswordHash (BCrypt), Role (string), IsActive
+- **User**: FullName, Phone (unique), Email, PasswordHash (BCrypt), Role (string), IsActive, MonthlySalary (default 0)
+- **SalaryEntry**: UserId, Type (enum: Payment/Deduction, string kimi), Amount, Note?, Date (UTC — pulun çıxdığı an), Month (`yyyy-MM` — hesab ayı), CreatedByUserId?
 - **Product**: ad/kateqoriya(string snapshot)/barcode/qiymətlər/Quantity/InitialQuantity(sabit)/MinStock/yerləşmə sahələri/Attributes(JSON)/Expenses(JSON)/RealCostPerUnit(hesablanan)
 - **Category**: sadə ad siyahısı (məhsul kateqoriyaya FK ilə bağlanmır)
 - **ExpenseType**: sadə ad siyahısı, unique (xərc `Category`-yə FK ilə bağlanmır — Category ilə eyni pattern)
@@ -42,6 +44,8 @@ Eyni schema daxilində, sahib entity-nin Id-si ilə. Konfiqurasiyalarda navigati
 - **StoreSettings**: singleton — StoreName, OwnerName?, Address?, Phone?, WhatsappTemplate, Currency, DefaultMinStock, Language
 
 ## Last Updated
+
+2026-08-01 — BE#28: `User.MonthlySalary` və yeni `SalaryEntry` entity-si (Auth modulu daxilində, `UserId` FK-sız); `Date` (kassa anı) və `Month` (hesab ayı) ayrımı.
 
 2026-07-27 — BE#4: `ExpenseType` əlavə olundu; `Expense.Category` enum-dan sərbəst-string snapshot-a keçdi, `Expense.Source` (general/product) sahəsi əlavə olundu. `SupplierDebtAdjustment` əlavə olundu; modul daxili münasibətlərin FK-sızlığı dəqiqləşdirildi.
 

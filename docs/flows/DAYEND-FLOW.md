@@ -5,8 +5,9 @@
 1. Validation: `openingCash ≥ 0`, `actualCash ≥ 0`.
 2. Gün = `IDateProvider.Today` (Bakı günü).
 3. Pre-check: həmin günə bağlanış varsa `DayEnd.AlreadyClosed` (409). Race qoruması: `Date` unique index — `DbUpdateException` də `AlreadyClosed`-a çevrilir.
-4. Server totalları özü hesablayır: `ISalesModule.GetDayTotalsAsync(date)` → nağd/kart/nisyə; `IExpensesModule.GetDayTotalAsync(date)`.
-   BE#15-dən sonra bu üç rəqəm REAL alınan pula əsaslanır (tək qruplaşdırılmış sorğu): **nağd** = `PaidVia = Cash` olan satışların `PaidAmount` cəmi (nisyə satışın nağd ilkin ödənişi də daxil), **kart** = `PaidVia = Card` üçün eyni, **nisyə** = nisyə satışların `TotalAmount − PaidAmount` (yalnız ödənilməmiş qalıq) cəmi.
+4. Server totalları özü hesablayır: `ISalesModule.GetDayTotalsAsync(date)` → nağd/kart/nisyə; `IExpensesModule.GetDayTotalAsync(date)`; `ISalaryModule.GetDayPaymentsTotalAsync(date)`.
+   BE#15-dən sonra ilk üç rəqəm REAL alınan pula əsaslanır (tək qruplaşdırılmış sorğu): **nağd** = `PaidVia = Cash` olan satışların `PaidAmount` cəmi (nisyə satışın nağd ilkin ödənişi də daxil), **kart** = `PaidVia = Card` üçün eyni, **nisyə** = nisyə satışların `TotalAmount − PaidAmount` (yalnız ödənilməmiş qalıq) cəmi.
+   BE#28-dən sonra **işçi maaş ödənişləri** (`SalaryEntry.Type = Payment`, `Date` Bakı gününə düşən) də kassadan çıxan puldur və `Closing.Create(...)`-a ötürülməzdən əvvəl xərc cəminə əlavə olunur: `expenses = xərclər + maaş ödənişləri`. Ayrı sahə YARADILMIR — `ClosingDto` wire formatı dondurulub (ADR-0006). Maaş **tutulmaları** (`Deduction`) sorğuya heç düşmür: fiziki pul çıxmır, yalnız işçinin hesabından tutulur.
 5. `Closing.Create(...)` — düsturlar constructor-da: `ExpectedCash = OpeningCash + CashSales − Expenses`, `Difference = ActualCash − ExpectedCash`. Nisyənin ödənilməmiş qalığı kassaya daxil deyil.
 6. Activity log ("Gün sonu bağladı"), transaction commit.
 
@@ -18,9 +19,12 @@
 ## Digər modullara təsiri
 
 - **Sales**: günü bağlanmış satış REDAKTƏ oluna bilməz (`ClosingExistsAsync` qoruması UpdateSale-də; Delete-də qoruma yoxdur).
-- **Reports**: dashboard `ExpectedCash` son bağlanışın `ActualCash`-inə lövbərlənir + ondan sonrakı REAL alınan nağd (`SalesReportRow.ReceivedVia = Nağd` sətirlərinin `ReceivedAmount` cəmi) − xərclər. Gün sonu ilə eyni düstur.
+- **Reports**: dashboard `ExpectedCash` son bağlanışın `ActualCash`-inə lövbərlənir + ondan sonrakı REAL alınan nağd (`SalesReportRow.ReceivedVia = Nağd` sətirlərinin `ReceivedAmount` cəmi) − xərclər − maaş ödənişləri. Gün sonu ilə eyni düstur. Dashboard diapazon üzərində işlədiyi üçün maaş sətirlərini `ISalaryModule.GetPaymentsAsync(from, to)` ilə oxuyur (`IExpensesModule.GetExpensesAsync` ilə simmetrik); bağlanmış günün ödənişi ikinci dəfə çıxılmır. `todayExpenses` də bugünkü maaş ödənişlərini ehtiva edir.
+- **Auth (employees)**: `ISalaryModule` kontraktını təqdim edir. BE#28-də `AuthDbContext` paylaşılan `IDbConnectionFactory` bağlantısına keçdi və `ITransactionalDbContext` oldu — maaş sətri ilə activity log-u eyni transaction-da yazmaq üçün.
 
 ## Last Updated
+
+2026-08-01 — BE#28: gün cəminə işçi maaş ödənişləri əlavə olundu (`ISalaryModule.GetDayPaymentsTotalAsync`); tutulmalar kassaya toxunmur.
 
 2026-07-30 — BE#15: gün totalları real alınan pula keçdi (nağd/kart = `PaidAmount`, nisyə = qalıq).
 

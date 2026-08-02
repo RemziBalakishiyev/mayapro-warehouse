@@ -33,6 +33,14 @@ public sealed class DayEndApiTests : IAsyncLifetime
         await SellPartiallyPaidAsync(client, product.Id, quantity: 5, paidAmount: 30m, customer.Id);
         await AddGeneralExpenseAsync(client, amount: 40m);                        // +40 expenses
 
+        // BE#28: a salary payment is cash out of the same drawer, so the server must fold it into the day's
+        // expense total; a deduction is charged to the employee's account only and must not.
+        decimal expensesBeforeSalary = await TodayExpensesAsync(client);
+        await AddSalaryEntryAsync(client, type: "payment", amount: 200m);         // +200 expenses
+        await AddSalaryEntryAsync(client, type: "deduction", amount: 30m);        // +0 — account only
+        decimal expensesWithSalary = await TodayExpensesAsync(client);
+        Assert.Equal(expensesBeforeSalary + 200m, expensesWithSalary);            // the 30 deduction is absent
+
         // The client sends only cash figures + note; totals are the server's job.
         HttpResponseMessage close = await client.PostAsJsonAsync(
             "/api/closings", new { openingCash = 100m, actualCash = 90m, note = "Gün sonu" });
@@ -46,7 +54,11 @@ public sealed class DayEndApiTests : IAsyncLifetime
         Assert.True(c.CashSales >= 60m);     // 30 outright + the partially paid sale's 30 down-payment
         Assert.True(c.CardSales >= 20m);
         Assert.True(c.CreditSales >= 30m);   // 10 owed outright + 20 still owed on the partially paid sale
-        Assert.True(c.Expenses >= 40m);
+        Assert.True(c.Expenses >= 240m);     // 40 store expense + the 200 salary payment (BE#28)
+
+        // The closing's expense figure is exactly the day's expenses plus salary payments — the same number
+        // the dashboard reports, so the two views of the drawer can never drift apart.
+        Assert.Equal(expensesWithSalary, c.Expenses);
 
         // The partially paid sale added its down-payment to the debt-free side and only the rest to the debt.
         Assert.Equal(30m, (await client.GetCustomerAsync(customer.Id)).Debt); // 10 + 20, not 10 + 50
@@ -101,6 +113,22 @@ public sealed class DayEndApiTests : IAsyncLifetime
             paidAmount,
             paidVia = "Nağd"
         });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task<decimal> TodayExpensesAsync(HttpClient client) =>
+        (await client.GetFromJsonAsync<IntegrationTestHelpers.DashboardDto>("/api/reports/dashboard"))!.TodayExpenses;
+
+    /// <summary>Records a salary line for the seeded employee no other day-end figure depends on.</summary>
+    private static async Task AddSalaryEntryAsync(HttpClient client, string type, decimal amount)
+    {
+        List<IntegrationTestHelpers.EmployeeDto> employees =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.EmployeeDto>>("/api/employees"))!;
+        Guid employeeId = employees.Single(e => e.Phone == IntegrationTestHelpers.SecondSellerPhone).Id;
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            $"/api/employees/{employeeId}/salary-entries",
+            new { type, amount, note = (string?)null, month = (string?)null });
         response.EnsureSuccessStatusCode();
     }
 
