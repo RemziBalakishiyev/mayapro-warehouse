@@ -44,9 +44,9 @@ internal static class ExportsEndpoints
                 ExportSalesPdfHandler handler,
                 CancellationToken ct) =>
             {
-                if (!TryParseOptionalDate(from, out DateOnly? fromDate, out string? fromError))
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
                     return Results.BadRequest(new { code = "Exports.InvalidFrom", message = fromError });
-                if (!TryParseOptionalDate(to, out DateOnly? toDate, out string? toError))
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
                     return Results.BadRequest(new { code = "Exports.InvalidTo", message = toError });
 
                 Result<ExportFileResult> result = await handler.Handle(fromDate, toDate, ct);
@@ -110,22 +110,5 @@ internal static class ExportsEndpoints
             .AllowAnonymous()
             .RequireRateLimiting(PublicInvoiceRateLimit)
             .WithName("GetPublicInvoicePdf");
-    }
-
-    private static bool TryParseOptionalDate(string? raw, out DateOnly? date, out string? error)
-    {
-        date = null;
-        error = null;
-        if (string.IsNullOrWhiteSpace(raw))
-            return true;
-
-        if (DateOnly.TryParse(raw, out DateOnly parsed))
-        {
-            date = parsed;
-            return true;
-        }
-
-        error = "Tarix formatı yanlışdır (gözlənilən: yyyy-MM-dd)";
-        return false;
     }
 }

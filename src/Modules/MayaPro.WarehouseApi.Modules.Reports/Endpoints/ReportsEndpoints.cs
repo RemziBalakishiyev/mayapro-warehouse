@@ -33,12 +33,14 @@ internal static class ReportsEndpoints
         // fields; an absent from/to means the whole history.
         // BE#31 — from/to are bound as raw strings, not DateOnly?: an unparsable value must reach the
         // handler as a normal { code, message } 400, not blow up minimal-API model binding into a 500.
+        // Parsing itself lives in the shared OptionalDateQuery (also used by ExportsEndpoints) so the two
+        // modules don't drift on what "unparsable" means or how it's worded.
         group.MapGet("/products-kpi", async (
                 string? from, string? to, GetProductsKpiHandler handler, CancellationToken ct) =>
             {
-                if (!TryParseOptionalDate(from, out DateOnly? fromDate, out string? fromError))
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
                     return Results.BadRequest(new { code = "Reports.InvalidFrom", message = fromError });
-                if (!TryParseOptionalDate(to, out DateOnly? toDate, out string? toError))
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
                     return Results.BadRequest(new { code = "Reports.InvalidTo", message = toError });
 
                 return (await handler.Handle(fromDate, toDate, ct)).ToHttpResult();
@@ -48,9 +50,9 @@ internal static class ReportsEndpoints
         group.MapGet("/sales-kpi", async (
                 string? from, string? to, GetSalesKpiHandler handler, CancellationToken ct) =>
             {
-                if (!TryParseOptionalDate(from, out DateOnly? fromDate, out string? fromError))
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
                     return Results.BadRequest(new { code = "Reports.InvalidFrom", message = fromError });
-                if (!TryParseOptionalDate(to, out DateOnly? toDate, out string? toError))
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
                     return Results.BadRequest(new { code = "Reports.InvalidTo", message = toError });
 
                 return (await handler.Handle(fromDate, toDate, ct)).ToHttpResult();
@@ -60,33 +62,13 @@ internal static class ReportsEndpoints
         group.MapGet("/debts-kpi", async (
                 string? from, string? to, GetDebtsKpiHandler handler, CancellationToken ct) =>
             {
-                if (!TryParseOptionalDate(from, out DateOnly? fromDate, out string? fromError))
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
                     return Results.BadRequest(new { code = "Reports.InvalidFrom", message = fromError });
-                if (!TryParseOptionalDate(to, out DateOnly? toDate, out string? toError))
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
                     return Results.BadRequest(new { code = "Reports.InvalidTo", message = toError });
 
                 return (await handler.Handle(fromDate, toDate, ct)).ToHttpResult();
             })
             .WithName("GetDebtsKpi");
-    }
-
-    // BE#31 — mirrors ExportsEndpoints.TryParseOptionalDate: an absent/blank value is valid (means
-    // "unbounded"), while an unparsable one is reported as a { code, message } 400 instead of letting
-    // minimal-API binding throw and surface as a 500 through the GlobalExceptionHandler.
-    private static bool TryParseOptionalDate(string? raw, out DateOnly? date, out string? error)
-    {
-        date = null;
-        error = null;
-        if (string.IsNullOrWhiteSpace(raw))
-            return true;
-
-        if (DateOnly.TryParse(raw, out DateOnly parsed))
-        {
-            date = parsed;
-            return true;
-        }
-
-        error = "Tarix formatı yanlışdır (gözlənilən: yyyy-MM-dd)";
-        return false;
     }
 }
