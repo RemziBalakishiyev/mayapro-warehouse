@@ -8,7 +8,8 @@ namespace MayaPro.WarehouseApi.Modules.DayEnd.Tests;
 /// </summary>
 public sealed class ClosingTests
 {
-    private static Closing Create(decimal openingCash, decimal cashSales, decimal expenses, decimal actualCash) =>
+    private static Closing Create(
+        decimal openingCash, decimal cashSales, decimal expenses, decimal actualCash, decimal salaryExpenses = 0m) =>
         Closing.Create(
             date: new DateOnly(2026, 7, 11),
             openingCash: openingCash,
@@ -16,6 +17,7 @@ public sealed class ClosingTests
             cardSales: 0,
             nisyeSales: 0,
             expenses: expenses,
+            salaryExpenses: salaryExpenses,
             actualCash: actualCash,
             closedByUserId: null,
             note: null);
@@ -50,5 +52,30 @@ public sealed class ClosingTests
         Closing closing = Create(openingCash: 100, cashSales: 200, expenses: 50, actualCash: 250);
 
         Assert.Equal(0m, closing.Difference);
+    }
+
+    /// <summary>
+    /// BE#33: <c>SalaryExpenses</c> is stored as an informational breakdown of <c>Expenses</c> — it must
+    /// never change <c>ExpectedCash</c>/<c>Difference</c>, which already folded salary payments into
+    /// <c>Expenses</c> before this field existed (BE#28).
+    /// </summary>
+    [Fact]
+    public void SalaryExpenses_Is_Stored_Without_Changing_ExpectedCash_Or_Difference()
+    {
+        Closing closing = Create(
+            openingCash: 100, cashSales: 200, expenses: 240, actualCash: 90, salaryExpenses: 200);
+
+        Assert.Equal(200m, closing.SalaryExpenses);
+        Assert.Equal(60m, closing.ExpectedCash);   // 100 + 200 − 240 (240 already includes the 200 salary)
+        Assert.Equal(30m, closing.Difference);     // 90 − 60
+    }
+
+    /// <summary>Default (no salary payments) keeps SalaryExpenses at zero — the pre-BE#33 shape.</summary>
+    [Fact]
+    public void SalaryExpenses_Defaults_To_Zero()
+    {
+        Closing closing = Create(openingCash: 100, cashSales: 200, expenses: 50, actualCash: 250);
+
+        Assert.Equal(0m, closing.SalaryExpenses);
     }
 }

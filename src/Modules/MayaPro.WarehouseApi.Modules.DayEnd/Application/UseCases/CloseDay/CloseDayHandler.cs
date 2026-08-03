@@ -16,8 +16,13 @@ namespace MayaPro.WarehouseApi.Modules.DayEnd.Application.UseCases.CloseDay;
 /// BE#28: salary <b>payments</b> made today are cash that left the same drawer, so they are added to the
 /// expense total before the closing is built — expected cash then reads
 /// <c>opening + cash sales − (expenses + salary payments)</c>. They are folded into the existing
-/// <c>Expenses</c> figure rather than a new field, because the closing's wire format is frozen (ADR-0006).
-/// Salary <b>deductions</b> move no cash and are deliberately not fetched at all.
+/// <c>Expenses</c> figure (ADR-0006-safe: existing figures never change). Salary <b>deductions</b> move no
+/// cash and are deliberately not fetched at all.
+/// </para>
+/// <para>
+/// BE#33: the same salary-payments figure is also stored on <c>Closing.SalaryExpenses</c> — an additive,
+/// informational breakdown of <c>Expenses</c> — so the frontend can show "employee payments" as its own
+/// line, matching exactly what <c>GetSummaryHandler</c>'s pre-close preview already reported.
 /// </para>
 /// </summary>
 public sealed class CloseDayHandler(
@@ -54,6 +59,7 @@ public sealed class CloseDayHandler(
             totals.Card,
             totals.Credit,
             expenseTotal + salaryPaid,
+            salaryPaid,
             command.ActualCash,
             currentUser.UserId,
             command.Note);

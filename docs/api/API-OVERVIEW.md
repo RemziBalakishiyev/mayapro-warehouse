@@ -24,7 +24,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 `salary-summary` hər işçi üçün bir sətir qaytarır (`userId, fullName, role, monthlySalary, paidTotal, deductionTotal, remaining`); sətri olmayan işçi də `0/0/monthlySalary` ilə görünür. `remaining = monthlySalary − paidTotal − deductionTotal` MƏNFİ ola bilər — «artıq ödənilib» deməkdir, xəta deyil.
 
-Kassa təsiri: `payment` sətirləri gün sonu bağlanışında mövcud `expenses` rəqəminin İÇİNƏ əlavə olunur (`ClosingDto` wire formatı dəyişmir — ADR-0006) və dashboard-un `todayExpenses`/`expectedCash` sahələrinə düşür. `deduction` heç birinə düşmür.
+Kassa təsiri: `payment` sətirləri gün sonu bağlanışında mövcud `expenses` rəqəminin İÇİNƏ əlavə olunur və dashboard-un `todayExpenses`/`expectedCash` sahələrinə düşür. `deduction` heç birinə düşmür. **BE#33:** həmin `payment` cəmi indi ayrıca da görünür — `GET /api/reports/summary`-nin cavabına (istənilən `period` üçün) additiv `salaryExpenses` sahəsi, `POST /api/closings` və `GET /api/closings*`-in cavabına additiv `ClosingDto.salaryExpenses` sahəsi əlavə olundu (`expenses = generalExpenses + productExpenses + salaryExpenses`; `Expenses`/`ExpectedCash`-in özü DƏYİŞMƏYİB, sadəcə artıq mövcud rəqəmin bir hissəsi ayrıca göstərilir).
 
 400 halları: `Salary.InvalidType` («Maaş əməliyyatının növü yanlışdır»), `Salary.InvalidMonth` («Ay formatı yanlışdır (yyyy-MM)»), «Məbləğ sıfırdan böyük olmalıdır», «Qeyd 500 simvoldan uzun ola bilməz», «Maaş mənfi ola bilməz». 404 halları: `Auth.UserNotFound`, `Salary.EntryNotFound` (sətir yoxdursa VƏ YA route-dakı işçiyə aid deyilsə — cross-user sızma yoxdur).
 

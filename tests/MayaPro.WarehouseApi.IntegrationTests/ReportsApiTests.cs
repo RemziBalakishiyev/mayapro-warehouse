@@ -234,8 +234,48 @@ public sealed class ReportsApiTests : IAsyncLifetime
 
         Assert.True(s.GeneralExpenses >= 100m);
         Assert.True(s.ProductExpenses >= 250m);
-        Assert.Equal(s.Expenses, s.GeneralExpenses + s.ProductExpenses); // split always sums to the total
+        // BE#33: the split now has three parts (general/product/salary) but must still sum to the total.
+        Assert.Equal(s.Expenses, s.GeneralExpenses + s.ProductExpenses + s.SalaryExpenses);
         Assert.Equal(s.Profit - s.Expenses, s.NetProfit);                // net profit formula unaffected
+    }
+
+    /// <summary>
+    /// BE#33: today's salary PAYMENT (BE#28 <c>salary-entries</c>, <c>type=payment</c>) must reach
+    /// <c>SummaryDto.SalaryExpenses</c> and be folded into <c>Expenses</c>/<c>NetProfit</c> exactly like the
+    /// day-end close already does — this is the pre-close preview the bug report is about. A same-day
+    /// DEDUCTION must never reach any of these figures (charged to the employee's account only).
+    /// </summary>
+    [Fact]
+    public async Task Summary_Today_Includes_Salary_Payments_But_Excludes_Deductions()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        var before = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+
+        await AddSalaryEntryAsync(client, type: "payment", amount: 120m);
+        await AddSalaryEntryAsync(client, type: "deduction", amount: 15m);
+
+        var after = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+
+        Assert.Equal(120m, after.SalaryExpenses - before.SalaryExpenses);   // only the payment counted
+        Assert.Equal(120m, after.Expenses - before.Expenses);               // …and folded into the total
+        Assert.Equal(after.Profit - after.Expenses, after.NetProfit);       // net profit formula unaffected
+        Assert.Equal(after.Expenses, after.GeneralExpenses + after.ProductExpenses + after.SalaryExpenses);
+    }
+
+    /// <summary>Records a salary line for the seeded employee no other reports test depends on.</summary>
+    private static async Task AddSalaryEntryAsync(HttpClient client, string type, decimal amount)
+    {
+        List<IntegrationTestHelpers.EmployeeDto> employees =
+            (await client.GetFromJsonAsync<List<IntegrationTestHelpers.EmployeeDto>>("/api/employees"))!;
+        Guid employeeId = employees.Single(e => e.Phone == IntegrationTestHelpers.SecondSellerPhone).Id;
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            $"/api/employees/{employeeId}/salary-entries",
+            new { type, amount, note = (string?)null, month = (string?)null });
+        response.EnsureSuccessStatusCode();
     }
 
     /// <summary>

@@ -10,10 +10,16 @@ namespace MayaPro.WarehouseApi.Modules.Reports.Application.Contracts;
 /// separately via <see cref="UnknownProfitSalesCount"/> and <see cref="UnknownProfitAmount"/> (their revenue sum).
 /// </para>
 /// <para>
-/// <see cref="GeneralExpenses"/> + <see cref="ProductExpenses"/> always sums to <see cref="Expenses"/> —
-/// a split of the same total by <c>Expense.Source</c> ("general" = no product effect, "product" = raised a
-/// product's real cost), not a separate figure. <see cref="NetProfit"/> keeps using the single total, so
-/// the split never changes it.
+/// <see cref="GeneralExpenses"/> + <see cref="ProductExpenses"/> + <see cref="SalaryExpenses"/> always sums
+/// to <see cref="Expenses"/> — <c>GeneralExpenses</c>/<c>ProductExpenses</c> are a split of the Expenses
+/// module's total by <c>Expense.Source</c> ("general" = no product effect, "product" = raised a product's
+/// real cost), and <c>SalaryExpenses</c> is a separate source (employee salary <b>payments</b>) folded into
+/// the same total. <see cref="NetProfit"/> keeps using the single total, so the split never changes it.
+/// </para>
+/// <para>
+/// BE#33: <see cref="SalaryExpenses"/> is the period's salary <b>payments</b> only (<c>ISalaryModule</c>
+/// never returns deductions — see its docs) — the same figure <c>CloseDayHandler</c> folds into a closing's
+/// <c>Expenses</c>, so this preview and the actual day-end close never disagree on "today"'s salary payments.
 /// </para>
 /// </summary>
 public sealed record SummaryDto(
@@ -31,4 +37,5 @@ public sealed record SummaryDto(
     int UnknownProfitSalesCount,
     decimal UnknownProfitAmount,
     decimal GeneralExpenses,
-    decimal ProductExpenses);
+    decimal ProductExpenses,
+    decimal SalaryExpenses);
