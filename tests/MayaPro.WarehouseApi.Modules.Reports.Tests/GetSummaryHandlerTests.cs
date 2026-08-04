@@ -24,7 +24,10 @@ public sealed class GetSummaryHandlerTests
             Expense(Today, 250m, Product),
             Expense(Today, 50m, General));
         var handler = new GetSummaryHandler(
-            new FakeSalesModule(Sale(Today, total: 1000m, profit: 400m)), expenses, new FixedDateProvider(Today));
+            new FakeSalesModule(Sale(Today, total: 1000m, profit: 400m)),
+            expenses,
+            new FakeSalaryModule(),
+            new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
@@ -32,8 +35,9 @@ public sealed class GetSummaryHandlerTests
         SummaryDto summary = result.Value;
         Assert.Equal(150m, summary.GeneralExpenses);
         Assert.Equal(250m, summary.ProductExpenses);
+        Assert.Equal(0m, summary.SalaryExpenses);
         Assert.Equal(400m, summary.Expenses);                                        // unchanged total
-        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses);
+        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses + summary.SalaryExpenses);
         Assert.Equal(0m, summary.NetProfit);                                         // 400 profit − 400 expenses
     }
 
@@ -41,13 +45,14 @@ public sealed class GetSummaryHandlerTests
     public async Task Split_Is_Zero_When_There_Are_No_Expenses()
     {
         var handler = new GetSummaryHandler(
-            new FakeSalesModule(), new FakeExpensesModule(), new FixedDateProvider(Today));
+            new FakeSalesModule(), new FakeExpensesModule(), new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0m, result.Value.GeneralExpenses);
         Assert.Equal(0m, result.Value.ProductExpenses);
+        Assert.Equal(0m, result.Value.SalaryExpenses);
         Assert.Equal(0m, result.Value.Expenses);
     }
 
@@ -57,6 +62,7 @@ public sealed class GetSummaryHandlerTests
         var handler = new GetSummaryHandler(
             new FakeSalesModule(),
             new FakeExpensesModule(Expense(Today, 75m, General)),
+            new FakeSalaryModule(),
             new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
@@ -75,7 +81,8 @@ public sealed class GetSummaryHandlerTests
         var expenses = new FakeExpensesModule(
             Expense(Today, 100m, General),
             Expense(yesterday, 500m, Product));
-        var handler = new GetSummaryHandler(new FakeSalesModule(), expenses, new FixedDateProvider(Today));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), expenses, new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
@@ -84,7 +91,7 @@ public sealed class GetSummaryHandlerTests
         Assert.Equal(100m, summary.GeneralExpenses);
         Assert.Equal(0m, summary.ProductExpenses);
         Assert.Equal(100m, summary.Expenses);
-        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses);
+        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses + summary.SalaryExpenses);
     }
 
     [Fact]
@@ -93,7 +100,8 @@ public sealed class GetSummaryHandlerTests
         var expenses = new FakeExpensesModule(
             Expense(Today, 40m, Product),
             Expense(Today, 60m, Product));
-        var handler = new GetSummaryHandler(new FakeSalesModule(), expenses, new FixedDateProvider(Today));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), expenses, new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
@@ -102,7 +110,7 @@ public sealed class GetSummaryHandlerTests
         Assert.Equal(0m, summary.GeneralExpenses);
         Assert.Equal(100m, summary.ProductExpenses);
         Assert.Equal(100m, summary.Expenses);
-        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses);
+        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses + summary.SalaryExpenses);
     }
 
     [Fact]
@@ -113,7 +121,8 @@ public sealed class GetSummaryHandlerTests
         var expenses = new FakeExpensesModule(
             Expense(Today, 30m, Product),
             Expense(Today, 70m, "supplier"));
-        var handler = new GetSummaryHandler(new FakeSalesModule(), expenses, new FixedDateProvider(Today));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), expenses, new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
@@ -121,7 +130,7 @@ public sealed class GetSummaryHandlerTests
         SummaryDto summary = result.Value;
         Assert.Equal(30m, summary.ProductExpenses);
         Assert.Equal(100m, summary.Expenses);
-        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses);
+        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses + summary.SalaryExpenses);
     }
 
     [Fact]
@@ -129,7 +138,8 @@ public sealed class GetSummaryHandlerTests
     {
         // The split must be computed over the requested period, not over everything.
         var expenses = new FakeExpensesModule(Expense(Today, 10m, General));
-        var handler = new GetSummaryHandler(new FakeSalesModule(), expenses, new FixedDateProvider(Today));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), expenses, new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("month", default);
 
@@ -137,6 +147,121 @@ public sealed class GetSummaryHandlerTests
         Assert.Equal(new DateOnly(2026, 7, 1), expenses.RequestedFrom);
         Assert.Equal(Today, expenses.RequestedTo);
         Assert.Equal("month", result.Value.Period);
+    }
+
+    /// <summary>
+    /// BE#33 happy path: today's salary payments flow through to <c>salaryExpenses</c> and into the
+    /// <c>expenses</c>/<c>netProfit</c> totals exactly like a store expense does.
+    /// </summary>
+    [Fact]
+    public async Task SalaryExpenses_Reflects_Todays_Salary_Payments_And_Feeds_Expenses_And_NetProfit()
+    {
+        var salary = new FakeSalaryModule(SalaryPayment(Today, 200m));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(Sale(Today, total: 1000m, profit: 400m)),
+            new FakeExpensesModule(),
+            salary,
+            new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        SummaryDto summary = result.Value;
+        Assert.Equal(200m, summary.SalaryExpenses);
+        Assert.Equal(200m, summary.Expenses);                 // no store expenses, only the salary payment
+        Assert.Equal(200m, summary.NetProfit);                // 400 profit − 200 expenses
+    }
+
+    /// <summary>BE#33 aggregation: several salary payments in the period sum into one figure.</summary>
+    [Fact]
+    public async Task SalaryExpenses_Sums_Several_Payments_In_The_Period()
+    {
+        var salary = new FakeSalaryModule(
+            SalaryPayment(Today, 100m),
+            SalaryPayment(Today, 50m),
+            SalaryPayment(Today, 25m));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), new FakeExpensesModule(), salary, new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(175m, result.Value.SalaryExpenses);
+        Assert.Equal(175m, result.Value.Expenses);
+    }
+
+    /// <summary>
+    /// BE#33: deductions never leave the drawer, so <c>ISalaryModule.GetPaymentsAsync</c> never returns them
+    /// (see its docs) — this fake mirrors that contract, proving the handler trusts it and adds no double
+    /// filtering of its own that could hide a real regression in the contract.
+    /// </summary>
+    [Fact]
+    public async Task SalaryExpenses_Excludes_Deductions()
+    {
+        var salary = new FakeSalaryModule(SalaryPayment(Today, 200m)); // a same-day deduction is never handed in
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), new FakeExpensesModule(), salary, new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(200m, result.Value.SalaryExpenses); // only the payment, never a deduction amount
+    }
+
+    /// <summary>BE#33 period boundary: a salary payment outside the requested window is excluded.</summary>
+    [Fact]
+    public async Task SalaryExpenses_Outside_The_Period_Are_Excluded()
+    {
+        DateOnly yesterday = Today.AddDays(-1);
+        var salary = new FakeSalaryModule(SalaryPayment(Today, 100m), SalaryPayment(yesterday, 500m));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(), new FakeExpensesModule(), salary, new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(100m, result.Value.SalaryExpenses);
+        Assert.Equal(Today, salary.RequestedFrom);
+        Assert.Equal(Today, salary.RequestedTo);
+    }
+
+    /// <summary>BE#33 empty salary: no salary payments at all keeps salaryExpenses (and expenses) unaffected.</summary>
+    [Fact]
+    public async Task SalaryExpenses_Is_Zero_With_No_Salary_Payments()
+    {
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(),
+            new FakeExpensesModule(Expense(Today, 40m, General)),
+            new FakeSalaryModule(),
+            new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle("today", default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0m, result.Value.SalaryExpenses);
+        Assert.Equal(40m, result.Value.Expenses); // unaffected — store expense only
+    }
+
+    /// <summary>BE#33 regression: month/all periods still fold salary payments into expenses the same way.</summary>
+    [Theory]
+    [InlineData("month")]
+    [InlineData("all")]
+    public async Task SalaryExpenses_Also_Works_For_Month_And_All_Periods(string period)
+    {
+        var salary = new FakeSalaryModule(SalaryPayment(Today, 60m));
+        var handler = new GetSummaryHandler(
+            new FakeSalesModule(),
+            new FakeExpensesModule(Expense(Today, 20m, General)),
+            salary,
+            new FixedDateProvider(Today));
+
+        Result<SummaryDto> result = await handler.Handle(period, default);
+
+        Assert.True(result.IsSuccess);
+        SummaryDto summary = result.Value;
+        Assert.Equal(60m, summary.SalaryExpenses);
+        Assert.Equal(80m, summary.Expenses); // 20 store + 60 salary
+        Assert.Equal(summary.Expenses, summary.GeneralExpenses + summary.ProductExpenses + summary.SalaryExpenses);
     }
 
     /// <summary>
@@ -154,7 +279,8 @@ public sealed class GetSummaryHandlerTests
             Sale(Today, total: 150m, profit: 30m, WireFormat.PaymentTypes.Card, paidAmount: 150m, paidVia: WireFormat.PaymentTypes.Card),
             Sale(Today, total: 500m, profit: 100m, WireFormat.PaymentTypes.Credit, paidAmount: 300m, paidVia: WireFormat.PaymentTypes.Cash),
             Sale(Today, total: 100m, profit: 20m, WireFormat.PaymentTypes.Credit, paidAmount: 0m, paidVia: null));
-        var handler = new GetSummaryHandler(sales, new FakeExpensesModule(), new FixedDateProvider(Today));
+        var handler = new GetSummaryHandler(
+            sales, new FakeExpensesModule(), new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
@@ -172,7 +298,7 @@ public sealed class GetSummaryHandlerTests
         // TC7: no rows at all must be zeros rather than a throw or a null — the summary is still a valid
         // (empty) report, which is the state every store starts its day in.
         var handler = new GetSummaryHandler(
-            new FakeSalesModule(), new FakeExpensesModule(), new FixedDateProvider(Today));
+            new FakeSalesModule(), new FakeExpensesModule(), new FakeSalaryModule(), new FixedDateProvider(Today));
 
         Result<SummaryDto> result = await handler.Handle("today", default);
 
@@ -185,6 +311,9 @@ public sealed class GetSummaryHandlerTests
 
     private static ExpenseReportRow Expense(DateOnly date, decimal amount, string source) =>
         new(date, "Yol pulu", amount, source);
+
+    private static SalaryPaymentRow SalaryPayment(DateOnly date, decimal amount) =>
+        new(date, Guid.NewGuid(), "Test işçi", amount);
 
     private static SalesReportRow Sale(DateOnly date, decimal total, decimal? profit) =>
         new(date, total, profit, WireFormat.PaymentTypes.Cash, null, "P", 1, total, IsManual: false);
@@ -208,6 +337,32 @@ public sealed class GetSummaryHandlerTests
             RequestedFrom = from;
             RequestedTo = to;
             IReadOnlyList<ExpenseReportRow> window = rows
+                .Where(r => (from is null || r.Date >= from) && (to is null || r.Date <= to))
+                .ToList();
+            return Task.FromResult(window);
+        }
+    }
+
+    /// <summary>
+    /// BE#33: mirrors <c>ISalaryModule</c>'s real contract — <c>GetPaymentsAsync</c> only ever hands out
+    /// rows that are already payments (never deductions), so the fake is seeded with amounts directly rather
+    /// than a wire "type", exactly like the real <c>SalaryModuleContract</c> filters before returning.
+    /// </summary>
+    private sealed class FakeSalaryModule(params SalaryPaymentRow[] rows) : ISalaryModule
+    {
+        public DateOnly? RequestedFrom { get; private set; }
+
+        public DateOnly? RequestedTo { get; private set; }
+
+        public Task<decimal> GetDayPaymentsTotalAsync(DateOnly date, CancellationToken cancellationToken = default) =>
+            Task.FromResult(rows.Where(r => r.Date == date).Sum(r => r.Amount));
+
+        public Task<IReadOnlyList<SalaryPaymentRow>> GetPaymentsAsync(
+            DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default)
+        {
+            RequestedFrom = from;
+            RequestedTo = to;
+            IReadOnlyList<SalaryPaymentRow> window = rows
                 .Where(r => (from is null || r.Date >= from) && (to is null || r.Date <= to))
                 .ToList();
             return Task.FromResult(window);

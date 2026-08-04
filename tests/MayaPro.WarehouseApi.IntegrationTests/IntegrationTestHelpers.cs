@@ -200,12 +200,14 @@ internal static class IntegrationTestHelpers
 
     internal sealed record SupplierHistoryEntryDto(DateTime Date, string Type, decimal Amount, string? Note);
 
+    /// <summary>Wire shape of a day-end closing — <c>salaryExpenses</c> added by BE#33.</summary>
     internal sealed record ClosingDto(
         decimal OpeningCash,
         decimal CashSales,
         decimal CardSales,
         decimal CreditSales,
         decimal Expenses,
+        decimal SalaryExpenses,
         decimal ExpectedCash,
         decimal ActualCash,
         decimal Difference);
@@ -287,6 +289,7 @@ internal static class IntegrationTestHelpers
 
     internal sealed record RecentPaymentDto(Guid Id, DateOnly Date, string CustomerName, decimal Amount);
 
+    /// <summary>Wire shape of <c>GET /api/reports/summary</c> — <c>salaryExpenses</c> added by BE#33.</summary>
     internal sealed record SummaryDto(
         string Period,
         DateOnly? From,
@@ -302,7 +305,8 @@ internal static class IntegrationTestHelpers
         int UnknownProfitSalesCount,
         decimal UnknownProfitAmount,
         decimal GeneralExpenses,
-        decimal ProductExpenses);
+        decimal ProductExpenses,
+        decimal SalaryExpenses);
 
     internal sealed record ErrorDto(string Code, string Message);
 }

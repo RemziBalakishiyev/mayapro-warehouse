@@ -41,6 +41,13 @@ public sealed class DayEndApiTests : IAsyncLifetime
         decimal expensesWithSalary = await TodayExpensesAsync(client);
         Assert.Equal(expensesBeforeSalary + 200m, expensesWithSalary);            // the 30 deduction is absent
 
+        // BE#33: the pre-close preview (GetSummaryHandler) must already report the same salary payments the
+        // actual close is about to fold in — captured here, right before closing, so nothing else can add a
+        // salary payment for today in between (this collection runs its tests sequentially).
+        var preview = (await client.GetFromJsonAsync<IntegrationTestHelpers.SummaryDto>(
+            "/api/reports/summary?period=today"))!;
+        Assert.True(preview.SalaryExpenses >= 200m);
+
         // The client sends only cash figures + note; totals are the server's job.
         HttpResponseMessage close = await client.PostAsJsonAsync(
             "/api/closings", new { openingCash = 100m, actualCash = 90m, note = "Gün sonu" });
@@ -59,6 +66,12 @@ public sealed class DayEndApiTests : IAsyncLifetime
         // The closing's expense figure is exactly the day's expenses plus salary payments — the same number
         // the dashboard reports, so the two views of the drawer can never drift apart.
         Assert.Equal(expensesWithSalary, c.Expenses);
+
+        // BE#33: SalaryExpenses is the salary-payments part of Expenses, broken out on its own, and it must
+        // agree exactly with what the pre-close preview reported a moment ago — no drift between preview and
+        // the actual close.
+        Assert.True(c.SalaryExpenses >= 200m);
+        Assert.Equal(preview.SalaryExpenses, c.SalaryExpenses);
 
         // The partially paid sale added its down-payment to the debt-free side and only the rest to the debt.
         Assert.Equal(30m, (await client.GetCustomerAsync(customer.Id)).Debt); // 10 + 20, not 10 + 50

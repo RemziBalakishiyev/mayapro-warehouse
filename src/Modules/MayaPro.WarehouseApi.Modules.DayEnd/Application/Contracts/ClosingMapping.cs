@@ -14,6 +14,7 @@ public static class ClosingMapping
             closing.CardSales,
             closing.NisyeSales,
             closing.Expenses,
+            closing.SalaryExpenses,
             closing.ExpectedCash,
             closing.ActualCash,
             closing.Difference,

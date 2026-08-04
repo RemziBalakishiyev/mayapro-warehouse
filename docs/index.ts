@@ -210,6 +210,8 @@ export interface Closing {
   cardSales: number;
   creditSales: number;
   expenses: number;
+  /** BE#33: the part of `expenses` that is employee salary payments (never deductions). Additive — `expenses`/`expectedCash` are unchanged. */
+  salaryExpenses: number;
   expectedCash: number;
   actualCash: number;
   difference: number;

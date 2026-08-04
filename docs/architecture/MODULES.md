@@ -24,7 +24,7 @@
 | `ICustomersModule` | Customers | Sales (`IncreaseDebtAsync`, `DecreaseDebtAsync`), Reports (`GetTotalDebtAsync`, `GetNamesAsync`, `GetRecentPaymentsAsync`), Exports (`GetCustomerInfoAsync`) |
 | `ISalesModule` | Sales | DayEnd (`GetDayTotalsAsync`), Reports (`GetSalesAsync`, `GetLastSaleDatesAsync`, `GetRecentSalesAsync`), Customers (`GetSalesByCustomerAsync`, `GetPurchaseStatsByCustomerAsync`, `GetOutstandingSalesAsync`, `DeleteCreditSaleAsync`), Exports (`GetInvoiceSaleAsync`, `GetSaleIdByInvoiceTokenAsync`) |
 | `IExpensesModule` | Expenses | DayEnd (`GetDayTotalAsync`), Reports, Exports |
-| `ISalaryModule` | Auth | DayEnd (`GetDayPaymentsTotalAsync` — günün maaş ödənişləri xərc cəminə), Reports (`GetPaymentsAsync` — dashboard `todayExpenses`/`expectedCash`). `IExpensesModule` ilə qəsdən simmetrikdir; hər iki metod YALNIZ `payment` sətirlərini qaytarır (tutulma kassaya toxunmur). |
+| `ISalaryModule` | Auth | DayEnd (`GetDayPaymentsTotalAsync` — günün maaş ödənişləri xərc cəminə), Reports (`GetPaymentsAsync` — dashboard `todayExpenses`/`expectedCash`, BE#33-dən sonra həm də `GetSummaryHandler`-in `salaryExpenses` sahəsi). `IExpensesModule` ilə qəsdən simmetrikdir; hər iki metod YALNIZ `payment` sətirlərini qaytarır (tutulma kassaya toxunmur). |
 | `ISuppliersModule` | Suppliers | Reports (ümumi borc, itemCount) |
 | `IDayEndModule` | DayEnd | Reports (`GetLastClosingAsync` — ExpectedCash lövbəri), Sales (`ClosingExistsAsync` — bağlı gün qoruması) |
 | `ISettingsModule` | Settings | Exports (`GetStoreNameAsync`, `GetStoreInfoAsync`) |
