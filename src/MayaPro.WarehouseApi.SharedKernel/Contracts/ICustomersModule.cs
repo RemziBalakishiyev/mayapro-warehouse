@@ -51,6 +51,24 @@ public interface ICustomersModule
     /// customer does not exist. Used by the Exports module for the invoice's customer block.
     /// </summary>
     Task<CustomerInfo?> GetCustomerInfoAsync(Guid customerId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// BE#27: returns every customer whose outstanding debt is positive, with their current balance.
+    /// Unlike <see cref="GetTotalDebtAsync"/> (a single sum), this is the per-customer breakdown the
+    /// read-only Reports module's debts-kpi endpoint needs for the debtor count and the top debtor.
+    /// </summary>
+    Task<IReadOnlyList<CustomerDebtRow>> GetDebtorsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// BE#27: returns the payments received in the inclusive date range (both bounds optional) — same
+    /// shape as <see cref="MayaPro.WarehouseApi.SharedKernel.Contracts.IExpensesModule.GetExpensesAsync"/>,
+    /// unlike <see cref="GetRecentPaymentsAsync"/> which is take-based rather than date-bounded. Used by the
+    /// read-only Reports module's debts-kpi endpoint for the period's collected total.
+    /// </summary>
+    Task<IReadOnlyList<CustomerPaymentRow>> GetPaymentsAsync(
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>A customer's printable details for documents: name, optional phone, current debt.</summary>
@@ -58,3 +76,9 @@ public sealed record CustomerInfo(string Name, string? Phone, decimal Debt);
 
 /// <summary>A recent customer payment for the dashboard feed. Date is the business-zone (local) date.</summary>
 public sealed record RecentPaymentInfo(Guid Id, DateOnly Date, string CustomerName, decimal Amount);
+
+/// <summary>BE#27: one customer's positive outstanding balance, for the debts-kpi debtor breakdown.</summary>
+public sealed record CustomerDebtRow(Guid CustomerId, string Name, decimal Debt);
+
+/// <summary>BE#27: a customer payment as seen by reports — amount and business-zone (local) date only.</summary>
+public sealed record CustomerPaymentRow(DateOnly Date, decimal Amount);

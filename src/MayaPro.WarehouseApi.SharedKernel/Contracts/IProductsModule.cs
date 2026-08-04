@@ -85,6 +85,18 @@ public interface IProductsModule
     Task<IReadOnlyList<ProductLabelInfo>> GetLabelInfoAsync(
         IReadOnlyCollection<Guid> productIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// BE#27: returns the manual stock corrections (see <c>Product.AdjustStock</c>) in the inclusive date
+    /// range (both bounds optional) — same shape as <see cref="IExpensesModule.GetExpensesAsync"/>. Used by
+    /// the read-only Reports module's products-kpi endpoint to compute how many units were added back to
+    /// stock over a period; negative corrections (loss/damage) are included too — the caller decides
+    /// whether to filter them out.
+    /// </summary>
+    Task<IReadOnlyList<StockAdjustmentRow>> GetStockAdjustmentsAsync(
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -101,6 +113,11 @@ public sealed record ProductStockSnapshot(
 /// <summary>
 /// A read-only product snapshot. Carries enough for the Reports module to value stock and flag low
 /// stock: identity, category, on-hand quantity, its reorder threshold, real cost and sale price.
+/// <para>
+/// BE#27: <see cref="InitialQuantity"/> and <see cref="CreatedAt"/> (UTC) are trailing, defaulted fields so
+/// every existing positional caller keeps compiling unchanged — only the products-kpi endpoint's
+/// purchasedUnits calculation (new product's opening stock within a period) needs them.
+/// </para>
 /// </summary>
 public sealed record ProductSnapshot(
     Guid Id,
@@ -109,7 +126,15 @@ public sealed record ProductSnapshot(
     int Quantity,
     int MinStock,
     decimal RealCostPerUnit,
-    decimal SalePrice);
+    decimal SalePrice,
+    int InitialQuantity = 0,
+    DateTime CreatedAt = default);
+
+/// <summary>
+/// BE#27: a manual stock correction as seen by reports — the product it applied to, the signed delta
+/// (positive adds, negative removes) and the business-zone (local) date it was made.
+/// </summary>
+public sealed record StockAdjustmentRow(Guid ProductId, int Delta, DateOnly Date);
 
 /// <summary>
 /// A product row for Excel export: catalogue fields plus expenses total and supplier reference.

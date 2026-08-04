@@ -80,4 +80,30 @@ internal sealed class CustomersModuleContract(ICustomersDbContext db, IDateProvi
 
         return customer is null ? null : new CustomerInfo(customer.Name, customer.Phone, customer.Debt);
     }
+
+    public async Task<IReadOnlyList<CustomerDebtRow>> GetDebtorsAsync(CancellationToken cancellationToken = default) =>
+        await db.Customers
+            .AsNoTracking()
+            .Where(c => c.Debt > 0m)
+            .Select(c => new CustomerDebtRow(c.Id, c.Name, c.Debt))
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<CustomerPaymentRow>> GetPaymentsAsync(
+        DateOnly? from,
+        DateOnly? to,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<CustomerPayment> query = db.CustomerPayments.AsNoTracking();
+
+        if (from is { } f)
+            query = query.Where(p => p.Date >= dateProvider.LocalDayRangeUtc(f).StartUtc);
+        if (to is { } t)
+            query = query.Where(p => p.Date < dateProvider.LocalDayRangeUtc(t).EndUtc);
+
+        List<CustomerPayment> payments = await query.OrderBy(p => p.Date).ToListAsync(cancellationToken);
+
+        return payments
+            .Select(p => new CustomerPaymentRow(dateProvider.ToLocalDate(p.Date), p.Amount))
+            .ToList();
+    }
 }

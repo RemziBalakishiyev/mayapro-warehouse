@@ -52,6 +52,10 @@ internal sealed class StubProductsModule(params ProductLabelInfo[] products) : I
 
     public Task<IReadOnlyList<ProductExportRow>> GetExportProductsAsync(CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+
+    public Task<IReadOnlyList<StockAdjustmentRow>> GetStockAdjustmentsAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
 }
 
 /// <summary>A frozen clock, so the export file name is asserted against a known date.</summary>
@@ -146,6 +150,13 @@ internal sealed class StubCustomersModule(CustomerInfo? customer = null) : ICust
 
     public Task<Dictionary<Guid, string>> GetNamesAsync(
         IEnumerable<Guid> ids, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<CustomerDebtRow>> GetDebtorsAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<CustomerPaymentRow>> GetPaymentsAsync(
+        DateOnly? from, DateOnly? to, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }
 

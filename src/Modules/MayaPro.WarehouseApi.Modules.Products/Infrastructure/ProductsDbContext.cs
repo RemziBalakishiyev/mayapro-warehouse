@@ -19,6 +19,8 @@ public sealed class ProductsDbContext(DbContextOptions<ProductsDbContext> option
 
     public DbSet<Category> Categories => Set<Category>();
 
+    public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
+
     public Task EnlistAsync(DbTransaction transaction, CancellationToken cancellationToken = default) =>
         Database.UseTransactionAsync(transaction, cancellationToken);
 
