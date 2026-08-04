@@ -365,6 +365,23 @@ public sealed class ReportsApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
+    /// <summary>
+    /// BE#31 (AC-G4): an unparsable <c>from</c> must come back as a normal { code, message } 400, not a
+    /// 500 raised by minimal-API's DateOnly? model binding — see BE#31 repro (from=not-a-date).
+    /// </summary>
+    [Fact]
+    public async Task ProductsKpi_PK_I5_Unparsable_From_Returns_400_Not_500()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp =
+            await client.GetAsync("/api/reports/products-kpi?from=not-a-date&to=2026-08-02");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidFrom", error.Code);
+    }
+
     [Fact]
     public async Task SalesKpi_SK_I1_Reflects_A_Cash_Sale_In_Revenue_Profit_And_ByPayment()
     {
@@ -407,6 +424,19 @@ public sealed class ReportsApiTests : IAsyncLifetime
         HttpResponseMessage resp = await client.GetAsync("/api/reports/sales-kpi");
 
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    /// <summary>BE#31 (AC-G4): same unparsable-date protection as products-kpi, for sales-kpi.</summary>
+    [Fact]
+    public async Task SalesKpi_SK_I4_Unparsable_From_Returns_400_Not_500()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/sales-kpi?from=not-a-date&to=2026-08-02");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidFrom", error.Code);
     }
 
     [Fact]
@@ -461,5 +491,18 @@ public sealed class ReportsApiTests : IAsyncLifetime
         HttpResponseMessage resp = await client.GetAsync("/api/reports/debts-kpi");
 
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    /// <summary>BE#31 (AC-G4): same unparsable-date protection as products-kpi, for debts-kpi.</summary>
+    [Fact]
+    public async Task DebtsKpi_DK_I5_Unparsable_From_Returns_400_Not_500()
+    {
+        HttpClient client = await _factory.AuthenticatedClientAsync();
+
+        HttpResponseMessage resp = await client.GetAsync("/api/reports/debts-kpi?from=not-a-date&to=2026-08-02");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var error = (await resp.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Reports.InvalidFrom", error.Code);
     }
 }

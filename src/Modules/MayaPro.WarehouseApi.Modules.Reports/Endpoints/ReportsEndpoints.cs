@@ -31,19 +31,44 @@ internal static class ReportsEndpoints
 
         // BE#27 — page KPI endpoints: from/to (both optional, ISO yyyy-MM-dd) bound the period-scoped
         // fields; an absent from/to means the whole history.
+        // BE#31 — from/to are bound as raw strings, not DateOnly?: an unparsable value must reach the
+        // handler as a normal { code, message } 400, not blow up minimal-API model binding into a 500.
+        // Parsing itself lives in the shared OptionalDateQuery (also used by ExportsEndpoints) so the two
+        // modules don't drift on what "unparsable" means or how it's worded.
         group.MapGet("/products-kpi", async (
-                DateOnly? from, DateOnly? to, GetProductsKpiHandler handler, CancellationToken ct) =>
-                (await handler.Handle(from, to, ct)).ToHttpResult())
+                string? from, string? to, GetProductsKpiHandler handler, CancellationToken ct) =>
+            {
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
+                    return Results.BadRequest(new { code = "Reports.InvalidFrom", message = fromError });
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
+                    return Results.BadRequest(new { code = "Reports.InvalidTo", message = toError });
+
+                return (await handler.Handle(fromDate, toDate, ct)).ToHttpResult();
+            })
             .WithName("GetProductsKpi");
 
         group.MapGet("/sales-kpi", async (
-                DateOnly? from, DateOnly? to, GetSalesKpiHandler handler, CancellationToken ct) =>
-                (await handler.Handle(from, to, ct)).ToHttpResult())
+                string? from, string? to, GetSalesKpiHandler handler, CancellationToken ct) =>
+            {
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
+                    return Results.BadRequest(new { code = "Reports.InvalidFrom", message = fromError });
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
+                    return Results.BadRequest(new { code = "Reports.InvalidTo", message = toError });
+
+                return (await handler.Handle(fromDate, toDate, ct)).ToHttpResult();
+            })
             .WithName("GetSalesKpi");
 
         group.MapGet("/debts-kpi", async (
-                DateOnly? from, DateOnly? to, GetDebtsKpiHandler handler, CancellationToken ct) =>
-                (await handler.Handle(from, to, ct)).ToHttpResult())
+                string? from, string? to, GetDebtsKpiHandler handler, CancellationToken ct) =>
+            {
+                if (!OptionalDateQuery.TryParse(from, out DateOnly? fromDate, out string? fromError))
+                    return Results.BadRequest(new { code = "Reports.InvalidFrom", message = fromError });
+                if (!OptionalDateQuery.TryParse(to, out DateOnly? toDate, out string? toError))
+                    return Results.BadRequest(new { code = "Reports.InvalidTo", message = toError });
+
+                return (await handler.Handle(fromDate, toDate, ct)).ToHttpResult();
+            })
             .WithName("GetDebtsKpi");
     }
 }
