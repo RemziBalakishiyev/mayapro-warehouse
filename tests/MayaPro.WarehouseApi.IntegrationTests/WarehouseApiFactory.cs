@@ -9,8 +9,8 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 
 /// <summary>
 /// Boots the real host against a dedicated test database (<c>MayaProWarehouse_Test</c>) on the local
-/// SQL Server. The database is dropped, migrated and seeded fresh once per test run, before the host
-/// starts, so the host's own startup migration/seed is an idempotent no-op.
+/// SQL Server. The database is dropped and recreated fresh once per test run: the identity schema is
+/// migrated + seeded directly, then the host is started so every module applies its own migrations.
 /// </summary>
 public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
 {
@@ -34,7 +34,10 @@ public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>Rebuilds the test database exactly once per run, before the host is first used.</summary>
+    /// <summary>
+    /// Rebuilds the test database exactly once per run and leaves it fully migrated — every module's
+    /// tables exist by the time this returns, whichever test class happens to run first.
+    /// </summary>
     public async Task EnsureDatabaseResetAsync()
     {
         if (_isReset)
@@ -47,12 +50,33 @@ public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
                 return;
 
             await ResetDatabaseAsync();
+            await StartHostAsync();
             _isReset = true;
         }
         finally
         {
             _resetLock.Release();
         }
+    }
+
+    /// <summary>
+    /// Starts the host right after the reset, which is what applies <b>every</b> module's migrations —
+    /// <see cref="ResetDatabaseAsync"/> only rebuilds the identity schema, the other modules are migrated
+    /// by the host's own startup <c>MigrateModulesAsync()</c>.
+    /// <para>
+    /// Without this the schema of a module is created lazily, on whatever line first reaches the host. A
+    /// test class that touches the database directly before its first HTTP call (as the tenant-isolation
+    /// suite does, provisioning shops through <c>TenantTestFixture</c>) would then hit a table that does
+    /// not exist yet — passing only when some earlier class happened to boot the host first. Starting the
+    /// host here removes that ordering dependency for the whole suite, and keeps the host as the single
+    /// source of truth for which migrations exist.
+    /// </para>
+    /// </summary>
+    private async Task StartHostAsync()
+    {
+        using HttpClient client = CreateClient();
+        using HttpResponseMessage response = await client.GetAsync("/health");
+        response.EnsureSuccessStatusCode();
     }
 
     private static async Task ResetDatabaseAsync()
