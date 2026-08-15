@@ -6,7 +6,7 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Domain;
 /// A system user (employee). Behaviour-rich entity — no public setters; state changes go through methods.
 /// Password is only ever stored as a BCrypt hash.
 /// </summary>
-public sealed class User : Entity
+public sealed class User : TenantEntity
 {
     // EF Core constructor.
     private User() { }

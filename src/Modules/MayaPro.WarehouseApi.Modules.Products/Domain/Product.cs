@@ -12,7 +12,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Domain;
 /// divisor, matching the frontend seed and the "expense → recompute cost" chain.
 /// </para>
 /// </summary>
-public sealed class Product : Entity
+public sealed class Product : TenantEntity
 {
     // EF Core constructor.
     private Product() { }

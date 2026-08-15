@@ -107,6 +107,11 @@ if (app.Environment.IsDevelopment())
 app.UseCors(FrontendCors);
 app.UseRateLimiter();
 app.UseAuthentication();
+
+// BE#35: an authenticated request must name a tenant, and that tenant must still be allowed in.
+// Runs before authorization so a blocked shop is stopped no matter which policy the endpoint carries.
+app.UseMiddleware<TenantGateMiddleware>();
+
 app.UseAuthorization();
 
 // --- Health check ---

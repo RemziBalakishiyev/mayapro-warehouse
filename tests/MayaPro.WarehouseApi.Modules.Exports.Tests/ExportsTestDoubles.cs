@@ -84,7 +84,8 @@ internal sealed class StubSalesModule(
     Guid saleId = default,
     SaleInvoiceInfo? sale = null,
     string? token = null,
-    IReadOnlyList<SalesReportRow>? reportRows = null) : ISalesModule
+    IReadOnlyList<SalesReportRow>? reportRows = null,
+    Guid tenantId = default) : ISalesModule
 {
     /// <summary>The sales-period handlers' half: a fixed row set, served through the requested window.</summary>
     public static StubSalesModule ForReport(params SalesReportRow[] rows) => new(reportRows: rows);
@@ -92,8 +93,11 @@ internal sealed class StubSalesModule(
     public Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(id == saleId ? sale : null);
 
-    public Task<Guid?> GetSaleIdByInvoiceTokenAsync(string requestedToken, CancellationToken cancellationToken = default) =>
-        Task.FromResult(token is not null && requestedToken == token ? (Guid?)saleId : null);
+    /// <summary>BE#35: the token now resolves to the sale <i>and</i> the tenant that owns it.</summary>
+    public Task<InvoiceTokenOwner?> GetInvoiceTokenOwnerAsync(string requestedToken, CancellationToken cancellationToken = default) =>
+        Task.FromResult(token is not null && requestedToken == token
+            ? new InvoiceTokenOwner(saleId, tenantId)
+            : null);
 
     public Task<SalesDayTotals> GetDayTotalsAsync(DateOnly date, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();

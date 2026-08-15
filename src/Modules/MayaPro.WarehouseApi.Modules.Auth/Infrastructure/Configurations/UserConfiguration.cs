@@ -20,7 +20,10 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(30);
 
-        builder.HasIndex(u => u.Phone).IsUnique();
+        // BE#35: the phone is the login identifier, but it is only unique inside a shop — two different
+        // shops may well employ the same person, or reuse a number. Login therefore cannot assume a single
+        // match; see LoginHandler for how the ambiguity is resolved deterministically.
+        builder.HasIndex(u => new { u.TenantId, u.Phone }).IsUnique();
 
         builder.Property(u => u.Email)
             .HasMaxLength(200);

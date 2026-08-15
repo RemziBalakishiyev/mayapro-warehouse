@@ -7,7 +7,7 @@ namespace MayaPro.WarehouseApi.Modules.Suppliers.Domain;
 /// A supplier. <see cref="Debt"/> is what <i>we</i> owe them; it grows on a purchase and shrinks on a
 /// payment, and can never go below zero.
 /// </summary>
-public sealed class Supplier : Entity
+public sealed class Supplier : TenantEntity
 {
     // EF Core constructor.
     private Supplier() { }

@@ -19,5 +19,9 @@ public sealed class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreS
         builder.Property(s => s.WhatsappTemplate).IsRequired().HasMaxLength(1000);
         builder.Property(s => s.Currency).IsRequired().HasMaxLength(10);
         builder.Property(s => s.Language).IsRequired().HasMaxLength(10);
+
+        // BE#35: "one settings row" is now a per-tenant rule, enforced here rather than by a fixed id.
+        // This tightens the plain TenantId index the shared tenant configuration adds.
+        builder.HasIndex(s => s.TenantId).IsUnique();
     }
 }

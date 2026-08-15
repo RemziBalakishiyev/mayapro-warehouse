@@ -10,7 +10,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Domain;
 /// removed in this period" via <see cref="MayaPro.WarehouseApi.SharedKernel.Contracts.IProductsModule.GetStockAdjustmentsAsync"/>
 /// without touching the products table's current-state columns.
 /// </summary>
-public sealed class StockAdjustment : Entity
+public sealed class StockAdjustment : TenantEntity
 {
     // EF Core constructor.
     private StockAdjustment() { }

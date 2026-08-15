@@ -11,9 +11,20 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
 /// <summary>
 /// Issues HS256-signed JWTs. Role is emitted as the enum name (Owner/Manager/Seller) so server-side
 /// role policies match directly; the frontend-facing role code lives only in DTOs.
+/// <para>
+/// BE#35: the token also carries <see cref="TenantClaim"/> — the shop the user belongs to. It is the only
+/// source of tenant identity for an authenticated request, so every protected endpoint is rejected when it
+/// is missing (the host's tenant gate), and no request can ever address another shop's data.
+/// </para>
 /// </summary>
 public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
 {
+    /// <summary>
+    /// The tenant claim's name. Raw (not a legacy URI) because the bearer handler disables inbound claim
+    /// mapping — <c>CurrentTenant</c> reads exactly this string.
+    /// </summary>
+    public const string TenantClaim = "tenantId";
+
     private readonly JwtOptions _options = options.Value;
 
     public string CreateToken(User user)
@@ -26,6 +37,7 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim("name", user.FullName),
             new Claim("role", user.Role.ToString()),
+            new Claim(TenantClaim, user.TenantId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         ];
 

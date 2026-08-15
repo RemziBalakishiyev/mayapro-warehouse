@@ -7,7 +7,8 @@ using Microsoft.IdentityModel.Tokens;
 namespace MayaPro.WarehouseApi.Api.Extensions;
 
 /// <summary>
-/// Wires JWT bearer authentication, role policies and the <see cref="ICurrentUser"/> accessor.
+/// Wires JWT bearer authentication, role policies and the <see cref="ICurrentUser"/> /
+/// <see cref="ICurrentTenant"/> accessors.
 /// The signing key / issuer / audience come from the shared <c>Jwt</c> configuration section, so the
 /// host validates exactly what the Auth module's TokenService issues.
 /// </summary>
@@ -55,6 +56,11 @@ public static class AuthenticationExtensions
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
+
+        // BE#35 — tenant context. TenantScope is the explicit override the anonymous invoice link uses;
+        // CurrentTenant reads it first and the JWT tenantId claim second.
+        services.AddScoped<TenantScope>();
+        services.AddScoped<ICurrentTenant, CurrentTenant>();
 
         return services;
     }

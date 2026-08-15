@@ -4,6 +4,7 @@ using MayaPro.WarehouseApi.Modules.Products.Application.Contracts;
 using MayaPro.WarehouseApi.Modules.Products.Domain;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
+using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Application.UseCases.CreateProduct;
 
@@ -23,6 +24,16 @@ public sealed class CreateProductHandler(
         var validation = await validator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return Result.Failure<ProductDto>(Error.Validation(validation.Errors[0].ErrorMessage));
+
+        // Barcodes are unique per shop (BE#35: the index is (TenantId, Barcode), filtered on non-empty).
+        // The query is tenant-scoped by the global filter, so this only ever sees the caller's own catalogue
+        // — another shop using the same barcode is none of our business. Checked up front so a collision is
+        // a clear Azerbaijani business error instead of a raw unique-index violation.
+        if (!string.IsNullOrWhiteSpace(command.Barcode) &&
+            await db.Products.AnyAsync(p => p.Barcode == command.Barcode, ct))
+        {
+            return Result.Failure<ProductDto>(ProductErrors.BarcodeDuplicate);
+        }
 
         var expenses = (command.Expenses ?? Array.Empty<ProductExpenseItemDto>())
             .Select(e => new ProductExpenseItem(e.Name.Trim(), e.Amount))

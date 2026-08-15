@@ -10,7 +10,7 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Domain;
 /// left null rather than inventing a phantom gain. Category on a manual sale is optional.
 /// Amounts are computed once in <see cref="Create"/> / <see cref="CreateManual"/>.
 /// </summary>
-public sealed class Sale : Entity
+public sealed class Sale : TenantEntity
 {
     // EF Core constructor.
     private Sale() { }

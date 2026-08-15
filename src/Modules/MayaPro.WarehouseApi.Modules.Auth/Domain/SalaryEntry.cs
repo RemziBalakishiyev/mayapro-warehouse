@@ -13,7 +13,7 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Domain;
 /// with an August date and a July month.
 /// </para>
 /// </summary>
-public sealed class SalaryEntry : Entity
+public sealed class SalaryEntry : TenantEntity
 {
     // EF Core constructor.
     private SalaryEntry() { }

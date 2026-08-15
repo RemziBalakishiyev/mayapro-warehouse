@@ -7,7 +7,7 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Domain;
 /// A customer with a running debt (outstanding balance). Behaviour-rich — debt only moves through
 /// <see cref="IncreaseDebt"/> / <see cref="DecreaseDebt"/>, and can never go below zero.
 /// </summary>
-public sealed class Customer : Entity
+public sealed class Customer : TenantEntity
 {
     // EF Core constructor.
     private Customer() { }

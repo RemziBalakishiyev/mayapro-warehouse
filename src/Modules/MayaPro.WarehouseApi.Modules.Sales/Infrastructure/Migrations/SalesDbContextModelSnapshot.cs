@@ -105,6 +105,9 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -125,6 +128,8 @@ namespace MayaPro.WarehouseApi.Modules.Sales.Infrastructure.Migrations
                     b.HasIndex("InvoiceToken")
                         .IsUnique()
                         .HasFilter("[InvoiceToken] IS NOT NULL");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Sales", "sales");
                 });

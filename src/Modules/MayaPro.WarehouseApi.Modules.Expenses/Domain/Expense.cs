@@ -6,7 +6,7 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Domain;
 /// A business expense. May be attached to a product (<see cref="ProductId"/>), in which case it raises
 /// that product's real cost; <see cref="ProductName"/> is a snapshot for display.
 /// </summary>
-public sealed class Expense : Entity
+public sealed class Expense : TenantEntity
 {
     // EF Core constructor.
     private Expense() { }

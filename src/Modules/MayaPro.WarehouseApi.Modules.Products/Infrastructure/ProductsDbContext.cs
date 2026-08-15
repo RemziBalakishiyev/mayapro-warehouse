@@ -2,6 +2,7 @@ using System.Data.Common;
 using MayaPro.WarehouseApi.Modules.Products.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Products.Domain;
 using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure;
@@ -9,11 +10,20 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure;
 /// <summary>
 /// The Products module's DbContext. Owns the <c>products</c> schema and nothing else — no other module's
 /// tables are visible here. Participates in cross-module transactions via <see cref="ITransactionalDbContext"/>.
+/// <para>
+/// BE#35: every entity here is tenant-scoped, so <c>OnModelCreating</c> installs the shared global query
+/// filter. <paramref name="currentTenant"/> is optional purely so unit tests can new the context up with
+/// options alone; in the host it is always injected.
+/// </para>
 /// </summary>
-public sealed class ProductsDbContext(DbContextOptions<ProductsDbContext> options)
-    : DbContext(options), IProductsDbContext, ITransactionalDbContext
+public sealed class ProductsDbContext(
+    DbContextOptions<ProductsDbContext> options,
+    ICurrentTenant? currentTenant = null)
+    : DbContext(options), IProductsDbContext, ITransactionalDbContext, ITenantAwareDbContext
 {
     public const string Schema = "products";
+
+    public Guid CurrentTenantId => currentTenant?.TenantId ?? Guid.Empty;
 
     public DbSet<Product> Products => Set<Product>();
 
@@ -28,6 +38,7 @@ public sealed class ProductsDbContext(DbContextOptions<ProductsDbContext> option
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ProductsDbContext).Assembly);
+        modelBuilder.ApplyTenantIsolation(this);
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

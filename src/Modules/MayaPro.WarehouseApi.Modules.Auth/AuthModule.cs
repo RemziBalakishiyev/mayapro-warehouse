@@ -46,6 +46,8 @@ public sealed class AuthModule : IModule
                 connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", AuthDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
+            // BE#35: stamps TenantId on insert and freezes it afterwards — the write-side of isolation.
+            options.AddInterceptors(new TenantInterceptor(sp.GetRequiredService<ICurrentTenant>()));
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<AuthDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<AuthDbContext>());

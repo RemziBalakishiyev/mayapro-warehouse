@@ -78,12 +78,17 @@ namespace MayaPro.WarehouseApi.Modules.DayEnd.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Date")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Date")
                         .IsUnique();
 
                     b.ToTable("Closings", "dayend");

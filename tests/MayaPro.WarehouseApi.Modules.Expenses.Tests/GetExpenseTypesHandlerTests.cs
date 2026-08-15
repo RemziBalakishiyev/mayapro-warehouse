@@ -1,6 +1,7 @@
 using MayaPro.WarehouseApi.Modules.Expenses.Application.UseCases.GetExpenseTypes;
 using MayaPro.WarehouseApi.Modules.Expenses.Domain;
 using MayaPro.WarehouseApi.Modules.Expenses.Infrastructure;
+using MayaPro.WarehouseApi.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Expenses.Tests;
@@ -41,7 +42,8 @@ public sealed class GetExpenseTypesHandlerTests
     [Fact]
     public async Task Seeder_Inserts_Exactly_The_Seven_Default_Types()
     {
-        await using ExpensesDbContext db = NewDb();
+        // BE#35: the seeder writes to the default shop, so read it back through that shop's context.
+        await using ExpensesDbContext db = TestDb.New(TenantDefaults.DefaultTenantId);
         var seeder = new ExpenseTypeSeeder(db);
 
         await seeder.SeedAsync();

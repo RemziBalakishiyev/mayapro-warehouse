@@ -62,6 +62,9 @@ namespace MayaPro.WarehouseApi.Modules.Settings.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -71,6 +74,9 @@ namespace MayaPro.WarehouseApi.Modules.Settings.Infrastructure.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
 
                     b.ToTable("StoreSettings", "settings");
                 });

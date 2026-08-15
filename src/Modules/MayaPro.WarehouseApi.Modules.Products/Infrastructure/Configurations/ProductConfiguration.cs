@@ -65,7 +65,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired();
 
         // Barcode is unique, but only where it is actually set — many products may have no barcode.
-        builder.HasIndex(p => p.Barcode)
+        // BE#35: unique per shop, not globally — two tenants may stock the same article.
+        builder.HasIndex(p => new { p.TenantId, p.Barcode })
             .IsUnique()
             .HasFilter("[Barcode] <> ''");
     }

@@ -7,7 +7,7 @@ namespace MayaPro.WarehouseApi.Modules.Products.Domain;
 /// pick-list the UI offers when adding a product; <see cref="Product.Category"/> stays a plain string
 /// snapshot, so renaming or deleting a category never rewrites existing products.
 /// </summary>
-public sealed class Category : Entity
+public sealed class Category : TenantEntity
 {
     // EF Core constructor.
     private Category() { }

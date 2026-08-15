@@ -26,6 +26,13 @@ public sealed class UpdateProductHandler(
         if (product is null)
             return Result.Failure<ProductDto>(ProductErrors.NotFound);
 
+        // Same per-shop barcode rule as on create — any other product of this shop, not this one.
+        if (!string.IsNullOrWhiteSpace(command.Barcode) &&
+            await db.Products.AnyAsync(p => p.Barcode == command.Barcode && p.Id != command.Id, ct))
+        {
+            return Result.Failure<ProductDto>(ProductErrors.BarcodeDuplicate);
+        }
+
         var expenses = (command.Expenses ?? Array.Empty<ProductExpenseItemDto>())
             .Select(e => new ProductExpenseItem(e.Name.Trim(), e.Amount))
             .Where(e => !string.IsNullOrWhiteSpace(e.Name))

@@ -9,6 +9,8 @@
     <PackageReference Include="ClosedXML" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- BE#35: mints a legacy (tenant-less) token to prove the host rejects it. -->
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
@@ -22,6 +24,15 @@
     <ProjectReference Include="..\..\src\MayaPro.WarehouseApi.Api\MayaPro.WarehouseApi.Api.csproj" />
     <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Auth\MayaPro.WarehouseApi.Modules.Auth.csproj" />
     <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Products\MayaPro.WarehouseApi.Modules.Products.csproj" />
+    <!-- BE#35: the tenant-isolation tests provision extra shops and walk every module's model. -->
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Tenancy\MayaPro.WarehouseApi.Modules.Tenancy.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Sales\MayaPro.WarehouseApi.Modules.Sales.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Customers\MayaPro.WarehouseApi.Modules.Customers.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Suppliers\MayaPro.WarehouseApi.Modules.Suppliers.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Expenses\MayaPro.WarehouseApi.Modules.Expenses.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.DayEnd\MayaPro.WarehouseApi.Modules.DayEnd.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Activity\MayaPro.WarehouseApi.Modules.Activity.csproj" />
+    <ProjectReference Include="..\..\src\Modules\MayaPro.WarehouseApi.Modules.Settings\MayaPro.WarehouseApi.Modules.Settings.csproj" />
   </ItemGroup>
 
 </Project>

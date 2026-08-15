@@ -43,6 +43,8 @@ public sealed class ProductsModule : IModule
                 connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ProductsDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
+            // BE#35: stamps TenantId on insert and freezes it afterwards — the write-side of isolation.
+            options.AddInterceptors(new TenantInterceptor(sp.GetRequiredService<ICurrentTenant>()));
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IProductsDbContext>(sp => sp.GetRequiredService<ProductsDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<ProductsDbContext>());
