@@ -50,6 +50,9 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -64,6 +67,8 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Date");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UserId", "Month");
 
@@ -109,12 +114,17 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Phone")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Phone")
                         .IsUnique();
 
                     b.ToTable("Users", "identity");

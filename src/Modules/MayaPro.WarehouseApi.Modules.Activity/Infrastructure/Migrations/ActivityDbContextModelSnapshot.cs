@@ -37,6 +37,9 @@ namespace MayaPro.WarehouseApi.Modules.Activity.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -56,6 +59,8 @@ namespace MayaPro.WarehouseApi.Modules.Activity.Infrastructure.Migrations
 
                     b.HasIndex("CreatedAt")
                         .IsDescending();
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("ActivityLogs", "activity");
                 });

@@ -4,7 +4,7 @@ namespace MayaPro.WarehouseApi.SharedKernel.Application;
 
 /// <summary>
 /// Uniform <see cref="Result"/> → HTTP translation, shared by every module's endpoints. Success returns
-/// 200/201; failure maps the error code to a status (404 / 409 / 400) and always returns the same body
+/// 200/201; failure maps the error code to a status (404 / 403 / 409 / 400) and always returns the same body
 /// shape: <c>{ code, message }</c>, which the frontend api-client reads directly for toasts.
 /// </summary>
 public static class ResultExtensions
@@ -41,6 +41,9 @@ public static class ResultExtensions
             return StatusCodes.Status410Gone;
         if (code.EndsWith("NotFound", StringComparison.Ordinal))
             return StatusCodes.Status404NotFound;
+        // BE#35: the caller authenticated fine but the tenant (mağaza) is not allowed in — 403, not 400.
+        if (code.EndsWith("Forbidden", StringComparison.Ordinal))
+            return StatusCodes.Status403Forbidden;
         if (code.EndsWith("Conflict", StringComparison.Ordinal) ||
             code.EndsWith("AlreadyExists", StringComparison.Ordinal) ||
             code.EndsWith("AlreadyClosed", StringComparison.Ordinal))

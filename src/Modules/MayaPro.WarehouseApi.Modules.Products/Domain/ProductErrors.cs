@@ -28,4 +28,12 @@ public static class ProductErrors
     /// </summary>
     public static readonly Error CategoryDuplicate =
         new("Products.CategoryDuplicate", "Bu kateqoriya artıq mövcuddur");
+
+    /// <summary>
+    /// Another product in the same shop already carries this barcode. Until BE#35 this collision surfaced
+    /// as a raw unique-index violation (a 500); it is now a business error, checked before the insert.
+    /// Same code convention as <see cref="CategoryDuplicate"/> → 400, not 409.
+    /// </summary>
+    public static readonly Error BarcodeDuplicate =
+        new("Products.BarcodeDuplicate", "Bu barkod artıq mövcuddur");
 }

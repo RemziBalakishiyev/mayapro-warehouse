@@ -15,4 +15,11 @@ public static class AuthErrors
 
     public static readonly Error UserNotFound =
         new("Auth.UserNotFound", "İstifadəçi tapılmadı");
+
+    /// <summary>
+    /// BE#35 — the credentials were fine but the shop is not allowed in (blocked, or still awaiting
+    /// approval, or unknown). The <c>Forbidden</c> suffix maps this to HTTP 403 and no token is issued.
+    /// </summary>
+    public static readonly Error TenantInactiveForbidden =
+        new("Auth.TenantInactiveForbidden", "Mağaza aktiv deyil");
 }

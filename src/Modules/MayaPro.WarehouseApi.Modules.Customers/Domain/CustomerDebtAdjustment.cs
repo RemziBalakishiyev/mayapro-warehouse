@@ -9,7 +9,7 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Domain;
 /// explains where the starting debt came from. Kept as its own tiny entity so that opening balance is an
 /// auditable record (who entered it, when) rather than an unexplained number on the customer row.
 /// </summary>
-public sealed class CustomerDebtAdjustment : Entity
+public sealed class CustomerDebtAdjustment : TenantEntity
 {
     /// <summary>Note stamped on the opening-balance adjustment written when a customer is created with a debt.</summary>
     public const string InitialDebtNote = "İlkin borc (sistemə keçid)";

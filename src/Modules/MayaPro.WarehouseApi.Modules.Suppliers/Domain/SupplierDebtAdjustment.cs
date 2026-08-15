@@ -10,7 +10,7 @@ namespace MayaPro.WarehouseApi.Modules.Suppliers.Domain;
 /// balance is an auditable record (who entered it, when) rather than an unexplained number on the supplier
 /// row.
 /// </summary>
-public sealed class SupplierDebtAdjustment : Entity
+public sealed class SupplierDebtAdjustment : TenantEntity
 {
     /// <summary>Note stamped on the opening-balance adjustment written when a supplier is created with a debt.</summary>
     public const string InitialDebtNote = "İlkin borc (sistemə keçid)";

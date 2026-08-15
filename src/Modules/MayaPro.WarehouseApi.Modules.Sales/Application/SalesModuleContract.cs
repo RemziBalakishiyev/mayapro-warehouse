@@ -219,14 +219,21 @@ internal sealed class SalesModuleContract(
             sale.PaidAmount);
     }
 
-    public async Task<Guid?> GetSaleIdByInvoiceTokenAsync(
+    /// <summary>
+    /// BE#35 — a deliberate, audited query-filter exception. The public invoice link is anonymous, so there
+    /// is no tenant context to filter by yet; the token <i>is</i> the tenant evidence. The lookup therefore
+    /// ignores the filter, and returns the owning tenant so the caller re-enters normal, filtered scope
+    /// before touching anything else. Nothing but the sale id and its tenant crosses this boundary.
+    /// </summary>
+    public async Task<InvoiceTokenOwner?> GetInvoiceTokenOwnerAsync(
         string token,
         CancellationToken cancellationToken = default)
     {
         return await db.Sales
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(s => s.InvoiceToken == token)
-            .Select(s => (Guid?)s.Id)
+            .Select(s => new InvoiceTokenOwner(s.Id, s.TenantId))
             .FirstOrDefaultAsync(cancellationToken);
     }
 }

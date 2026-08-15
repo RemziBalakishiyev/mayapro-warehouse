@@ -149,11 +149,24 @@ internal sealed class FakeDateProvider(DateTime? utcNow = null) : IDateProvider
 
 internal static class TestDb
 {
-    public static ExpensesDbContext New()
+    /// <summary>
+    /// An isolated in-memory Expenses context. <paramref name="tenantId"/> is the tenant its global query
+    /// filter is pinned to (BE#35); the default — no tenant, i.e. <c>Guid.Empty</c> — matches the rows these
+    /// tests build by hand, which carry no tenant either. Tests that exercise the startup seeder pass the
+    /// default tenant, because that is the shop the seeder writes to.
+    /// </summary>
+    public static ExpensesDbContext New(Guid? tenantId = null)
     {
         var options = new DbContextOptionsBuilder<ExpensesDbContext>()
             .UseInMemoryDatabase($"expenses-tests-{Guid.NewGuid()}")
             .Options;
-        return new ExpensesDbContext(options);
+        return new ExpensesDbContext(options, new FixedTenant(tenantId));
+    }
+
+    private sealed class FixedTenant(Guid? tenantId) : ICurrentTenant
+    {
+        public Guid? TenantId => tenantId;
+
+        public bool HasTenant => tenantId is not null;
     }
 }

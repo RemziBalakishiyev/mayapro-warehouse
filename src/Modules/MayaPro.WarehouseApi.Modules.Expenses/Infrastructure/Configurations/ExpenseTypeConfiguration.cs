@@ -14,7 +14,7 @@ public sealed class ExpenseTypeConfiguration : IEntityTypeConfiguration<ExpenseT
 
         builder.Property(t => t.Name).IsRequired().HasMaxLength(100);
 
-        // One row per expense type name.
-        builder.HasIndex(t => t.Name).IsUnique();
+        // One row per expense type name — per shop (BE#35).
+        builder.HasIndex(t => new { t.TenantId, t.Name }).IsUnique();
     }
 }

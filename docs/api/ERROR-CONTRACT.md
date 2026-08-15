@@ -19,7 +19,9 @@ Status kodu error code-un **suffiksindən** avtomatik seçilir (`ResultExtension
 
 | Code suffiksi | Status |
 |---|---|
+| `...TokenExpired`, `...TokenNotFound` | 410 |
 | `...NotFound` | 404 |
+| `...Forbidden` | 403 |
 | `...Conflict`, `...AlreadyExists`, `...AlreadyClosed` | 409 |
 | qalan hamısı | 400 |
 
@@ -36,6 +38,9 @@ Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location 
 
 - Token yoxdur/yanlışdır → 401 (framework, body-siz)
 - Rol icazəsi çatmır (məs. OwnerOnly) → 403 (framework, body-siz)
+- **BE#35 — tenant qapısı** (`TenantGateMiddleware`, adi `{code, message}` body ilə):
+  - token-də `tenantId` claim-i yoxdur → 401 `Auth.TenantMissing`
+  - mağaza `Active` deyil (bloklanıb / təsdiq gözləyir) → 403 `Auth.TenantInactiveForbidden` — "Mağaza aktiv deyil". Login də eyni kodu qaytarır. Detallar: [`multi-tenancy.md`](../multi-tenancy.md)
 
 ## Gözlənilməz xətalar
 
@@ -47,6 +52,7 @@ Hər modulun `Domain/<Modul>Errors.cs` faylı var (məs. `SaleErrors`, `Customer
 
 ## Last Updated
 
+2026-08-16 — BE#35: `...Forbidden` → 403 suffiksi, tenant qapısı xətaları, `Products.BarcodeDuplicate` (əvvəl dublikat barkod 500 verirdi).
 2026-07-25 — sistem qurulanda yaradıldı.
 
 ## Related Code

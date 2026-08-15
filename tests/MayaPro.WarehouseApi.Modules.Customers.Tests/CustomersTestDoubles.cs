@@ -40,7 +40,7 @@ internal sealed class FakeSalesModule(params CustomerOutstandingSale[] outstandi
     public Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid saleId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<Guid?> GetSaleIdByInvoiceTokenAsync(string token, CancellationToken cancellationToken = default) =>
+    public Task<InvoiceTokenOwner?> GetInvoiceTokenOwnerAsync(string token, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }
 

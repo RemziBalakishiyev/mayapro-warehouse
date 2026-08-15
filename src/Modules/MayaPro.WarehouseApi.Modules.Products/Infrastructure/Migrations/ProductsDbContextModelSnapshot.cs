@@ -37,12 +37,17 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Name")
                         .IsUnique();
 
                     b.ToTable("Categories", "products");
@@ -141,6 +146,9 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -151,7 +159,9 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Barcode")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Barcode")
                         .IsUnique()
                         .HasFilter("[Barcode] <> ''");
 
@@ -176,6 +186,9 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -184,6 +197,8 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure.Migrations
                     b.HasIndex("Date");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("StockAdjustments", "products");
                 });

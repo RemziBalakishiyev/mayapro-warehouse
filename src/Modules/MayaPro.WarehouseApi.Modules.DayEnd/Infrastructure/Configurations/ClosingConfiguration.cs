@@ -16,6 +16,7 @@ public sealed class ClosingConfiguration : IEntityTypeConfiguration<Closing>
         builder.Property(c => c.Note).HasMaxLength(500);
 
         // A day can be closed only once — the guard against a concurrent second close.
-        builder.HasIndex(c => c.Date).IsUnique();
+        // BE#35: "once" means once per shop; two shops close the same calendar day independently.
+        builder.HasIndex(c => new { c.TenantId, c.Date }).IsUnique();
     }
 }

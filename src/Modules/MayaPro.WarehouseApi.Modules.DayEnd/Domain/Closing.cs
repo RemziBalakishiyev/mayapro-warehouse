@@ -9,7 +9,7 @@ namespace MayaPro.WarehouseApi.Modules.DayEnd.Domain;
 /// BE#33: <see cref="SalaryExpenses"/> is stored alongside <see cref="Expenses"/> as an informational
 /// breakdown — it never changes the <see cref="Expenses"/>/<see cref="ExpectedCash"/> formulas above.
 /// </summary>
-public sealed class Closing : Entity
+public sealed class Closing : TenantEntity
 {
     // EF Core constructor.
     private Closing() { }

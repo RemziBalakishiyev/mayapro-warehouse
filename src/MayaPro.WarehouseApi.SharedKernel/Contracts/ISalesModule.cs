@@ -70,11 +70,20 @@ public interface ISalesModule
     Task<SaleInvoiceInfo?> GetInvoiceSaleAsync(Guid saleId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Resolves a public invoice-link token to its sale id, or null when no sale carries the token.
+    /// Resolves a public invoice-link token to its sale, or null when no sale carries the token.
     /// Used by the Exports module's anonymous invoice endpoint (WhatsApp sharing).
+    /// <para>
+    /// BE#35: this is the one lookup that has to see across tenants, because the caller is anonymous and the
+    /// token is the only identity it has. It therefore returns the owning tenant alongside the sale id, so
+    /// the caller can enter that tenant's scope and run the rest of the render fully filtered. The token is
+    /// globally unique (32 random bytes), which is what makes the resolution unambiguous.
+    /// </para>
     /// </summary>
-    Task<Guid?> GetSaleIdByInvoiceTokenAsync(string token, CancellationToken cancellationToken = default);
+    Task<InvoiceTokenOwner?> GetInvoiceTokenOwnerAsync(string token, CancellationToken cancellationToken = default);
 }
+
+/// <summary>A public invoice token resolved to the sale it prints and the tenant that owns it.</summary>
+public sealed record InvoiceTokenOwner(Guid SaleId, Guid TenantId);
 
 /// <summary>
 /// A sale as printed on its invoice. <see cref="Date"/> is the UTC sale instant (callers localise it);

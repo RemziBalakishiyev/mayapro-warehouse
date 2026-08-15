@@ -49,10 +49,15 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Customers", "customers");
                 });
@@ -83,12 +88,17 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("CustomerDebtAdjustments", "customers");
                 });
@@ -119,6 +129,9 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Infrastructure.Migrations
                     b.Property<Guid?>("ReceivedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -127,6 +140,8 @@ namespace MayaPro.WarehouseApi.Modules.Customers.Infrastructure.Migrations
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("Date");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("CustomerPayments", "customers");
                 });

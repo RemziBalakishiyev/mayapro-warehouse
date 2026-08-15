@@ -67,6 +67,9 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
 
         builder.HasIndex(s => s.Date);
         builder.HasIndex(s => s.CustomerId);
+        // BE#35: deliberately NOT tenant-scoped. The public invoice link is anonymous, so the token is the
+        // only thing that identifies the sale — and through it the tenant. Global uniqueness is what makes
+        // that resolution unambiguous. The token is 32 random bytes, so collisions are not a concern.
         builder.HasIndex(s => s.InvoiceToken).IsUnique().HasFilter("[InvoiceToken] IS NOT NULL");
     }
 }

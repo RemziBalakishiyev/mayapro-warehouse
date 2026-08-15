@@ -3,7 +3,7 @@ using MayaPro.WarehouseApi.SharedKernel.Domain;
 namespace MayaPro.WarehouseApi.Modules.Suppliers.Domain;
 
 /// <summary>A payment we made against a supplier's debt.</summary>
-public sealed class SupplierPayment : Entity
+public sealed class SupplierPayment : TenantEntity
 {
     // EF Core constructor.
     private SupplierPayment() { }

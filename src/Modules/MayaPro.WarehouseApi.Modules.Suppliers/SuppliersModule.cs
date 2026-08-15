@@ -40,6 +40,8 @@ public sealed class SuppliersModule : IModule
                 connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", SuppliersDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
+            // BE#35: stamps TenantId on insert and freezes it afterwards — the write-side of isolation.
+            options.AddInterceptors(new TenantInterceptor(sp.GetRequiredService<ICurrentTenant>()));
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<ISuppliersDbContext>(sp => sp.GetRequiredService<SuppliersDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<SuppliersDbContext>());

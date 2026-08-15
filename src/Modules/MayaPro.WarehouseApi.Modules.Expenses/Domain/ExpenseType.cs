@@ -7,7 +7,7 @@ namespace MayaPro.WarehouseApi.Modules.Expenses.Domain;
 /// pick-list the UI offers when recording an expense; <see cref="Expense.Category"/> stays a plain string
 /// snapshot, so renaming or deleting a type never rewrites existing expenses.
 /// </summary>
-public sealed class ExpenseType : Entity
+public sealed class ExpenseType : TenantEntity
 {
     // EF Core constructor.
     private ExpenseType() { }

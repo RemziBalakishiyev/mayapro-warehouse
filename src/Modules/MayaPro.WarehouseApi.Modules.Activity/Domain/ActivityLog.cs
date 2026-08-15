@@ -7,7 +7,7 @@ namespace MayaPro.WarehouseApi.Modules.Activity.Domain;
 /// these map to the frontend <c>Activity.action</c> / <c>Activity.detail</c>. <see cref="UserName"/> is a
 /// snapshot so the feed reads well even if the user is later renamed.
 /// </summary>
-public sealed class ActivityLog : Entity
+public sealed class ActivityLog : TenantEntity
 {
     // EF Core constructor.
     private ActivityLog() { }

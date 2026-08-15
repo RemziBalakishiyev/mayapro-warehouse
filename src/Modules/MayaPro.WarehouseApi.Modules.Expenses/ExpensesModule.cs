@@ -38,6 +38,8 @@ public sealed class ExpensesModule : IModule
                 connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ExpensesDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
+            // BE#35: stamps TenantId on insert and freezes it afterwards — the write-side of isolation.
+            options.AddInterceptors(new TenantInterceptor(sp.GetRequiredService<ICurrentTenant>()));
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IExpensesDbContext>(sp => sp.GetRequiredService<ExpensesDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<ExpensesDbContext>());

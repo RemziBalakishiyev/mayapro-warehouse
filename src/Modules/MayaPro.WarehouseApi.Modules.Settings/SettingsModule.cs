@@ -33,6 +33,8 @@ public sealed class SettingsModule : IModule
                 connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", SettingsDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
+            // BE#35: stamps TenantId on insert and freezes it afterwards — the write-side of isolation.
+            options.AddInterceptors(new TenantInterceptor(sp.GetRequiredService<ICurrentTenant>()));
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<ISettingsDbContext>(sp => sp.GetRequiredService<SettingsDbContext>());
 

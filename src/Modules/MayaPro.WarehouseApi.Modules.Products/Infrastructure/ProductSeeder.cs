@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.Modules.Products.Domain;
+using MayaPro.WarehouseApi.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure;
@@ -8,6 +9,11 @@ namespace MayaPro.WarehouseApi.Modules.Products.Infrastructure;
 /// <c>seed.ts</c> with identical values. Real cost is computed by the domain (never seeded literally).
 /// Each product is created at its initial quantity — which fixes the real-cost divisor — then stock is
 /// adjusted down to the current on-hand quantity, exactly as the frontend seed models sales-to-date.
+/// <para>
+/// BE#35: seeders run at startup, outside any request, so there is no tenant context. The demo catalogue
+/// belongs to the default shop and says so explicitly; the emptiness checks ignore the query filter, which
+/// would otherwise report "empty" on every boot and re-seed forever.
+/// </para>
 /// </summary>
 public sealed class ProductSeeder(ProductsDbContext db)
 {
@@ -19,7 +25,7 @@ public sealed class ProductSeeder(ProductsDbContext db)
 
     private async Task SeedProductsAsync(CancellationToken ct)
     {
-        if (await db.Products.AnyAsync(ct))
+        if (await db.Products.IgnoreQueryFilters().AnyAsync(ct))
             return;
 
         for (int i = 0; i < RawProducts.Length; i++)
@@ -51,6 +57,7 @@ public sealed class ProductSeeder(ProductsDbContext db)
             if (raw.Quantity != raw.InitialQuantity)
                 product.AdjustStock(raw.Quantity - raw.InitialQuantity);
 
+            product.AssignTenant(TenantDefaults.DefaultTenantId);
             db.Products.Add(product);
         }
 
@@ -60,7 +67,7 @@ public sealed class ProductSeeder(ProductsDbContext db)
     /// <summary>Seeds the managed category list from the unique category names of the demo products.</summary>
     private async Task SeedCategoriesAsync(CancellationToken ct)
     {
-        if (await db.Categories.AnyAsync(ct))
+        if (await db.Categories.IgnoreQueryFilters().AnyAsync(ct))
             return;
 
         IEnumerable<string> names = RawProducts
@@ -69,7 +76,11 @@ public sealed class ProductSeeder(ProductsDbContext db)
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
         foreach (string name in names)
-            db.Categories.Add(Category.Create(name));
+        {
+            Category category = Category.Create(name);
+            category.AssignTenant(TenantDefaults.DefaultTenantId);
+            db.Categories.Add(category);
+        }
 
         await db.SaveChangesAsync(ct);
     }

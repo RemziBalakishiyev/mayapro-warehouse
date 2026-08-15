@@ -3,14 +3,23 @@ using MayaPro.WarehouseApi.SharedKernel.Domain;
 namespace MayaPro.WarehouseApi.Modules.Settings.Domain;
 
 /// <summary>
-/// The store's configuration — a single-row (singleton) table. There is never more than one
-/// <see cref="StoreSettings"/>; it is created lazily with sensible defaults on first read and then edited
-/// in place. The fixed <see cref="SingletonId"/> keeps the row unique and idempotent to seed.
+/// A store's configuration — one row <b>per tenant</b>. It is created lazily with sensible defaults on
+/// first read and then edited in place.
+/// <para>
+/// BE#35: this used to be a true singleton pinned to a fixed <c>SingletonId</c>. Under multi-tenancy the
+/// uniqueness moved to the tenant: each shop gets its own row (new random id), the global query filter
+/// makes "the settings row" unambiguous inside a request, and a unique index on <c>TenantId</c> keeps a
+/// tenant from ever accumulating two. The legacy fixed id survives only as
+/// <see cref="LegacySingletonId"/>, which the data migration reuses for the default tenant's row.
+/// </para>
 /// </summary>
-public sealed class StoreSettings : Entity
+public sealed class StoreSettings : TenantEntity
 {
-    /// <summary>The one and only settings row's id.</summary>
-    public static readonly Guid SingletonId = new("11111111-1111-1111-1111-111111111111");
+    /// <summary>
+    /// The id the pre-multi-tenancy singleton row carried. Kept as a constant so the migration (and tests
+    /// that assert the row survived) can still name it; new rows never use it.
+    /// </summary>
+    public static readonly Guid LegacySingletonId = new("11111111-1111-1111-1111-111111111111");
 
     public const string DefaultStoreName = "Sədərək Anbar";
     public const string DefaultCurrency = "AZN";
@@ -36,7 +45,6 @@ public sealed class StoreSettings : Entity
         int defaultMinStock,
         string language)
     {
-        Id = SingletonId;
         StoreName = storeName;
         OwnerName = ownerName;
         WhatsappTemplate = whatsappTemplate;
@@ -64,7 +72,7 @@ public sealed class StoreSettings : Entity
 
     public string Language { get; private set; } = DefaultLanguage;
 
-    /// <summary>Builds the singleton with default values, used on first access.</summary>
+    /// <summary>Builds a tenant's settings row with default values, used on its first access.</summary>
     public static StoreSettings CreateDefault() =>
         new(DefaultStoreName, null, DefaultWhatsappTemplate, DefaultCurrency, DefaultMinStockValue, DefaultLanguage);
 

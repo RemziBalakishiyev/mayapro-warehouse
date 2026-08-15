@@ -14,7 +14,7 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.Property(c => c.Name).IsRequired().HasMaxLength(100);
 
-        // One row per category name.
-        builder.HasIndex(c => c.Name).IsUnique();
+        // One row per category name — per shop (BE#35).
+        builder.HasIndex(c => new { c.TenantId, c.Name }).IsUnique();
     }
 }

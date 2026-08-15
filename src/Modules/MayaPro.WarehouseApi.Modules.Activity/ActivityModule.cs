@@ -32,6 +32,8 @@ public sealed class ActivityModule : IModule
                 connection,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ActivityDbContext.Schema));
             options.AddInterceptors(new AuditInterceptor());
+            // BE#35: stamps TenantId on insert and freezes it afterwards — the write-side of isolation.
+            options.AddInterceptors(new TenantInterceptor(sp.GetRequiredService<ICurrentTenant>()));
         }, ServiceLifetime.Scoped, ServiceLifetime.Scoped);
         services.AddScoped<IActivityDbContext>(sp => sp.GetRequiredService<ActivityDbContext>());
         services.AddScoped<ITransactionalDbContext>(sp => sp.GetRequiredService<ActivityDbContext>());
