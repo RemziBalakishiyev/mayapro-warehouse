@@ -43,5 +43,12 @@ public static class WireFormat
         public const string Owner = "sahib";
         public const string Manager = "menecer";
         public const string Seller = "satici";
+
+        /// <summary>
+        /// BE#36 — the platform operator. Added, never substituted: the three shop roles above keep their
+        /// frozen values. This one belongs to no shop, so the shop UI never renders it; only the platform
+        /// admin surface (<c>/api/admin/*</c>) does.
+        /// </summary>
+        public const string PlatformAdmin = "platform_admin";
     }
 }

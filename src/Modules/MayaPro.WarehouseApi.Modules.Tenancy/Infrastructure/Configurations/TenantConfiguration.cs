@@ -19,6 +19,13 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         // Stored as int (0/1/2) — the values are part of the migration's seed statement.
         builder.Property(t => t.Status).IsRequired().HasConversion<int>();
 
+        // BE#36 — subscription. ExpiresAt is nullable on purpose: null means open-ended, never expired.
+        builder.Property(t => t.ExpiresAt);
+        builder.Property(t => t.MonthlyFee).IsRequired();
+
         builder.HasIndex(t => t.Status);
+
+        // The admin list filters/sorts by expiry and the stats endpoint counts lapsed shops by it.
+        builder.HasIndex(t => t.ExpiresAt);
     }
 }

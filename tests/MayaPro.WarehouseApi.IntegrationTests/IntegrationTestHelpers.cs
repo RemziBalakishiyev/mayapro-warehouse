@@ -32,6 +32,14 @@ internal static class IntegrationTestHelpers
         return client;
     }
 
+    /// <summary>
+    /// BE#36 — signs in as the platform operator seeded from configuration. It belongs to no shop, so this
+    /// client carries a token the tenant gate lets through without a tenant.
+    /// </summary>
+    public static Task<HttpClient> PlatformAdminClientAsync(this WarehouseApiFactory factory) =>
+        factory.AuthenticatedClientAsync(
+            WarehouseApiFactory.PlatformAdminPhone, WarehouseApiFactory.PlatformAdminPassword);
+
     public static async Task<ProductDto> CreateProductAsync(
         this HttpClient client, string barcode, int quantity, decimal salePrice = 10m, string supplierId = "sup_1",
         decimal purchasePrice = 5m, IEnumerable<(string Name, decimal Amount)>? expenses = null)

@@ -1,6 +1,7 @@
 using System.Text;
 using MayaPro.WarehouseApi.Api.Security;
 using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -19,6 +20,12 @@ public static class AuthenticationExtensions
 
     /// <summary>Owner or Manager — products, expenses.</summary>
     public const string OwnerOrManager = "OwnerOrManager";
+
+    /// <summary>
+    /// BE#36 — the platform operator only (<c>/api/admin/*</c>). Deliberately <b>not</b> reachable by a
+    /// shop's Owner: "Sahibkar" is the top role inside one shop, and the platform console is above all shops.
+    /// </summary>
+    public const string PlatformAdminOnly = PlatformAdminAccess.Policy;
 
     public static IServiceCollection AddJwtAuthentication(
         this IServiceCollection services,
@@ -52,7 +59,14 @@ public static class AuthenticationExtensions
         services.AddAuthorizationBuilder()
             .AddPolicy(OwnerOnly, policy => policy.RequireRole(nameof(Roles.Owner)))
             .AddPolicy(OwnerOrManager, policy =>
-                policy.RequireRole(nameof(Roles.Owner), nameof(Roles.Manager)));
+                policy.RequireRole(nameof(Roles.Owner), nameof(Roles.Manager)))
+            .AddPolicy(PlatformAdminOnly, policy => policy.RequireRole(PlatformAdminAccess.RoleName));
+
+        // BE#36 — the platform operator's credentials and support phone. Bound here (not in a module)
+        // because three places read it: the Auth module's seeder, the login refusal message and the host's
+        // tenant gate.
+        services.AddOptions<PlatformAdminOptions>()
+            .Bind(configuration.GetSection(PlatformAdminOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();

@@ -38,9 +38,18 @@ Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location 
 
 - Token yoxdur/yanlışdır → 401 (framework, body-siz)
 - Rol icazəsi çatmır (məs. OwnerOnly) → 403 (framework, body-siz)
-- **BE#35 — tenant qapısı** (`TenantGateMiddleware`, adi `{code, message}` body ilə):
-  - token-də `tenantId` claim-i yoxdur → 401 `Auth.TenantMissing`
-  - mağaza `Active` deyil (bloklanıb / təsdiq gözləyir) → 403 `Auth.TenantInactiveForbidden` — "Mağaza aktiv deyil". Login də eyni kodu qaytarır. Detallar: [`multi-tenancy.md`](../multi-tenancy.md)
+- **BE#35/BE#36 — tenant qapısı** (`TenantGateMiddleware`, adi `{code, message}` body ilə). Login (`POST /api/auth/login`) EYNİ kod/mesaj cütlərini qaytarır — qapı token verildikdən sonra da işləyir:
+
+  | Hal | Status | Code | Mesaj |
+  |---|---|---|---|
+  | token-də `tenantId` claim-i yoxdur | 401 | `Auth.TenantMissing` | «Token mağaza məlumatı daşımır — yenidən daxil olun» |
+  | mağaza tapılmır | 403 | `Auth.TenantInactiveForbidden` | «Mağaza aktiv deyil» |
+  | mağaza təsdiq gözləyir | 403 | `Auth.TenantPendingApprovalForbidden` | «Hesabınız təsdiq gözləyir» |
+  | mağaza bloklanıb | 403 | `Auth.TenantBlockedForbidden` | «Abunəliyiniz bitib — əlaqə: {admin telefonu}» |
+  | abunə müddəti keçib (status hələ `Active`) | 403 | `Auth.SubscriptionExpiredForbidden` | «Abunəliyiniz bitib — əlaqə: {admin telefonu}» |
+
+  Admin telefonu `PlatformAdmin:Phone` konfiqurasiyasındandır; təyin olunmayıbsa mesaj «Abunəliyiniz bitib — dəstək ilə əlaqə saxlayın» olur. `PlatformAdmin` rolu ilə gələn token qapıdan keçir (heç bir mağazaya aid deyil). Detallar: [`multi-tenancy.md`](../multi-tenancy.md)
+- **BE#36 — Tenancy**: `Tenancy.PhoneAlreadyExists` → 409 («Bu telefon nömrəsi artıq qeydiyyatdadır», qeydiyyat qlobal telefon yoxlaması) · `Tenancy.TenantNotFound` → 404 («Mağaza tapılmadı»)
 
 ## Gözlənilməz xətalar
 
@@ -52,6 +61,7 @@ Hər modulun `Domain/<Modul>Errors.cs` faylı var (məs. `SaleErrors`, `Customer
 
 ## Last Updated
 
+2026-08-16 — BE#36: tenant qapısının 403-ləri statusa görə ayrıldı (`TenantPendingApproval` / `TenantBlocked` / `SubscriptionExpired`); `Tenancy.PhoneAlreadyExists` (409), `Tenancy.TenantNotFound` (404).
 2026-08-16 — BE#35: `...Forbidden` → 403 suffiksi, tenant qapısı xətaları, `Products.BarcodeDuplicate` (əvvəl dublikat barkod 500 verirdi).
 2026-07-25 — sistem qurulanda yaradıldı.
 

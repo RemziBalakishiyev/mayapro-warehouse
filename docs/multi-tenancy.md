@@ -1,10 +1,13 @@
-# Multi-tenancy — Mərhələ 1: data təcridi
+# Multi-tenancy — Mərhələ 1 (data təcridi) və Mərhələ 2 (abunə + platforma admini)
 
-**Status:** tətbiq olunub (BE#35) · **Əhatə:** data təcridi · **Sonrakılar:** Mərhələ 2 (tenant qeydiyyatı), Mərhələ 3 (plan/billing)
+**Status:** Mərhələ 1 tətbiq olunub (BE#35) · Mərhələ 2 tətbiq olunub (BE#36) · **Sonrakı:** Mərhələ 3 (plan/limit/rate-limit)
 
-Sistem tək mağaza üçün yazılmışdı. Bu mərhələ onu **çox mağazalı (multi-tenant) SaaS**-a çevirir: eyni proqram və eyni baza bir neçə mağazaya xidmət edir, amma heç bir mağaza digərinin bir sətrini belə görmür.
+Sistem tək mağaza üçün yazılmışdı. Bu sənəd onun **çox mağazalı (multi-tenant) SaaS**-a çevrilməsini təsvir edir: eyni proqram və eyni baza bir neçə mağazaya xidmət edir, amma heç bir mağaza digərinin bir sətrini belə görmür.
 
-Bir cümləlik xülasə: **hər biznes sətrində `TenantId` var; oxumağı EF global query filter, yazmağı isə `SaveChanges` interceptor-u avtomatik məhdudlaşdırır — use case kodu tenantdan xəbərsizdir.**
+İki cümləlik xülasə:
+
+- **Mərhələ 1** — hər biznes sətrində `TenantId` var; oxumağı EF global query filter, yazmağı isə `SaveChanges` interceptor-u avtomatik məhdudlaşdırır — use case kodu tenantdan xəbərsizdir.
+- **Mərhələ 2** — mağazalar özləri qeydiyyatdan keçir, platforma admini onları təsdiqləyir/bloklayır və abunə ödənişlərini yazır; abunə müddəti bitən mağaza növbəti sorğudan avtomatik bağlanır (§9).
 
 ---
 
@@ -24,13 +27,15 @@ Sətir-səviyyəli təcridin məlum riski budur ki, bir unudulmuş `WHERE` büt�
 
 ### 1.2 Tenancy modulu
 
-`Modules.Tenancy` (`tenancy` schema) mağazaların reyestridir: `Tenants(Id, Name, OwnerName, Phone, Status, CreatedAt, UpdatedAt)`.
+`Modules.Tenancy` (`tenancy` schema) mağazaların reyestridir:
+`Tenants(Id, Name, OwnerName, Phone, Status, ExpiresAt, MonthlyFee, CreatedAt, UpdatedAt)`.
 
 - `Status`: `PendingApproval` (0) · `Active` (1) · `Blocked` (2). Yalnız `Active` sistemə girə bilər.
+- `ExpiresAt` / `MonthlyFee` Mərhələ 2-də əlavə olundu (§9).
 - `Tenant` **tenant-scoped deyil** — təcridin özünü tərif edən cədvəldir.
 - Digər modullara heç bir FK/navigation yoxdur; əlaqə həmişə sadə `TenantId` Guid-idir (eynilə `Sale.CustomerId` kimi).
-- **Mərhələ 1-də HTTP endpoint açmır.** Mağaza yaratmaq/idarə etmək Mərhələ 2-nin işidir.
-- Başqa modullar ona yalnız `SharedKernel.Contracts.ITenantDirectory` ilə müraciət edir ("bu tenant var və girə bilərmi?").
+- **Mərhələ 1-də HTTP endpoint açmırdı.** Mərhələ 2-də iki səth açdı: anonim qeydiyyat (`POST /api/auth/register`) və platforma admin konsolu (`/api/admin/*`).
+- Başqa modullar ona yalnız `SharedKernel.Contracts.ITenantDirectory` ilə müraciət edir ("bu tenant var, girə bilərmi və müddəti nə vaxt bitir?"). Əks istiqamətdə — Tenancy → Auth — `IIdentityProvisioning` var (yeni mağazanın ilk Sahibkarını yaratmaq).
 
 ---
 
@@ -110,17 +115,25 @@ Nəticədə **use case / handler kodlarında bir dənə də `Where(x => x.Tenant
 
 `TokenService` token-a `tenantId` claim-i əlavə edir (`TokenService.TenantClaim`). Claim adı xamdır, çünki bearer handler-də `MapInboundClaims = false`-dur.
 
-`TenantGateMiddleware` (authentication-dan sonra, authorization-dan əvvəl):
+`TenantGateMiddleware` (authentication-dan sonra, authorization-dan əvvəl) — sıra ilə:
 
-| Hal | Cavab |
-|---|---|
-| Anonim sorğu | Buraxılır (login, public faktura, health, Swagger) |
-| Autentifikasiya olunub, `tenantId` claim-i yoxdur/parse olunmur | `401` + `{ code: "Auth.TenantMissing" }` |
-| Tenant tapılmır və ya `Active` deyil | `403` + `{ code: "Auth.TenantInactiveForbidden", message: "Mağaza aktiv deyil" }` |
+| # | Hal | Cavab |
+|---|---|---|
+| 0 | Anonim sorğu | Buraxılır (login, **qeydiyyat**, public faktura, health, Swagger) |
+| 1 | `role` claim-i `PlatformAdmin`-dir | **Buraxılır** — platforma admini heç bir mağazaya aid deyil (§9.1) |
+| 2 | Autentifikasiya olunub, `tenantId` claim-i yoxdur/parse olunmur | `401` + `{ code: "Auth.TenantMissing" }` |
+| 3 | Tenant tapılmır | `403` + `{ code: "Auth.TenantInactiveForbidden", message: "Mağaza aktiv deyil" }` |
+| 4 | Tenant `PendingApproval` | `403` + `{ code: "Auth.TenantPendingApprovalForbidden", message: "Hesabınız təsdiq gözləyir" }` |
+| 5 | Tenant `Blocked` | `403` + `{ code: "Auth.TenantBlockedForbidden", message: "Abunəliyiniz bitib — əlaqə: {admin telefonu}" }` |
+| 6 | Tenant `Active`, amma `ExpiresAt` keçib | `403` + `{ code: "Auth.SubscriptionExpiredForbidden", message: "Abunəliyiniz bitib — əlaqə: {admin telefonu}" }` |
 
-Login-də də eyni yoxlama var (`AuthErrors.TenantInactiveForbidden` → `403`, token verilmir). Middleware-də təkrarlanır, çünki token bloklama qərarından uzun yaşayır.
+Login-də də **eyni** yoxlamalar var (`LoginHandler.EnsureTenantAllowedAsync`) və eyni kod/mesaj cütlərini qaytarır — token verilmir. Middleware-də təkrarlanır, çünki token bloklama qərarından uzun yaşayır; test hər iki cavabın mesajını bir-birinə qarşı yoxlayır.
+
+Admin telefonu `PlatformAdmin:Phone` konfiqurasiyasındandır — kodda literal yoxdur. Konfiqurasiya olunmayıbsa mesaj «Abunəliyiniz bitib — dəstək ilə əlaqə saxlayın» olur.
 
 **Status kodları (AC-9):** login `403`, mövcud token ilə sonrakı sorğu `403`. `401` yalnız tenant claim-i ümumiyyətlə olmayanda qaytarılır — bu, "token yaramazdır" halıdır, "mağaza qapalıdır" halı deyil.
+
+**Qiymət:** 4–6 nömrəli yoxlamalar ƏLAVƏ sorğu tələb etmir — `ExpiresAt` mövcud `ITenantDirectory.FindAsync` nəticəsinin (`TenantInfo`) içindədir, yəni sorğu başına yenə **bir** primary-key lookup.
 
 ---
 
@@ -166,7 +179,9 @@ Bundan əlavə hər tenant-scoped cədvəldə sadə `TenantId` indeksi var (hər
 
 4-cü bənd şüurlu seçimdir: birini "təsadüfən" seçmək istifadəçini yad mağazaya salardı — məhz bu taskın qarşısını almaq istədiyi sızma. Heç bir halda `500` qaytarılmır.
 
-**Qalıq risk:** eyni telefon + eyni şifrə ilə iki mağazada qeydiyyatdan keçmiş istifadəçi heç birinə girə bilmir. Mərhələ 2-də qeydiyyat forması bu vəziyyəti (məs. mağaza seçimi addımı və ya qeydiyyatda qlobal telefon yoxlaması ilə) həll etməlidir.
+**✅ Qalıq risk Mərhələ 2-də bağlandı.** `POST /api/auth/register` telefonu **qlobal** (bütün mağazalar üzrə) yoxlayır: artıq istifadə olunan telefonla qeydiyyat `409 Tenancy.PhoneAlreadyExists`. Deməli qeydiyyat yolundan keçən hər telefon **dəqiq bir** istifadəçini göstərir və yuxarıdakı 4-cü bənd praktikada işə düşmür. Yoxlama `IIdentityProvisioning.PhoneExistsAsync`-dədir (Auth modulu, `IgnoreQueryFilters` ilə — §5.1) və eyni qayda admin özü mağaza yaradanda (`POST /api/admin/tenants`) da tətbiq olunur.
+
+**Yeni (kiçik) qalıq risk:** yoxlama oxu + yazıdır, ona görə eyni yeni telefonla eyni anda göndərilən iki qeydiyyat hər ikisi yoxlamadan keçə bilər. Pəncərə çox dardır və nəticə köhnə, artıq həll olunmuş qeyri-müəyyənlikdir (hər ikisi login-də rədd olunur, heç vaxt yad mağazaya düşmür). Tam bağlanması üçün register endpoint-inə **rate-limit** + platforma səviyyəli unique index lazımdır — hər ikisi Mərhələ 3-dədir (§8).
 
 ### 4.2 `InvoiceToken` qlobal unikal qalır ⚠️
 
@@ -182,7 +197,7 @@ Yəni filter bypass olunmur; sadəcə tenant JWT yerinə token-dən qurulur və 
 
 ### 4.3 Seeder və miqrasiyalar
 
-Beş dev seeder (`UserSeeder`, `ProductSeeder`, `CustomerSeeder`, `SupplierSeeder`, `ExpenseTypeSeeder`) startup-da, HTTP sorğusundan kənarda işləyir — tenant konteksti yoxdur. Hər biri iki şeyi edir:
+Startup seeder-ləri (`UserSeeder`, `ProductSeeder`, `CustomerSeeder`, `SupplierSeeder`, `ExpenseTypeSeeder` — hamısı yalnız Development; və BE#36-nın `PlatformAdminSeeder`-i — **hər mühitdə**) HTTP sorğusundan kənarda işləyir — tenant konteksti yoxdur. Hər biri iki şeyi edir:
 
 - yazdığı sətirlərə `TenantDefaults.DefaultTenantId`-ni **açıq şəkildə** təyin edir (`AssignTenant`) — əks halda `TenantInterceptor` haqlı olaraq `MissingTenantContextException` atardı;
 - "cədvəl boşdurmu?" yoxlamasını `IgnoreQueryFilters()` ilə edir — əks halda boş tenant filtrindən həmişə "boş" görünüb hər açılışda yenidən seed edərdi.
@@ -197,9 +212,11 @@ Miqrasiyalar EF query pipeline-ından tamamilə kənardadır (xam SQL) — orada
 
 ### 4.5 Hələ tenant-aware olmayan şeylər
 
-- **Tenant idarəetməsi yoxdur** — mağaza yaratmaq/aktivləşdirmək/bloklamaq üçün endpoint yoxdur (Mərhələ 2). Hazırda bu, bazada birbaşa `tenancy.Tenants` sətri ilə edilir.
-- **Plan/limit/billing yoxdur** (Mərhələ 3).
-- **Cross-tenant admin görünüşü yoxdur** — heç bir rol bütün mağazaları görə bilmir. `Owner` da yalnız öz mağazasını görür.
+- ~~Tenant idarəetməsi yoxdur~~ → **Mərhələ 2-də gəldi** (§9).
+- ~~Cross-tenant admin görünüşü yoxdur~~ → **Mərhələ 2-də gəldi**: `PlatformAdmin` rolu bütün mağazaların *reyestrini* görür. Mağazaların **datasını** (mal, satış, müştəri) heç bir rol, o cümlədən platforma admini, görmür (§9.1).
+- **Plan/limit yoxdur** (Mərhələ 3): məhsul sayı, istifadəçi sayı, export həcmi kimi limitlər yoxdur.
+- **Register endpoint-ində rate-limit yoxdur** (Mərhələ 3) — §4.1-in qalıq riski.
+- **Tenant silinməsi/arxivləşdirilməsi və data ixracı yoxdur** (Mərhələ 3).
 
 ---
 
@@ -212,9 +229,21 @@ Query filter-i keçə biləcək bütün yollar araşdırıldı. Boş cədvəl q�
 | Yer | Risk | Görülən tədbir |
 |---|---|---|
 | `LoginHandler` — istifadəçini telefonla tapmaq | Yüksək: bütün mağazaların istifadəçilərini görür | **Şüurlu istisna.** Login anonimdir, başqa yolu yoxdur. Yalnız `Phone` üzrə filtrlənir, nəticə yalnız şifrə yoxlaması üçün istifadə olunur, heç bir sahə çölə verilmir; birdən çox uyğunluqda giriş rədd olunur (§4.1) |
+| `IdentityProvisioningContract.PhoneExistsAsync` (BE#36) | Aşağı: `Any()` — heç bir sətir oxunmur | **Şüurlu istisna.** Qeydiyyat anonimdir və sual məhz "bu telefon HƏR YERDƏ tutulubmu?" sualıdır (§4.1). Yalnız `bool` qaytarır |
 | `SalesModuleContract.GetInvoiceTokenOwnerAsync` | Orta: token üzrə bütün mağazaların satışlarını görür | **Şüurlu istisna.** Yalnız `(SaleId, TenantId)` qaytarır, dərhal `TenantScope` qurulur və qalan hər şey filtrlənmiş işləyir (§4.2) |
-| Dev seeder-lərin boşluq yoxlaması (`UserSeeder`, `ProductSeeder` ×2, `CustomerSeeder`, `SupplierSeeder`, `ExpenseTypeSeeder`) | Aşağı: yalnız `Any()`, heç bir sətir oxunmur | **Şüurlu istisna.** Startup-da tenant konteksti yoxdur; əks halda hər açılışda təkrar seed edərdi (§4.3) |
-| Digər | — | **Başqa `IgnoreQueryFilters()` çağırışı yoxdur** (bütün `src/` yoxlanıldı) |
+| Startup seeder-lərin boşluq yoxlaması (`UserSeeder`, `PlatformAdminSeeder`, `ProductSeeder` ×2, `CustomerSeeder`, `SupplierSeeder`, `ExpenseTypeSeeder`) | Aşağı: yalnız `Any()`, heç bir sətir oxunmur | **Şüurlu istisna.** Startup-da tenant konteksti yoxdur; əks halda hər açılışda təkrar seed edərdi (§4.3) |
+| **Tenancy admin use case-ləri** (`/api/admin/*`) | — | **Bypass ehtiyacı YOXDUR.** `Tenant` və `SubscriptionPayment` `ITenantScoped` deyil, yəni onlarda söndürüləcək filtr yoxdur. Bu, `SubscriptionPayment`-i qəsdən tenant-scoped etməməyin əsas səbəbidir: bütün mağazaları görməli olan modul eyni zamanda bypass-ı olmayan modul olur |
+| Digər | — | **Başqa `IgnoreQueryFilters()` çağırışı yoxdur** — bu, artıq əl ilə deyil, arxitektura testi ilə təsbit olunub (§5.1.1) |
+
+### 5.1.1 Arxitektura testi (BE#36, AC-7)
+
+`tests/…/IntegrationTests/IgnoreQueryFiltersArchitectureTests.cs` bütün `src/**/*.cs` mənbə fayllarını oxuyur (IL yox — mənbə, çünki nəzarət olunmalı olan şey **insanın həmin sətri yazmasıdır** və əsaslandırma fayl adının yanında görünməlidir) və:
+
+1. allowlist-də olmayan bir `IgnoreQueryFilters(` çağırışı taparsa → **test qırılır**;
+2. allowlist-də olub artıq çağırışı olmayan (və ya silinmiş) yol qalarsa → **test qırılır** (siyahı köhnəlmir);
+3. skanerin özü sanity yoxlanılır (mənbə ağacını tapıb-tapmadığı).
+
+Allowlist elə testin içindədir: hər sətir "yol + səbəb" cütüdür. Doc-comment-dəki `IgnoreQueryFilters` qeydləri saymır (yalnız kod sətirləri nəzərə alınır).
 
 ### 5.2 Raw SQL / Dapper
 
@@ -266,8 +295,12 @@ Praktiki nəticə: `POST /api/sales` sorğusunda başqa mağazanın `productId`-
 | Sənəd | Nə yoxlayır |
 |---|---|
 | `tests/…/IntegrationTests/TenantIsolationApiTests.cs` | İki mağaza real HTTP API üzərindən: siyahı süzgəci, cross-tenant GET/PUT/DELETE → `404`, interceptor davranışı, body ilə spoofing, tenant-scoped unique indekslər, cross-module zəncir sızması, hesabatlar, activity, ayarlar, export, anonim faktura, bloklanmış mağaza, telefon birmənalılığı |
-| `tests/…/IntegrationTests/TenantQueryFilterCoverageTests.cs` | Model səviyyəsi: hər `ITenantScoped` entity üçün query filter + `TenantId` indeksi var; `Tenant` isə filtrlənməyib; heç bir biznes entity marker-siz qalmayıb |
-| `tests/…/IntegrationTests/TenantTestFixture.cs` | İkinci/üçüncü mağazanı provizasiya edən köməkçi (Mərhələ 2-də qeydiyyat endpoint-i gələndə bunun yerini tutacaq) |
+| `tests/…/IntegrationTests/TenantQueryFilterCoverageTests.cs` | Model səviyyəsi: hər `ITenantScoped` entity üçün query filter + `TenantId` indeksi var; `tenancy` sxemində isə YALNIZ sənədləşdirilmiş iki entity (`Tenant`, `SubscriptionPayment`) marker-sizdir; heç bir digər biznes entity marker-siz qalmayıb |
+| `tests/…/IntegrationTests/PlatformAdminApiTests.cs` (BE#36) | Mərhələ 2 uçdan-uca: qeydiyyat → pending → login `403`; təsdiq → login OK; müddət keçib → istənilən authenticated sorğu `403 SubscriptionExpired`; ödəniş → dərhal yenidən işləyir; uzatma riyaziyyatı (canlı/keçmiş müddət); təkrar telefon `409`; `ExpiresAt = null` heç vaxt bloklanmır; adi Sahibkar `/api/admin/*`-a `403`; platforma admini tenant qapısından keçir, amma heç bir mağaza datasını görmür |
+| `tests/…/IntegrationTests/IgnoreQueryFiltersArchitectureTests.cs` (BE#36) | Bypass allowlist-i — §5.1.1 |
+| `tests/…/Modules.Tenancy.Tests/SubscriptionPeriodTests.cs` (BE#36) | `ExpiresAt` riyaziyyatı saatsız/bazasız: uzatma, təsdiq, sərhəd (dəqiq an), müddətsiz mağaza, blok/deblok müddətə toxunmur |
+| `tests/…/Modules.Auth.Tests/PlatformAdminRoleTests.cs` (BE#36) | Rol adı/kodu və rezerv edilmiş tenant id-nin toqquşmaması |
+| `tests/…/IntegrationTests/TenantTestFixture.cs` | İkinci/üçüncü mağazanı provizasiya edən köməkçi; BE#36-da `SetExpiryAsync`/`GetTenantAsync` əlavə olundu |
 
 Cross-tenant müraciət **həmişə `404`**-dür, `403` deyil: `403` resursun mövcud olduğunu təsdiqləyərdi.
 
@@ -280,7 +313,12 @@ Miqrasiyalar hər modulun öz tarixçəsindədir və startup-da avtomatik tətbi
 | Modul | Miqrasiya |
 |---|---|
 | Tenancy | `InitialTenancy` — `tenancy.Tenants` + default mağaza (`"İlk Mağaza"`, `Active`, sabit id `00000000-0000-0000-0000-000000000001`) |
+| Tenancy (BE#36) | `AddSubscriptionFields` — `Tenants.ExpiresAt` (nullable), `Tenants.MonthlyFee` (`decimal(18,2)`, default 0) + yeni `tenancy.SubscriptionPayments` cədvəli |
 | Auth, Products, Sales, Customers, Suppliers, Expenses, DayEnd, Activity, Settings | `AddTenantId` — `TenantId` sütunu + indekslər + **back-fill** |
+
+**BE#36-da `identity` sxemi üçün miqrasiya YOXDUR** — bu şüurlu qərardır, bax §9.1.
+
+**`ExpiresAt` üçün back-fill də YOXDUR:** sütun `NULL` olaraq əlavə olunur və mövcud hər mağaza (o cümlədən "İlk Mağaza") `NULL` qalır. `NULL` = **müddətsiz**, yəni heç vaxt "bitmiş" sayılmır — işləyən quraşdırma yeniləmədən sonra özünü kilidləyə bilməz. Mağaza son tarixi yalnız admin onu təsdiqləyəndə və ya ödəniş yazanda alır.
 
 Back-fill sadə `UPDATE`-dir: `TenantId` boş olan hər sətir default mağazaya bağlanır. **Heç bir sətir silinmir, dublikat olunmur** — miqrasiyadan əvvəl və sonra sətir sayları eynidir. Hər `UPDATE`-in `WHERE [TenantId] = '000…000'` şərti var, tenant sətrinin `INSERT`-i isə `IF NOT EXISTS` ilə qorunub, ona görə təkrar icra idempotentdir.
 
@@ -288,23 +326,113 @@ Miqrasiyadan sonra mövcud istifadəçilər eyni telefon/şifrə ilə girməyə 
 
 ---
 
-## 8. Gələcək mərhələlər
+## 8. Mərhələlərin vəziyyəti
 
-### Mərhələ 2 — tenant qeydiyyatı və idarəsi
+### ✅ Mərhələ 1 — data təcridi (BE#35)
 
-- Self-service qeydiyyat: mağaza adı + sahibkar + telefon → `Tenant(PendingApproval)` + ilk `Owner` istifadəçi.
-- Təsdiq/bloklama üçün admin səthi (`Active` / `Blocked` keçidləri).
-- §4.1-dəki telefon birmənalılığı problemi qeydiyyat mərhələsində həll olunmalıdır (mağaza seçimi addımı və ya qeydiyyatda telefonun qlobal yoxlanması).
-- Tenant silinməsi/arxivləşdirilməsi və data ixracı.
+`TenantId` + query filter + interceptor + tenant qapısı. §1–§7.
 
-### Mərhələ 3 — plan və billing
+### ✅ Mərhələ 2 — qeydiyyat, platforma admini, abunə (BE#36)
 
+- Self-service qeydiyyat: mağaza adı + sahibkar + telefon → `Tenant(PendingApproval)` + ilk `Owner`.
+- `PlatformAdmin` rolu + `PlatformAdminOnly` policy + `/api/admin/*` konsolu (təsdiq/blok/deblok/ödəniş/statistika).
+- Abunə: `Tenant.ExpiresAt` + `Tenant.MonthlyFee` + `tenancy.SubscriptionPayments`; müddəti keçən mağaza avtomatik bağlanır.
+- §4.1-dəki telefon birmənalılığı qeydiyyatda qlobal telefon yoxlaması ilə həll olundu.
+
+Detallar: §9.
+
+### ⏳ Mərhələ 3 — plan, limit və möhkəmləndirmə
+
+- **Register endpoint-inə rate-limit** (IP başına, mövcud `PublicInvoice` policy-si kimi) — §4.1-in qalıq yarışı və spam qeydiyyat üçün. **Mərhələ 2-də qəsdən edilmədi**, çünki düzgün ölçü (IP? telefon prefiksi? captcha?) məhsul qərarıdır.
+- Platforma səviyyəli telefon unikallığı (filtrli unique index) — yuxarıdakı ilə birlikdə.
 - Plan (`Free` / `Pro` / …), limitlər (məhsul sayı, istifadəçi sayı, export həcmi).
-- Abunə vəziyyəti → `TenantStatus` ilə əlaqə (ödəniş gecikəndə avtomatik `Blocked`).
-- İstifadə ölçmə və faktura.
+- İstifadə ölçmə və avtomatik faktura/qəbz.
+- Tenant silinməsi/arxivləşdirilməsi və data ixracı.
+- Tenant statusu üçün qısa TTL-li keş (§4.4) — yük problemi yaranarsa.
+
+---
+
+## 9. Mərhələ 2 — qeydiyyat, platforma admini və abunə (BE#36)
+
+### 9.1 Platforma admini: `TenantId` necə həll olundu
+
+Platforma operatoru heç bir mağazaya aid deyil, amma `identity.Users`-dakı `TenantId` sütunu `NOT NULL`-dur və `(TenantId, Phone)` unikal indeksi var. Üç variant vardı:
+
+| Variant | Nəticə | Qərar |
+|---|---|---|
+| `TenantId` nullable etmək | `TenantEntity`, query filter mexanizmi, unikal indeks — hamısı dəyişməli; işləyən quraşdırmada miqrasiya riski | **Seçilmədi** — mərkəzi abstraksiyanı bir istifadəçi üçün deşmək |
+| `Guid.Empty` | `TenantInterceptor` `Guid.Empty`-ni "təyin edilməyib" kimi oxuyur → seed-də `MissingTenantContextException`; üstəlik tenant konteksti boş olan sorğuda filter məhz bu sətri **tapır** — "boş kontekst heç nə görmür" invariantı pozulur | **Seçilmədi** |
+| **Rezerv edilmiş id** `00000000-0000-0000-0000-0000000000ff` (`TenantDefaults.PlatformTenantId`) | Sxem dəyişmir, interceptor kontraktı pozulmur, heç bir `tenancy.Tenants` sətri bu id-ni istifadə etmir → bu id altında **bir dənə də biznes sətri yoxdur** → hər tenant-scoped sorğu boş qayıdır (fail-closed) | **Seçildi** |
+
+Əlavə üstünlük: adminin **öz** `identity.Users` sətri bu id altındadır, ona görə `GET /api/auth/me` heç bir bypass olmadan işləyir (`NULL` variantında `404` olardı).
+
+Nəticədə admin üçün:
+
+- token-də `tenantId` claim-i **var** (rezerv id), amma tenant qapısı onu **rola görə** buraxır — `role = PlatformAdmin` (§2.4, sətir 1). Bu, yeganə istisnadır və yalnız bu rola aiddir: tenant claim-siz **adi** token hələ də `401` alır (test: `Token_Without_A_Tenant_Claim_Is_Rejected`);
+- `/api/admin/*` `PlatformAdminOnly` policy-si ilə qorunur — adi `Owner` (Sahibkar) `403` alır;
+- `/api/products`, `/api/customers` və s. sorğuları `200` qaytarır, amma **boş** — sızma yoxdur (test: `Platform_Admin_Passes_The_Tenant_Gate_But_Sees_No_Shop_Data`).
+
+Seed: `PlatformAdminSeeder` (`PlatformAdmin` konfiqurasiya bölməsindən telefon/şifrə/ad), **hər mühitdə** işləyir (əks halda təzə production quraşdırmasının konsola girişi olmazdı), **idempotentdir** (mövcud admin varsa heç nə etmir və şifrəsini yenidən yazmır) və bölmə konfiqurasiya olunmayıbsa **heç nə seed etmir** (təxmin edilə bilən default parol yaranmasın).
+
+> **Production:** `PlatformAdmin__Password` (və `PlatformAdmin__Phone`) mühit dəyişəni ilə override edin. `appsettings.json`-dakı dəyər yalnız dev üçündür.
+
+### 9.2 Qeydiyyat axını
+
+```
+POST /api/auth/register   (ANONİM)
+  { storeName, ownerName, phone, password }
+        │
+        ├─ validasiya (ad/telefon uzunluqları, şifrə ≥ 6)
+        ├─ IIdentityProvisioning.PhoneExistsAsync(phone)   ← QLOBAL, §4.1
+        │      └─ tapıldı → 409 Tenancy.PhoneAlreadyExists
+        │
+        └─ IUnitOfWork transaction:
+               tenancy.Tenants   ← Tenant(PendingApproval)
+               identity.Users    ← User(Owner, TenantId AÇIQ təyin olunur)
+        →  201 { tenantId, storeName, status: "PendingApproval", message }
+```
+
+- **Token verilmir** — mağaza hələ girə bilmir; login `403 Auth.TenantPendingApprovalForbidden` ("Hesabınız təsdiq gözləyir") deyir.
+- İki fərqli sxemə yazıldığı üçün `TenancyDbContext` BE#36-da `ITransactionalDbContext` oldu: "sahibi olmayan mağaza" və ya "mağazası olmayan sahib" əldə edilə bilən vəziyyət deyil.
+- Yeni istifadəçinin `TenantId`-si **açıq şəkildə** təyin olunur (`AssignTenant`) — qeydiyyat anonimdir, ambient tenant yoxdur və `TenantInterceptor` haqlı olaraq `MissingTenantContextException` atardı (§4.3-dəki seeder qaydasının eynisi).
+- Eyni provizasiya kodu (`TenantProvisioning`) admin `POST /api/admin/tenants` çağıranda da işləyir — fərq yalnız statusdur (`Active`) və opsional müddətdir.
+
+### 9.3 Abunə və `ExpiresAt` semantikası
+
+| Dəyər | Məna |
+|---|---|
+| `ExpiresAt = null` | **Müddətsiz** — HEÇ VAXT bitmiş sayılmır |
+| `ExpiresAt > now` | Abunə qüvvədədir |
+| `ExpiresAt <= now` | **Bitib** — status dəyişmir, amma giriş bağlanır |
+
+Sərhəd **inklüzivdir**: `ExpiresAt == now` artıq bitmiş sayılır.
+
+İki fərqli əməliyyat:
+
+| Əməliyyat | Düstur | Niyə |
+|---|---|---|
+| **Təsdiq** (`approve`) | `ExpiresAt = now + N ay` | Təsdiq təmiz başlanğıcdır; köhnə (çox güman köhnəlmiş) tarixin üstünə qurmaq yanlış olardı |
+| **Ödəniş** (`payments`) | `ExpiresAt = max(now, mövcud ExpiresAt ?? now) + N ay` | Vaxtından əvvəl ödəyən müştəri qalan günlərini itirmir; gecikən müştəri isə qismən keçmişdə olan müddət almır |
+
+Bütün tarix hesabı `Tenant` domain entity-sindədir və "indi"ni **arqument kimi** alır; handler-lər `IDateProvider.UtcNow` ötürür (kodda birbaşa `DateTime.UtcNow` yoxdur), ona görə riyaziyyat saatsız unit testlə örtülüb (`SubscriptionPeriodTests`).
+
+### 9.4 Avto-blok mexanizmi
+
+- Yoxlama **mövcud** tenant lookup-ının içindədir (`TenantGateMiddleware`, §2.4 sətir 6) — nə yeni middleware, nə ikinci sorğu.
+- **Status DƏYİŞMİR.** `ExpiresAt` özü hökmdür. Bunun üç faydası var: fon işi (scheduler) lazım deyil; admin ödəniş yazan kimi mağaza **növbəti sorğuda** açılır (yenidən login belə tələb olunmur — token dəyişmir); "bloklanıb, amma niyə?" kimi bərpa ediləsi vəziyyət yaranmır.
+- Support-un əl ilə qoyduğu `Blocked` statusu **ayrıdır**: ödəniş onu açmır. Blok — support qərarı, `ExpiresAt` — billing.
+- `GET /api/admin/stats`-dakı `expiredCount` məhz "Active, amma müddəti keçib" mağazaları sayır.
+
+### 9.5 Admin endpoint-ləri
+
+Hamısı `/api/admin/*`, hamısı `PlatformAdminOnly`. Siyahı və validasiya qaydaları: `docs/api/API-OVERVIEW.md`.
+
+`SubscriptionPayment` **qəsdən `ITenantScoped` deyil**: bu, platforma səviyyəli billing qeydidir, mağaza datası deyil. Onu tenant-scoped etsəydik, tenant konteksti olmayan admin heç nə görməzdi və məhz bypass-sız olmalı modula `IgnoreQueryFilters()` gətirməli olardıq (§5.1).
 
 ---
 
 ## Last Updated
+
+2026-08-16 — BE#36 (Mərhələ 2: qeydiyyat, platforma admini, abunə və avto-blok).
 
 2026-08-16 — BE#35 (Mərhələ 1: data təcridi).

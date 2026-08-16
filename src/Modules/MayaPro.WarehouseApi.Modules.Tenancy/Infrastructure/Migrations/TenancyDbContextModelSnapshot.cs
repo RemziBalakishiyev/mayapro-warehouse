@@ -23,6 +23,47 @@ namespace MayaPro.WarehouseApi.Modules.Tenancy.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("MayaPro.WarehouseApi.Modules.Tenancy.Domain.SubscriptionPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("PeriodMonths")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("RecordedByAdminId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaidAt");
+
+                    b.HasIndex("TenantId", "PaidAt");
+
+                    b.ToTable("SubscriptionPayments", "tenancy");
+                });
+
             modelBuilder.Entity("MayaPro.WarehouseApi.Modules.Tenancy.Domain.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -31,6 +72,13 @@ namespace MayaPro.WarehouseApi.Modules.Tenancy.Infrastructure.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("MonthlyFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -52,6 +100,8 @@ namespace MayaPro.WarehouseApi.Modules.Tenancy.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
 
                     b.HasIndex("Status");
 

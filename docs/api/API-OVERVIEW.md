@@ -2,14 +2,17 @@
 
 Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (JSON number). Wire dəyərləri (ödəniş növləri, rollar) dondurulub — bax [ADR-0006](../decisions/0006-frozen-wire-format.md). Xəta formatı: `docs/api/ERROR-CONTRACT.md`.
 
-**Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy. Rol çatmır → 403.
+**Auth səviyyələri:** `anon` = açıq · `auth` = istənilən login olmuş rol · `O+M` = OwnerOrManager policy · `O` = OwnerOnly policy · `PA` = PlatformAdminOnly policy (platforma operatoru; adi Sahibkar da daxil olmaqla heç bir mağaza rolu keçmir). Rol çatmır → 403.
 
-## Endpoint-lər (53)
+**Multi-tenancy (BE#35/BE#36).** Autentifikasiya olunmuş HƏR sorğu tenant qapısından keçir: token `tenantId` daşımırsa 401; mağaza tapılmır/təsdiq gözləyir/bloklanıb/abunə müddəti bitibsə 403 (kodlar `docs/api/ERROR-CONTRACT.md`-də). Yeganə istisna `PlatformAdmin` rolu ilə gələn tokendir — o, heç bir mağazaya aid deyil, ona görə qapıdan keçir, lakin mağaza datasını GÖRMÜR (query filter boş qaytarır). Detallar: `docs/multi-tenancy.md`.
+
+## Endpoint-lər (62)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
 |---|---|---|---|
 | POST | `/api/auth/login` | anon | `{phone, password}` → `{token, user}` |
+| POST | `/api/auth/register` | anon | `{storeName, ownerName, phone, password}` → 201 `{tenantId, storeName, status, message}` |
 | GET | `/api/auth/me` | auth | Cari istifadəçi |
 | GET | `/api/employees` | auth | İşçi siyahısı (`monthlySalary` daxil) |
 | PUT | `/api/employees/{id}/salary` | O | `{monthlySalary}` → yenilənmiş işçi sətri |
@@ -17,6 +20,10 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 | POST | `/api/employees/{id}/salary-entries` | O+M | `{type, amount, note?, month?}` → 201 |
 | GET | `/api/employees/{id}/salary-entries?month=` | auth | Ayın maaş sətirləri (ən yenisi əvvəldə) |
 | DELETE | `/api/employees/{id}/salary-entries/{entryId}` | O | Maaş sətrini silir |
+
+**Mağaza qeydiyyatı (BE#36).** `POST /api/auth/register` anonimdir və mağazanı `PendingApproval` statusunda yaradır + ilk `Sahibkar` istifadəçisini verir — **token qaytarmır**, çünki mağaza hələ girə bilmir. Telefon **qlobal** (bütün mağazalar üzrə) unikal olmalıdır: təkrar → 409 `Tenancy.PhoneAlreadyExists`. 400 halları: boş mağaza/sahibkar adı (>200 simvol), boş telefon (>30 simvol), şifrə < 6 simvol. Mağaza + istifadəçi tək transaction-da yazılır. **Rate-limit YOXDUR** — Mərhələ 3-ə qalıb (`docs/multi-tenancy.md` §8).
+
+Qeydiyyatdan sonrakı login cavabları: `PendingApproval` → 403 `Auth.TenantPendingApprovalForbidden` «Hesabınız təsdiq gözləyir»; `Blocked` → 403 `Auth.TenantBlockedForbidden` «Abunəliyiniz bitib — əlaqə: {admin telefonu}»; abunə müddəti keçib → 403 `Auth.SubscriptionExpiredForbidden` (eyni mesaj).
 
 **Maaş sistemi (BE#28).** `GET /api/employees` cavabına additiv `monthlySalary` sahəsi əlavə olundu (təyin edilməyibsə `0`, heç vaxt null); mövcud sahələr dəyişməyib.
 
@@ -114,6 +121,27 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 ### Public (`/api/public`) — AUTH-SUZ
 `GET /api/public/invoices/{token}` — token ilə qaimə PDF, inline (WhatsApp paylaşımı). Rate limit: IP başına 30/dəq (429). Yanlış token → 404.
 
+### PlatformAdmin (`/api/admin`) — hamısı `PA` (BE#36)
+| Verb | Route | Qeyd |
+|---|---|---|
+| GET | `/api/admin/tenants?status&search` | Mağaza siyahısı + billing xülasəsi |
+| POST | `/api/admin/tenants` | Admin özü mağaza yaradır → dərhal `Active`, 201 |
+| POST | `/api/admin/tenants/{id}/approve` | `{months}` → `ExpiresAt = now + N ay`, status `Active` |
+| POST | `/api/admin/tenants/{id}/block` · `/unblock` | Status keçidi — abunə müddətinə TOXUNMUR |
+| POST | `/api/admin/tenants/{id}/payments` | `{amount, months, note?}` → ödəniş yazılır + müddət uzanır |
+| GET | `/api/admin/tenants/{id}/payments` | Ödəniş tarixçəsi (ən yenisi əvvəldə) |
+| GET | `/api/admin/stats` | `{activeCount, pendingCount, blockedCount, expiredCount, thisMonthCollected}` |
+
+`GET /api/admin/tenants` hər sətirdə: `id, name, ownerName, phone, status, expiresAt, monthlyFee, isExpired, lastPaymentAt, lastPaymentAmount, totalPaid`. `status` filtri `TenantStatus` adıdır (`PendingApproval` \| `Active` \| `Blocked`, case-insensitive) — naməlum dəyər 400; `search` mağaza adı / sahibkar adı / telefon üzrə case-insensitive `contains`.
+
+`POST /api/admin/tenants` body-si: `{storeName, ownerName, phone, password, months?, monthlyFee?}`. `months` verilməsə mağaza **müddətsiz** `Active` olur. Telefon qaydası qeydiyyatla eynidir (409).
+
+**Abunə uzatma qaydası:** ödənişdə `ExpiresAt = max(now, mövcud ExpiresAt ?? now) + N ay` (vaxtından əvvəl ödəyən qalan günlərini itirmir; gecikən müddəti indidən başlayır). Təsdiqdə isə `ExpiresAt = now + N ay` (təmiz başlanğıc). `ExpiresAt = null` = **müddətsiz**, heç vaxt bloklanmır.
+
+Validasiya: `months` 1–120 arası (kənar → 400), `amount` > 0 və ≤ 1 000 000 (→ 400), `note` ≤ 500 simvol, mövcud olmayan mağaza → 404 `Tenancy.TenantNotFound`.
+
+`expiredCount` = statusu `Active`, amma `ExpiresAt` keçmiş mağazalar (avto-blok statusu dəyişmir). `thisMonthCollected` cari **Bakı** təqvim ayının ödəniş cəmidir (ADR-0005).
+
 ### Activity, Health
 `GET /api/activity?take&skip` (auth) · `GET /health` (anon)
 
@@ -122,6 +150,8 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-08-16 — BE#36: `POST /api/auth/register` (anon) və `/api/admin/*` platforma konsolu (8 endpoint, `PA` policy); login-in 403 cavabları statusa görə ayrıldı (`TenantPendingApproval` / `TenantBlocked` / `SubscriptionExpired`); abunə müddəti keçən mağaza istənilən authenticated sorğuda 403 alır.
 
 2026-08-01 — BE#28: işçi maaş sistemi — `PUT /api/employees/{id}/salary` (O), `POST`/`GET`/`DELETE /api/employees/{id}/salary-entries` və `GET /api/employees/salary-summary`; `GET /api/employees` cavabına additiv `monthlySalary`. Maaş ödənişləri gün sonu `expenses` və dashboard `todayExpenses`/`expectedCash` rəqəmlərinə daxil oldu; tutulmalar kassaya toxunmur.
 

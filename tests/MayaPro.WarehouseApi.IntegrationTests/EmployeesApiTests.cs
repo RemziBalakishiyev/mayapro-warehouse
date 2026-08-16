@@ -196,7 +196,19 @@ public sealed class EmployeesApiTests : IAsyncLifetime
         List<IntegrationTestHelpers.SalaryEntryDto> pastEntries = await EntriesAsync(client, employeeId, PastMonth);
         IntegrationTestHelpers.SalaryEntryDto entry = Assert.Single(pastEntries);
         Assert.Equal(PastMonth, entry.Month);
-        Assert.Equal(DateTime.UtcNow.Date, entry.Date.ToUniversalTime().Date);
+
+        // The API returns UTC instants, but SQL Server hands `datetime2` back with Kind=Unspecified, so the
+        // JSON carries no offset and `ToUniversalTime()` would re-interpret it as the machine's LOCAL time
+        // and shift it by that offset. On a UTC+4 machine that turned this assertion red for the first four
+        // hours of every UTC day. Stamp the kind instead of converting, and compare the instant rather than
+        // the calendar day so a run that crosses midnight is not a failure either.
+        DateTime entryUtc = entry.Date.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(entry.Date, DateTimeKind.Utc)
+            : entry.Date.ToUniversalTime();
+
+        Assert.True(
+            (DateTime.UtcNow - entryUtc).Duration() < TimeSpan.FromMinutes(5),
+            $"Sətrin tarixi indiki ana yaxın olmalıdır: {entryUtc:O} vs {DateTime.UtcNow:O}");
     }
 
     /// <summary>TC26 — the salary line and its activity entry are written together; the feed shows it.</summary>

@@ -18,6 +18,17 @@ public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
         "Server=localhost;Database=MayaProWarehouse_Test;Trusted_Connection=True;" +
         "TrustServerCertificate=True;MultipleActiveResultSets=True";
 
+    /// <summary>
+    /// BE#36 — the platform admin the host seeds at startup. Pinned here rather than taken from
+    /// appsettings.json so the suite keeps working whatever an installation configures, and so the tests
+    /// prove the credentials really do come from configuration.
+    /// </summary>
+    public const string PlatformAdminPhone = "0509999999";
+
+    public const string PlatformAdminPassword = "platform-admin-test-pass";
+
+    public const string PlatformAdminName = "Platforma Admini";
+
     private readonly SemaphoreSlim _resetLock = new(1, 1);
     private bool _isReset;
 
@@ -29,7 +40,10 @@ public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Default"] = TestConnectionString
+                ["ConnectionStrings:Default"] = TestConnectionString,
+                ["PlatformAdmin:Phone"] = PlatformAdminPhone,
+                ["PlatformAdmin:Password"] = PlatformAdminPassword,
+                ["PlatformAdmin:FullName"] = PlatformAdminName
             });
         });
     }

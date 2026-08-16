@@ -56,9 +56,14 @@ public sealed class AuthModule : IModule
         // read them the same way they read expenses.
         services.AddScoped<ISalaryModule, SalaryModuleContract>();
 
+        // BE#36 cross-module contract: how the Tenancy module gets a new shop's first Sahibkar created
+        // (and asks whether a phone is already a login anywhere on the platform).
+        services.AddScoped<IIdentityProvisioning, IdentityProvisioningContract>();
+
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<UserSeeder>();
+        services.AddScoped<PlatformAdminSeeder>();
 
         services.AddScoped<IValidator<LoginCommand>, LoginValidator>();
         services.AddScoped<IValidator<SetEmployeeSalaryCommand>, SetEmployeeSalaryValidator>();
@@ -91,5 +96,11 @@ public sealed class AuthModule : IModule
             var seeder = services.GetRequiredService<UserSeeder>();
             await seeder.SeedAsync();
         }
+
+        // BE#36: unlike the demo users, the platform admin is seeded in every environment — a fresh
+        // production install would otherwise have no way into /api/admin/*. Idempotent, and a no-op when
+        // the PlatformAdmin section is not configured.
+        var platformAdminSeeder = services.GetRequiredService<PlatformAdminSeeder>();
+        await platformAdminSeeder.SeedAsync();
     }
 }
