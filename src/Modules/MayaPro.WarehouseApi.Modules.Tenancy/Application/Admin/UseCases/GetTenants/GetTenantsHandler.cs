@@ -19,6 +19,9 @@ namespace MayaPro.WarehouseApi.Modules.Tenancy.Application.Admin.UseCases.GetTen
 /// </summary>
 public sealed class GetTenantsHandler(TenancyDbContext db, IDateProvider dateProvider)
 {
+    /// <summary>The <c>ESCAPE</c> character the search pattern below is built with.</summary>
+    private const string LikeEscape = "\\";
+
     public async Task<Result<IReadOnlyList<TenantListItemDto>>> Handle(GetTenantsQuery query, CancellationToken ct)
     {
         TenantStatus? status = null;
@@ -38,13 +41,21 @@ public sealed class GetTenantsHandler(TenancyDbContext db, IDateProvider datePro
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            // Lowered on both sides, exactly like the expense-type duplicate check: the same operation on
-            // either side behaves identically on SQL Server and on the in-memory provider.
-            string term = query.Search.Trim().ToLower();
+            // BE#40 — there is deliberately no ToLower() on this path, on either side.
+            //
+            // The host culture is az-Latn-AZ, where 'I'.ToLower() is 'ı' (U+0131) while SQL Server's
+            // LOWER() maps 'I' to 'i'. Lowering the term in C# and the column in SQL therefore produced
+            // two different strings for any term containing a capital I, and the comparison could never
+            // match — "QAAXTARIS" found nothing while "qaaxtaris" found the row.
+            //
+            // The fix is to stop translating case at all: LIKE resolves case (and accents) through the
+            // column's collation, which is case-insensitive, so the same term matches in any register
+            // without a culture ever entering the picture.
+            string pattern = $"%{EscapeLikePattern(query.Search.Trim())}%";
             tenants = tenants.Where(t =>
-                t.Name.ToLower().Contains(term) ||
-                (t.OwnerName != null && t.OwnerName.ToLower().Contains(term)) ||
-                (t.Phone != null && t.Phone.ToLower().Contains(term)));
+                EF.Functions.Like(t.Name, pattern, LikeEscape) ||
+                (t.OwnerName != null && EF.Functions.Like(t.OwnerName, pattern, LikeEscape)) ||
+                (t.Phone != null && EF.Functions.Like(t.Phone, pattern, LikeEscape)));
         }
 
         List<Tenant> rows = await tenants.OrderBy(t => t.Name).ToListAsync(ct);
@@ -87,4 +98,15 @@ public sealed class GetTenantsHandler(TenancyDbContext db, IDateProvider datePro
 
         return Result.Success<IReadOnlyList<TenantListItemDto>>(items);
     }
+
+    /// <summary>
+    /// The search box is free text, so LIKE's own metacharacters must be neutralised: without this a
+    /// lone <c>%</c> would list every shop on the platform and <c>_</c> would silently match any letter.
+    /// The backslash prefix is honoured because every call passes it as the <c>ESCAPE</c> character.
+    /// </summary>
+    private static string EscapeLikePattern(string term) => term
+        .Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
+        .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
+        .Replace("_", LikeEscape + "_", StringComparison.Ordinal)
+        .Replace("[", LikeEscape + "[", StringComparison.Ordinal);
 }

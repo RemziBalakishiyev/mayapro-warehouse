@@ -42,11 +42,11 @@ public sealed class RecordPaymentHandler(
             tenant.Id,
             command.Amount,
             now,
-            command.Months,
+            command.PeriodMonths,
             string.IsNullOrWhiteSpace(command.Note) ? null : command.Note.Trim(),
             currentUser.UserId));
 
-        tenant.Extend(now, command.Months);
+        tenant.Extend(now, command.PeriodMonths);
 
         // One SaveChanges: the payment row and the new expiry are the same fact, recorded together.
         await db.SaveChangesAsync(ct);

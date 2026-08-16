@@ -131,7 +131,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         RegistrationDto registered = await RegisterAsync("Təsdiq Mağazası", phone);
 
         HttpResponseMessage approve = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{registered.TenantId}/approve", new { months = 3 });
+            $"/api/admin/tenants/{registered.TenantId}/approve", new { periodMonths = 3 });
         approve.EnsureSuccessStatusCode();
 
         var summary = (await approve.Content.ReadFromJsonAsync<TenantSummary>())!;
@@ -148,16 +148,16 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
     public async Task Approve_Validates_Its_Input_And_Its_Target()
     {
         HttpResponseMessage missing = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{Guid.NewGuid()}/approve", new { months = 1 });
+            $"/api/admin/tenants/{Guid.NewGuid()}/approve", new { periodMonths = 1 });
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
 
         TenantTestFixture.TenantHandle shop =
             await TenantTestFixture.CreateTenantAsync("Validasiya Mağazası", TenantPhones.Next());
 
-        foreach (int months in new[] { 0, -1, 1000 })
+        foreach (int periodMonths in new[] { 0, -1, 1000 })
         {
             HttpResponseMessage bad = await _admin.PostAsJsonAsync(
-                $"/api/admin/tenants/{shop.TenantId}/approve", new { months });
+                $"/api/admin/tenants/{shop.TenantId}/approve", new { periodMonths });
             Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
         }
     }
@@ -186,13 +186,15 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
             var error = (await response.Content.ReadFromJsonAsync<ErrorDto>())!;
-            Assert.Equal("Auth.SubscriptionExpiredForbidden", error.Code);
+            // BE#41 — the literal is spelled out rather than taken from WireFormat.ErrorCodes on purpose:
+            // this is the string the frontend hard-codes, so the test has to fail if the constant moves.
+            Assert.Equal("SubscriptionExpired", error.Code);
             Assert.Contains("Abunəliyiniz bitib", error.Message, StringComparison.Ordinal);
         }
 
         (HttpStatusCode status, ErrorDto loginError) = await LoginFailureAsync(shop.OwnerPhone, shop.OwnerPassword);
         Assert.Equal(HttpStatusCode.Forbidden, status);
-        Assert.Equal("Auth.SubscriptionExpiredForbidden", loginError.Code);
+        Assert.Equal("SubscriptionExpired", loginError.Code);
 
         // The shop was never demoted — expiry is enforced by the date alone.
         Tenant stored = await TenantTestFixture.GetTenantAsync(shop.TenantId);
@@ -259,7 +261,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
 
         HttpResponseMessage payment = await _admin.PostAsJsonAsync(
             $"/api/admin/tenants/{shop.TenantId}/payments",
-            new { amount = 50m, months = 1, note = "Avqust ödənişi" });
+            new { amount = 50m, periodMonths = 1, note = "Avqust ödənişi" });
         payment.EnsureSuccessStatusCode();
 
         // Same token, next request — no re-login needed, because nothing about the token changed.
@@ -287,7 +289,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         DateTime remaining = DateTime.UtcNow.AddMonths(2);
         await TenantTestFixture.SetExpiryAsync(live.TenantId, remaining);
 
-        await RecordPaymentAsync(live.TenantId, amount: 30m, months: 1);
+        await RecordPaymentAsync(live.TenantId, amount: 30m, periodMonths: 1);
 
         Tenant afterLive = await TenantTestFixture.GetTenantAsync(live.TenantId);
         AssertCloseTo(remaining.AddMonths(1), afterLive.ExpiresAt);
@@ -298,7 +300,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         await TenantTestFixture.SetExpiryAsync(lapsed.TenantId, DateTime.UtcNow.AddMonths(-4));
 
         DateTime paidAt = DateTime.UtcNow;
-        await RecordPaymentAsync(lapsed.TenantId, amount: 30m, months: 1);
+        await RecordPaymentAsync(lapsed.TenantId, amount: 30m, periodMonths: 1);
 
         Tenant afterLapsed = await TenantTestFixture.GetTenantAsync(lapsed.TenantId);
         AssertCloseTo(paidAt.AddMonths(1), afterLapsed.ExpiresAt, TimeSpan.FromMinutes(5));
@@ -313,19 +315,19 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
             await TenantTestFixture.CreateTenantAsync("Validasiya Ödənişi", TenantPhones.Next());
 
         HttpResponseMessage zeroAmount = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 0m, months = 1 });
+            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 0m, periodMonths = 1 });
         Assert.Equal(HttpStatusCode.BadRequest, zeroAmount.StatusCode);
 
         HttpResponseMessage negativeAmount = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = -5m, months = 1 });
+            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = -5m, periodMonths = 1 });
         Assert.Equal(HttpStatusCode.BadRequest, negativeAmount.StatusCode);
 
         HttpResponseMessage badPeriod = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 10m, months = 0 });
+            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 10m, periodMonths = 0 });
         Assert.Equal(HttpStatusCode.BadRequest, badPeriod.StatusCode);
 
         HttpResponseMessage unknownShop = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{Guid.NewGuid()}/payments", new { amount = 10m, months = 1 });
+            $"/api/admin/tenants/{Guid.NewGuid()}/payments", new { amount = 10m, periodMonths = 1 });
         Assert.Equal(HttpStatusCode.NotFound, unknownShop.StatusCode);
 
         HttpResponseMessage unknownHistory = await _admin.GetAsync($"/api/admin/tenants/{Guid.NewGuid()}/payments");
@@ -341,9 +343,9 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         string phone = TenantPhones.Next();
         RegistrationDto pending = await RegisterAsync("Axtarış Mağazası Qeyd", phone, ownerName: "Kamran Süleymanov");
 
-        await _admin.PostAsJsonAsync($"/api/admin/tenants/{pending.TenantId}/approve", new { months = 2 });
-        await RecordPaymentAsync(pending.TenantId, amount: 40m, months: 1);
-        await RecordPaymentAsync(pending.TenantId, amount: 60m, months: 1);
+        await _admin.PostAsJsonAsync($"/api/admin/tenants/{pending.TenantId}/approve", new { periodMonths = 2 });
+        await RecordPaymentAsync(pending.TenantId, amount: 40m, periodMonths: 1);
+        await RecordPaymentAsync(pending.TenantId, amount: 60m, periodMonths: 1);
 
         List<TenantRow> bySearch = (await _admin.GetFromJsonAsync<List<TenantRow>>(
             "/api/admin/tenants?search=Axtarış Mağazası"))!;
@@ -374,6 +376,45 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, unknownStatus.StatusCode);
     }
 
+    /// <summary>
+    /// TC-18 / BE#40 — the search is register-blind across all three searchable fields, <b>including</b>
+    /// terms that carry a capital <c>I</c>.
+    /// <para>
+    /// That letter is the whole point of this test. The host culture is <c>az-Latn-AZ</c>, where
+    /// <c>'I'.ToLower()</c> is <c>'ı'</c> (U+0131) while SQL Server's <c>LOWER()</c> produces <c>'i'</c>;
+    /// the original implementation lowered the term in C# and the column in SQL, so an upper-case term
+    /// silently matched nothing. Both terms below differ only in register and must return the same row —
+    /// which they can only do if no culture-dependent casing is left on the path.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Tenant_Search_Ignores_Register_Even_For_Terms_Containing_A_Capital_I()
+    {
+        // Hex, so upper-casing it stays a valid term — and "Axtaris"/"Ismayilov" both carry the letter
+        // that used to break: 'i' upper-cases to 'I', which az-Latn-AZ lower-cases back to 'ı'.
+        string token = $"{Guid.NewGuid():N}"[..8];
+        string storeName = $"QaAxtaris{token}Magaza";
+        string ownerName = $"QaSahibkar{token}Ismayilov";
+        string phone = TenantPhones.Next();
+
+        await TenantTestFixture.CreateTenantAsync(storeName, phone, ownerName);
+
+        // One term per searchable field: shop name, owner name, phone.
+        foreach (string term in new[] { $"QaAxtaris{token}", $"QaSahibkar{token}", phone })
+        {
+            foreach (string register in new[] { term, term.ToUpperInvariant(), term.ToLowerInvariant() })
+            {
+                TenantRow row = Assert.Single(await SearchTenantsAsync(register));
+                Assert.Equal(storeName, row.Name);
+            }
+        }
+
+        // The pattern is escaped, so LIKE's own metacharacters are literal text: a lone '%' is a term
+        // nobody is called, not a request for every shop on the platform.
+        Assert.DoesNotContain(await SearchTenantsAsync("%"), t => t.Name == storeName);
+        Assert.DoesNotContain(await SearchTenantsAsync("_"), t => t.Name == storeName);
+    }
+
     /// <summary>The admin can create a shop that is usable immediately — no approval round trip.</summary>
     [Fact]
     public async Task Admin_Created_Shop_Is_Active_At_Once_And_Its_Owner_Can_Sign_In()
@@ -386,7 +427,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
             ownerName = "Admin Sahibkarı",
             phone,
             password = "demo123",
-            months = 6,
+            periodMonths = 6,
             monthlyFee = 25m
         });
 
@@ -407,7 +448,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
             ownerName = "Sahibkar",
             phone,
             password = "demo123",
-            months = (int?)null,
+            periodMonths = (int?)null,
             monthlyFee = (decimal?)null
         });
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
@@ -467,18 +508,18 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         TenantTestFixture.TenantHandle blocked = await TenantTestFixture.CreateTenantAsync(
             "Statistika Bloklu", TenantPhones.Next(), status: TenantStatus.Blocked);
 
-        await RecordPaymentAsync(active.TenantId, amount: 75m, months: 1);
+        await RecordPaymentAsync(active.TenantId, amount: 75m, periodMonths: 1);
 
         StatsDto after = (await _admin.GetFromJsonAsync<StatsDto>("/api/admin/stats"))!;
 
         Assert.Equal(before.PendingCount + 1, after.PendingCount);
         Assert.Equal(before.ActiveCount + 1, after.ActiveCount);
         Assert.Equal(before.BlockedCount + 1, after.BlockedCount);
-        Assert.Equal(before.ThisMonthCollected + 75m, after.ThisMonthCollected);
+        Assert.Equal(before.CollectedThisMonth + 75m, after.CollectedThisMonth);
 
         // An expired-but-Active shop is counted separately, because it is locked out by its date rather
         // than by its status.
-        await _admin.PostAsJsonAsync($"/api/admin/tenants/{pending.TenantId}/approve", new { months = 1 });
+        await _admin.PostAsJsonAsync($"/api/admin/tenants/{pending.TenantId}/approve", new { periodMonths = 1 });
         await TenantTestFixture.SetExpiryAsync(pending.TenantId, DateTime.UtcNow.AddDays(-1));
 
         StatsDto withExpired = (await _admin.GetFromJsonAsync<StatsDto>("/api/admin/stats"))!;
@@ -505,7 +546,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden,
             (await owner.PostAsync($"/api/admin/tenants/{shop.TenantId}/block", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await owner.PostAsJsonAsync(
-            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 1m, months = 1 })).StatusCode);
+            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 1m, periodMonths = 1 })).StatusCode);
     }
 
     /// <summary>
@@ -616,10 +657,14 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<RegistrationDto>())!;
     }
 
-    private async Task RecordPaymentAsync(Guid tenantId, decimal amount, int months, string? note = null)
+    private async Task<List<TenantRow>> SearchTenantsAsync(string term) =>
+        (await _admin.GetFromJsonAsync<List<TenantRow>>(
+            $"/api/admin/tenants?search={Uri.EscapeDataString(term)}"))!;
+
+    private async Task RecordPaymentAsync(Guid tenantId, decimal amount, int periodMonths, string? note = null)
     {
         HttpResponseMessage response = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{tenantId}/payments", new { amount, months, note });
+            $"/api/admin/tenants/{tenantId}/payments", new { amount, periodMonths, note });
         response.EnsureSuccessStatusCode();
     }
 
@@ -674,7 +719,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         Guid? RecordedByAdminId);
 
     private sealed record StatsDto(
-        int ActiveCount, int PendingCount, int BlockedCount, int ExpiredCount, decimal ThisMonthCollected);
+        int ActiveCount, int PendingCount, int BlockedCount, int ExpiredCount, decimal CollectedThisMonth);
 
     private sealed record MeDto(Guid Id, string FullName, string Phone, string Role);
 

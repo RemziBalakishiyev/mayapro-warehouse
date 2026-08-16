@@ -4,7 +4,7 @@
 
 1. `POST /api/auth/login` (anonim) — `{phone, password}`.
 2. `LoginHandler`: telefonla istifadəçi tapılır → yoxdursa və ya BCrypt uyğun gəlmirsə **eyni mesajla** `Auth.InvalidCredentials` (telefon mövcudluğu sızdırılmır); `IsActive=false` → `Auth.UserInactive`. **BE#35:** telefon yalnız mağaza daxilində unikaldır, ona görə axtarış `IgnoreQueryFilters()` ilə gedir və birdən çox uyğunluqda giriş rədd olunur (`multi-tenancy.md` §4.1).
-3. **BE#35/BE#36 — mağaza yoxlaması** (`PlatformAdmin` üçün atlanır): tapılmır → 403 `Auth.TenantInactiveForbidden`; təsdiq gözləyir → 403 `Auth.TenantPendingApprovalForbidden`; bloklanıb → 403 `Auth.TenantBlockedForbidden`; abunə müddəti keçib → 403 `Auth.SubscriptionExpiredForbidden`. Token verilmir. Eyni yoxlama hər sorğuda `TenantGateMiddleware`-də təkrarlanır.
+3. **BE#35/BE#36 — mağaza yoxlaması** (`PlatformAdmin` üçün atlanır): tapılmır → 403 `Auth.TenantInactiveForbidden`; təsdiq gözləyir → 403 `Auth.TenantPendingApprovalForbidden`; bloklanıb → 403 `Auth.TenantBlockedForbidden`; abunə müddəti keçib → 403 `SubscriptionExpired` (BE#41 — prefikssiz/suffikssiz ad qəsdəndir, `docs/api/ERROR-CONTRACT.md`). Token verilmir. Eyni yoxlama hər sorğuda `TenantGateMiddleware`-də təkrarlanır.
 4. Uğur: JWT (HS256) + `UserDto {id, fullName, phone, role}` (rol wire kodu: `sahib`/`menecer`/`satici`/`platform_admin`).
 
 ## Qeydiyyat (BE#36)

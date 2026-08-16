@@ -16,9 +16,10 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 /// TC-12, TC-15 (negative period), TC-16, TC-17 and TC-21, plus the platform admin's read isolation on
 /// <c>/api/sales</c>. Added by the QA agent; nothing under <c>src/</c> was changed.
 /// <para>
-/// TC-18 is deliberately absent: the case-insensitive search is <b>broken</b> for terms containing an
-/// upper-case <c>I</c> (see <c>docs/qa/BE36-qa-report.md</c>, BUG-1). The regression test belongs with the
-/// fix, not with the report of it.
+/// TC-18 lives with its fix rather than here: the case-insensitive search was <b>broken</b> for terms
+/// containing an upper-case <c>I</c> (<c>docs/qa/BE36-qa-report.md</c>, BUG-1 → BE#40), and the regression
+/// test landed in the same change as the correction —
+/// <see cref="PlatformAdminApiTests.Tenant_Search_Ignores_Register_Even_For_Terms_Containing_A_Capital_I"/>.
 /// </para>
 /// </summary>
 [Collection(ApiCollection.Name)]
@@ -115,11 +116,11 @@ public sealed class Be36QaGapTests : IAsyncLifetime
         await TenantTestFixture.SetExpiryAsync(shop.TenantId, expiry);
 
         HttpResponseMessage negativePayment = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 10m, months = -1 });
+            $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 10m, periodMonths = -1 });
         Assert.Equal(HttpStatusCode.BadRequest, negativePayment.StatusCode);
 
         HttpResponseMessage negativeApprove = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{shop.TenantId}/approve", new { months = -1 });
+            $"/api/admin/tenants/{shop.TenantId}/approve", new { periodMonths = -1 });
         Assert.Equal(HttpStatusCode.BadRequest, negativeApprove.StatusCode);
 
         Assert.Empty((await _admin.GetFromJsonAsync<List<PaymentDto>>(
@@ -158,7 +159,7 @@ public sealed class Be36QaGapTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// TC-17 — <c>thisMonthCollected</c> counts only the current calendar month. A payment dated last
+    /// TC-17 — <c>collectedThisMonth</c> counts only the current calendar month. A payment dated last
     /// month is written straight to the table (the API always stamps "now"), and the figure must not move.
     /// Asserted as a delta: the suite shares one database.
     /// </summary>
@@ -183,7 +184,7 @@ public sealed class Be36QaGapTests : IAsyncLifetime
 
         StatsDto after = (await _admin.GetFromJsonAsync<StatsDto>("/api/admin/stats"))!;
 
-        Assert.Equal(before.ThisMonthCollected + 250m, after.ThisMonthCollected);
+        Assert.Equal(before.CollectedThisMonth + 250m, after.CollectedThisMonth);
     }
 
     /// <summary>
@@ -216,10 +217,10 @@ public sealed class Be36QaGapTests : IAsyncLifetime
         Assert.Equal(0, adminsSales.Total);
     }
 
-    private async Task PayAsync(Guid tenantId, decimal amount, int months, string note)
+    private async Task PayAsync(Guid tenantId, decimal amount, int periodMonths, string note)
     {
         HttpResponseMessage response = await _admin.PostAsJsonAsync(
-            $"/api/admin/tenants/{tenantId}/payments", new { amount, months, note });
+            $"/api/admin/tenants/{tenantId}/payments", new { amount, periodMonths, note });
         response.EnsureSuccessStatusCode();
 
         // The ordering assertion needs distinguishable timestamps.
@@ -243,7 +244,7 @@ public sealed class Be36QaGapTests : IAsyncLifetime
         Guid? RecordedByAdminId);
 
     private sealed record StatsDto(
-        int ActiveCount, int PendingCount, int BlockedCount, int ExpiredCount, decimal ThisMonthCollected);
+        int ActiveCount, int PendingCount, int BlockedCount, int ExpiredCount, decimal CollectedThisMonth);
 
     private sealed record ErrorDto(string Code, string Message);
 }

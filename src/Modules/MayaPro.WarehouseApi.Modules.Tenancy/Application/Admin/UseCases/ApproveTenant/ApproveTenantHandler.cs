@@ -28,7 +28,7 @@ public sealed class ApproveTenantHandler(
         if (tenant is null)
             return Result.Failure<TenantSummaryDto>(TenancyErrors.TenantNotFound);
 
-        tenant.Approve(dateProvider.UtcNow, command.Months);
+        tenant.Approve(dateProvider.UtcNow, command.PeriodMonths);
         await db.SaveChangesAsync(ct);
 
         return Result.Success(TenantSummaryDto.From(tenant, dateProvider.UtcNow));

@@ -25,6 +25,8 @@ Status kodu error code-un **suffiksindən** avtomatik seçilir (`ResultExtension
 | `...Conflict`, `...AlreadyExists`, `...AlreadyClosed` | 409 |
 | qalan hamısı | 400 |
 
+**Konvensiyanın yeganə istisnası (BE#41):** `SubscriptionExpired` — modul prefiksi və `...Forbidden` suffiksi YOXDUR, çünki bu, hər hansı modulun biznes xətası deyil, infrastruktur səviyyəli middleware cavabıdır (`TenantGateMiddleware`); sətir spesifikasiyada dondurulub və frontend onu hardcode edir. Suffiksi olmadığı üçün 403-ü `ResultExtensions.StatusCodeFor`-da **adı ilə** xüsusi olaraq xəritələnir; dəyər `WireFormat.ErrorCodes.SubscriptionExpired`-dədir. Yeni error yazanda bu istisnanı NÜMUNƏ GÖTÜRMƏ — suffiks qaydasına tabe ol.
+
 Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location header.
 
 **Yeni error yazanda:** 404 istəyirsənsə kodu mütləq `NotFound` ilə bitir (məs. `Exports.SaleNotFound`).
@@ -46,7 +48,7 @@ Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location 
   | mağaza tapılmır | 403 | `Auth.TenantInactiveForbidden` | «Mağaza aktiv deyil» |
   | mağaza təsdiq gözləyir | 403 | `Auth.TenantPendingApprovalForbidden` | «Hesabınız təsdiq gözləyir» |
   | mağaza bloklanıb | 403 | `Auth.TenantBlockedForbidden` | «Abunəliyiniz bitib — əlaqə: {admin telefonu}» |
-  | abunə müddəti keçib (status hələ `Active`) | 403 | `Auth.SubscriptionExpiredForbidden` | «Abunəliyiniz bitib — əlaqə: {admin telefonu}» |
+  | abunə müddəti keçib (status hələ `Active`) | 403 | `SubscriptionExpired` | «Abunəliyiniz bitib — əlaqə: {admin telefonu}» |
 
   Admin telefonu `PlatformAdmin:Phone` konfiqurasiyasındandır; təyin olunmayıbsa mesaj «Abunəliyiniz bitib — dəstək ilə əlaqə saxlayın» olur. `PlatformAdmin` rolu ilə gələn token qapıdan keçir (heç bir mağazaya aid deyil). Detallar: [`multi-tenancy.md`](../multi-tenancy.md)
 - **BE#36 — Tenancy**: `Tenancy.PhoneAlreadyExists` → 409 («Bu telefon nömrəsi artıq qeydiyyatdadır», qeydiyyat qlobal telefon yoxlaması) · `Tenancy.TenantNotFound` → 404 («Mağaza tapılmadı»)
@@ -60,6 +62,8 @@ Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location 
 Hər modulun `Domain/<Modul>Errors.cs` faylı var (məs. `SaleErrors`, `CustomerErrors`, `ProductErrors`) — mövcud kodların siyahısı üçün həmin fayllara bax.
 
 ## Last Updated
+
+2026-08-16 — BE#41: abunə müddəti keçmiş mağazanın kodu `Auth.SubscriptionExpiredForbidden` → **`SubscriptionExpired`** (spesifikasiyada dondurulmuş sətir); suffiks konvensiyasından qəsdən kənarda qalan yeganə kod, 403-ü adı ilə xəritələnir.
 
 2026-08-16 — BE#36: tenant qapısının 403-ləri statusa görə ayrıldı (`TenantPendingApproval` / `TenantBlocked` / `SubscriptionExpired`); `Tenancy.PhoneAlreadyExists` (409), `Tenancy.TenantNotFound` (404).
 2026-08-16 — BE#35: `...Forbidden` → 403 suffiksi, tenant qapısı xətaları, `Products.BarcodeDuplicate` (əvvəl dublikat barkod 500 verirdi).

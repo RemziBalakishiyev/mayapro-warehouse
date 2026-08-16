@@ -60,10 +60,14 @@ public sealed record SubscriptionPaymentDto(
 /// <c>GET /api/admin/stats</c>. <see cref="ExpiredCount"/> counts shops that are still <c>Active</c> but
 /// whose paid period has lapsed — they are locked out by <c>ExpiresAt</c>, not by their status, which is
 /// exactly the distinction the operator needs to see.
+/// <para>
+/// BE#42 — <see cref="CollectedThisMonth"/> is the specified name for the current Baku calendar month's
+/// takings (ADR-0005).
+/// </para>
 /// </summary>
 public sealed record PlatformStatsDto(
     int ActiveCount,
     int PendingCount,
     int BlockedCount,
     int ExpiredCount,
-    decimal ThisMonthCollected);
+    decimal CollectedThisMonth);

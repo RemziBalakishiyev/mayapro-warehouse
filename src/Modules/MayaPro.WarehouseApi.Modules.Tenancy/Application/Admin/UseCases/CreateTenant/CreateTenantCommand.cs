@@ -4,8 +4,11 @@ namespace MayaPro.WarehouseApi.Modules.Tenancy.Application.Admin.UseCases.Create
 /// Body of <c>POST /api/admin/tenants</c> — the platform admin registering a shop on the customer's behalf.
 /// The shop is <b>Active immediately</b> (no approval step; the admin is the approval).
 /// <para>
-/// <paramref name="Months"/> is optional: given, it starts a paid period now; omitted, the shop is
+/// <paramref name="PeriodMonths"/> is optional: given, it starts a paid period now; omitted, the shop is
 /// open-ended and never expires until the admin records a payment.
+/// </para>
+/// <para>
+/// BE#42 — named <c>periodMonths</c> like every other subscription-period field on this surface.
 /// </para>
 /// </summary>
 public sealed record CreateTenantCommand(
@@ -13,5 +16,5 @@ public sealed record CreateTenantCommand(
     string OwnerName,
     string Phone,
     string Password,
-    int? Months,
+    int? PeriodMonths,
     decimal? MonthlyFee);

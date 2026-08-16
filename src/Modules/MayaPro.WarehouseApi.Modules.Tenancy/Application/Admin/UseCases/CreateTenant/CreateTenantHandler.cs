@@ -31,7 +31,7 @@ public sealed class CreateTenantHandler(
             command.Password,
             TenantStatus.Active,
             now,
-            command.Months,
+            command.PeriodMonths,
             command.MonthlyFee ?? 0m,
             ct);
 

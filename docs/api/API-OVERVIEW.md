@@ -23,7 +23,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Mağaza qeydiyyatı (BE#36).** `POST /api/auth/register` anonimdir və mağazanı `PendingApproval` statusunda yaradır + ilk `Sahibkar` istifadəçisini verir — **token qaytarmır**, çünki mağaza hələ girə bilmir. Telefon **qlobal** (bütün mağazalar üzrə) unikal olmalıdır: təkrar → 409 `Tenancy.PhoneAlreadyExists`. 400 halları: boş mağaza/sahibkar adı (>200 simvol), boş telefon (>30 simvol), şifrə < 6 simvol. Mağaza + istifadəçi tək transaction-da yazılır. **Rate-limit YOXDUR** — Mərhələ 3-ə qalıb (`docs/multi-tenancy.md` §8).
 
-Qeydiyyatdan sonrakı login cavabları: `PendingApproval` → 403 `Auth.TenantPendingApprovalForbidden` «Hesabınız təsdiq gözləyir»; `Blocked` → 403 `Auth.TenantBlockedForbidden` «Abunəliyiniz bitib — əlaqə: {admin telefonu}»; abunə müddəti keçib → 403 `Auth.SubscriptionExpiredForbidden` (eyni mesaj).
+Qeydiyyatdan sonrakı login cavabları: `PendingApproval` → 403 `Auth.TenantPendingApprovalForbidden` «Hesabınız təsdiq gözləyir»; `Blocked` → 403 `Auth.TenantBlockedForbidden` «Abunəliyiniz bitib — əlaqə: {admin telefonu}»; abunə müddəti keçib → 403 `SubscriptionExpired` (eyni mesaj; prefikssiz ad qəsdəndir — `ERROR-CONTRACT.md`).
 
 **Maaş sistemi (BE#28).** `GET /api/employees` cavabına additiv `monthlySalary` sahəsi əlavə olundu (təyin edilməyibsə `0`, heç vaxt null); mövcud sahələr dəyişməyib.
 
@@ -126,21 +126,23 @@ POST `/api/suppliers` optional `debt` (ilkin borc, default 0) qəbul edir; mənf
 |---|---|---|
 | GET | `/api/admin/tenants?status&search` | Mağaza siyahısı + billing xülasəsi |
 | POST | `/api/admin/tenants` | Admin özü mağaza yaradır → dərhal `Active`, 201 |
-| POST | `/api/admin/tenants/{id}/approve` | `{months}` → `ExpiresAt = now + N ay`, status `Active` |
+| POST | `/api/admin/tenants/{id}/approve` | `{periodMonths}` → `ExpiresAt = now + N ay`, status `Active` |
 | POST | `/api/admin/tenants/{id}/block` · `/unblock` | Status keçidi — abunə müddətinə TOXUNMUR |
-| POST | `/api/admin/tenants/{id}/payments` | `{amount, months, note?}` → ödəniş yazılır + müddət uzanır |
+| POST | `/api/admin/tenants/{id}/payments` | `{amount, periodMonths, note?}` → ödəniş yazılır + müddət uzanır |
 | GET | `/api/admin/tenants/{id}/payments` | Ödəniş tarixçəsi (ən yenisi əvvəldə) |
-| GET | `/api/admin/stats` | `{activeCount, pendingCount, blockedCount, expiredCount, thisMonthCollected}` |
+| GET | `/api/admin/stats` | `{activeCount, pendingCount, blockedCount, expiredCount, collectedThisMonth}` |
 
-`GET /api/admin/tenants` hər sətirdə: `id, name, ownerName, phone, status, expiresAt, monthlyFee, isExpired, lastPaymentAt, lastPaymentAmount, totalPaid`. `status` filtri `TenantStatus` adıdır (`PendingApproval` \| `Active` \| `Blocked`, case-insensitive) — naməlum dəyər 400; `search` mağaza adı / sahibkar adı / telefon üzrə case-insensitive `contains`.
+`GET /api/admin/tenants` hər sətirdə: `id, name, ownerName, phone, status, expiresAt, monthlyFee, isExpired, lastPaymentAt, lastPaymentAmount, totalPaid`. `status` filtri `TenantStatus` adıdır (`PendingApproval` \| `Active` \| `Blocked`, case-insensitive) — naməlum dəyər 400; `search` mağaza adı / sahibkar adı / telefon üzrə case-insensitive `contains`. Registrdən asılılıq **DB collation-ı** ilə həll olunur (`LIKE`, C# tərəfdə `ToLower()` YOXDUR) — BE#40: `az-Latn-AZ` mədəniyyətində `'I'.ToLower()` `'ı'` (U+0131) verirdi və SQL `LOWER()`-in `'i'`-si ilə heç vaxt üst-üstə düşmürdü. `%`, `_`, `[` simvolları literal kimi axtarılır (escape olunur).
 
-`POST /api/admin/tenants` body-si: `{storeName, ownerName, phone, password, months?, monthlyFee?}`. `months` verilməsə mağaza **müddətsiz** `Active` olur. Telefon qaydası qeydiyyatla eynidir (409).
+`POST /api/admin/tenants` body-si: `{storeName, ownerName, phone, password, periodMonths?, monthlyFee?}`. `periodMonths` verilməsə mağaza **müddətsiz** `Active` olur. Telefon qaydası qeydiyyatla eynidir (409).
 
 **Abunə uzatma qaydası:** ödənişdə `ExpiresAt = max(now, mövcud ExpiresAt ?? now) + N ay` (vaxtından əvvəl ödəyən qalan günlərini itirmir; gecikən müddəti indidən başlayır). Təsdiqdə isə `ExpiresAt = now + N ay` (təmiz başlanğıc). `ExpiresAt = null` = **müddətsiz**, heç vaxt bloklanmır.
 
-Validasiya: `months` 1–120 arası (kənar → 400), `amount` > 0 və ≤ 1 000 000 (→ 400), `note` ≤ 500 simvol, mövcud olmayan mağaza → 404 `Tenancy.TenantNotFound`.
+Validasiya: `periodMonths` 1–120 arası (kənar → 400), `amount` > 0 və ≤ 1 000 000 (→ 400), `note` ≤ 500 simvol, mövcud olmayan mağaza → 404 `Tenancy.TenantNotFound`.
 
-`expiredCount` = statusu `Active`, amma `ExpiresAt` keçmiş mağazalar (avto-blok statusu dəyişmir). `thisMonthCollected` cari **Bakı** təqvim ayının ödəniş cəmidir (ADR-0005).
+`expiredCount` = statusu `Active`, amma `ExpiresAt` keçmiş mağazalar (avto-blok statusu dəyişmir). `collectedThisMonth` cari **Bakı** təqvim ayının ödəniş cəmidir (ADR-0005).
+
+**Sahə adları (BE#42):** müddət sahəsi hər yerdə `periodMonths`-dur — sorğuda da, `GET /api/admin/tenants/{id}/payments` cavabında da. Endpoint-lər heç bir istehlakçıya çıxmadan düzəldiyi üçün köhnə `months` / `thisMonthCollected` adları üçün alias YOXDUR.
 
 ### Activity, Health
 `GET /api/activity?take&skip` (auth) · `GET /health` (anon)
@@ -150,6 +152,8 @@ Validasiya: `months` 1–120 arası (kənar → 400), `amount` > 0 və ≤ 1 000
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-08-16 — BE#40/41/42 (BE#36 QA düzəlişləri): admin axtarışı registrdən asılı deyil (`az-Latn-AZ` `'I'` problemi); abunə kodu `SubscriptionExpired`; sorğu sahəsi `months` → `periodMonths`, stats sahəsi `thisMonthCollected` → `collectedThisMonth` (alias yoxdur).
 
 2026-08-16 — BE#36: `POST /api/auth/register` (anon) və `/api/admin/*` platforma konsolu (8 endpoint, `PA` policy); login-in 403 cavabları statusa görə ayrıldı (`TenantPendingApproval` / `TenantBlocked` / `SubscriptionExpired`); abunə müddəti keçən mağaza istənilən authenticated sorğuda 403 alır.
 

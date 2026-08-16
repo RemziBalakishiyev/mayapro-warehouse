@@ -23,7 +23,7 @@ namespace MayaPro.WarehouseApi.Api.Middleware;
 ///   but tokens outlive that decision, so the check is repeated per request. → <c>403</c>, same message as
 ///   login.</item>
 ///   <item><b>The subscription must still be paid (BE#36).</b> An <c>Active</c> shop whose <c>ExpiresAt</c>
-///   has passed is refused with <c>Auth.SubscriptionExpiredForbidden</c>. The shop's <b>status is never
+///   has passed is refused with <c>SubscriptionExpired</c>. The shop's <b>status is never
 ///   changed</b> — the date is the verdict — so recording a payment re-opens it on the very next request
 ///   with no background job and no state to repair. A shop with no <c>ExpiresAt</c> is open-ended and can
 ///   never fall into this branch. The check costs nothing extra: <see cref="TenantInfo"/> already carries
@@ -50,7 +50,13 @@ public sealed class TenantGateMiddleware(RequestDelegate next)
     private const string PendingApprovalMessage = "Hesabınız təsdiq gözləyir";
 
     private const string BlockedCode = "Auth.TenantBlockedForbidden";
-    private const string SubscriptionExpiredCode = "Auth.SubscriptionExpiredForbidden";
+
+    /// <summary>
+    /// BE#41 — the frozen contract string, taken from <see cref="WireFormat.ErrorCodes"/> so login and this
+    /// gate cannot drift apart. Deliberately outside the <c>&lt;Modul&gt;.&lt;Səbəb&gt;&lt;Status&gt;</c>
+    /// convention: see the constant's own remarks.
+    /// </summary>
+    private const string SubscriptionExpiredCode = WireFormat.ErrorCodes.SubscriptionExpired;
 
     private const string PendingApprovalStatus = "PendingApproval";
 

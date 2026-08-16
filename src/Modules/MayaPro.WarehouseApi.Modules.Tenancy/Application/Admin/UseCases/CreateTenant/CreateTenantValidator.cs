@@ -27,7 +27,7 @@ public sealed class CreateTenantValidator : AbstractValidator<CreateTenantComman
 
         // Optional — but if a period is named it must be a real one. The upper bound stops a typo
         // ("12000" instead of "12") from handing out a century of free service.
-        When(x => x.Months is not null, () => RuleFor(x => x.Months!.Value)
+        When(x => x.PeriodMonths is not null, () => RuleFor(x => x.PeriodMonths!.Value)
             .InclusiveBetween(1, Tenant.MaxPeriodMonths)
             .WithMessage($"Ay sayı 1 ilə {Tenant.MaxPeriodMonths} arasında olmalıdır"));
 

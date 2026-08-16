@@ -1,4 +1,5 @@
 using MayaPro.WarehouseApi.SharedKernel.Application;
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 
 namespace MayaPro.WarehouseApi.Modules.Auth.Domain;
 
@@ -44,9 +45,16 @@ public static class AuthErrors
     /// BE#36 — the shop is <c>Active</c> but its paid period has lapsed. Same wording as a block, because
     /// from the customer's side it is the same situation and the same phone call fixes it; the distinct code
     /// is what lets the frontend (and support) tell them apart.
+    /// <para>
+    /// BE#41 — the code is the bare <c>SubscriptionExpired</c>, not <c>Auth.SubscriptionExpiredForbidden</c>:
+    /// it is a frozen contract string the frontend hard-codes, shared verbatim with the per-request gate in
+    /// <c>TenantGateMiddleware</c>, and therefore lives in <see cref="WireFormat.ErrorCodes"/>. Because it
+    /// carries no <c>Forbidden</c> suffix, its 403 comes from an explicit rule in
+    /// <c>ResultExtensions.StatusCodeFor</c>.
+    /// </para>
     /// </summary>
-    public static Error SubscriptionExpiredForbidden(string? supportPhone) =>
-        new("Auth.SubscriptionExpiredForbidden", SubscriptionMessage(supportPhone));
+    public static Error SubscriptionExpired(string? supportPhone) =>
+        new(WireFormat.ErrorCodes.SubscriptionExpired, SubscriptionMessage(supportPhone));
 
     /// <summary>
     /// "Abunəliyiniz bitib — əlaqə: {telefon}", degrading gracefully when no contact number is configured

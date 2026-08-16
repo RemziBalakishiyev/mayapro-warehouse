@@ -37,6 +37,23 @@ public static class WireFormat
         public const string Deduction = "deduction";
     }
 
+    /// <summary>
+    /// Error codes the frontend <b>branches on</b> rather than merely displays, so the string itself is
+    /// part of the contract and lives here with the rest of the frozen vocabulary.
+    /// </summary>
+    public static class ErrorCodes
+    {
+        /// <summary>
+        /// BE#36/BE#41 — the subscription gate's 403. Deliberately outside the project's
+        /// <c>&lt;Modul&gt;.&lt;Səbəb&gt;&lt;Status&gt;</c> naming convention: this is an
+        /// infrastructure-level middleware refusal that belongs to no module, and the value is frozen by
+        /// the specification because the frontend hard-codes it to show the "renew your subscription"
+        /// screen. Its 403 is mapped by name in <c>ResultExtensions.StatusCodeFor</c>, since the usual
+        /// <c>...Forbidden</c> suffix rule cannot apply to it.
+        /// </summary>
+        public const string SubscriptionExpired = "SubscriptionExpired";
+    }
+
     /// <summary>User roles as the frontend reads them in the <c>role</c> field.</summary>
     public static class Roles
     {

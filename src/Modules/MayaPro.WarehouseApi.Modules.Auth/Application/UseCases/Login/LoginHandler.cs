@@ -131,7 +131,7 @@ public sealed class LoginHandler(
         // that would be refused on its very next call.
         DateTime now = dateProvider?.UtcNow ?? DateTime.UtcNow;
         return tenant.IsSubscriptionExpired(now)
-            ? Result.Failure(AuthErrors.SubscriptionExpiredForbidden(supportPhone))
+            ? Result.Failure(AuthErrors.SubscriptionExpired(supportPhone))
             : Result.Success();
     }
 

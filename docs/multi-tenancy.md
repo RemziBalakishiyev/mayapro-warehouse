@@ -125,7 +125,7 @@ Nəticədə **use case / handler kodlarında bir dənə də `Where(x => x.Tenant
 | 3 | Tenant tapılmır | `403` + `{ code: "Auth.TenantInactiveForbidden", message: "Mağaza aktiv deyil" }` |
 | 4 | Tenant `PendingApproval` | `403` + `{ code: "Auth.TenantPendingApprovalForbidden", message: "Hesabınız təsdiq gözləyir" }` |
 | 5 | Tenant `Blocked` | `403` + `{ code: "Auth.TenantBlockedForbidden", message: "Abunəliyiniz bitib — əlaqə: {admin telefonu}" }` |
-| 6 | Tenant `Active`, amma `ExpiresAt` keçib | `403` + `{ code: "Auth.SubscriptionExpiredForbidden", message: "Abunəliyiniz bitib — əlaqə: {admin telefonu}" }` |
+| 6 | Tenant `Active`, amma `ExpiresAt` keçib | `403` + `{ code: "SubscriptionExpired", message: "Abunəliyiniz bitib — əlaqə: {admin telefonu}" }` |
 
 Login-də də **eyni** yoxlamalar var (`LoginHandler.EnsureTenantAllowedAsync`) və eyni kod/mesaj cütlərini qaytarır — token verilmir. Middleware-də təkrarlanır, çünki token bloklama qərarından uzun yaşayır; test hər iki cavabın mesajını bir-birinə qarşı yoxlayır.
 
@@ -296,7 +296,7 @@ Praktiki nəticə: `POST /api/sales` sorğusunda başqa mağazanın `productId`-
 |---|---|
 | `tests/…/IntegrationTests/TenantIsolationApiTests.cs` | İki mağaza real HTTP API üzərindən: siyahı süzgəci, cross-tenant GET/PUT/DELETE → `404`, interceptor davranışı, body ilə spoofing, tenant-scoped unique indekslər, cross-module zəncir sızması, hesabatlar, activity, ayarlar, export, anonim faktura, bloklanmış mağaza, telefon birmənalılığı |
 | `tests/…/IntegrationTests/TenantQueryFilterCoverageTests.cs` | Model səviyyəsi: hər `ITenantScoped` entity üçün query filter + `TenantId` indeksi var; `tenancy` sxemində isə YALNIZ sənədləşdirilmiş iki entity (`Tenant`, `SubscriptionPayment`) marker-sizdir; heç bir digər biznes entity marker-siz qalmayıb |
-| `tests/…/IntegrationTests/PlatformAdminApiTests.cs` (BE#36) | Mərhələ 2 uçdan-uca: qeydiyyat → pending → login `403`; təsdiq → login OK; müddət keçib → istənilən authenticated sorğu `403 SubscriptionExpired`; ödəniş → dərhal yenidən işləyir; uzatma riyaziyyatı (canlı/keçmiş müddət); təkrar telefon `409`; `ExpiresAt = null` heç vaxt bloklanmır; adi Sahibkar `/api/admin/*`-a `403`; platforma admini tenant qapısından keçir, amma heç bir mağaza datasını görmür |
+| `tests/…/IntegrationTests/PlatformAdminApiTests.cs` (BE#36) | Mərhələ 2 uçdan-uca: qeydiyyat → pending → login `403`; təsdiq → login OK; müddət keçib → istənilən authenticated sorğu `403 SubscriptionExpired`; ödəniş → dərhal yenidən işləyir; axtarış registrdən asılı deyil (BE#40 reqressiyası: böyük `I` daşıyan termin); uzatma riyaziyyatı (canlı/keçmiş müddət); təkrar telefon `409`; `ExpiresAt = null` heç vaxt bloklanmır; adi Sahibkar `/api/admin/*`-a `403`; platforma admini tenant qapısından keçir, amma heç bir mağaza datasını görmür |
 | `tests/…/IntegrationTests/IgnoreQueryFiltersArchitectureTests.cs` (BE#36) | Bypass allowlist-i — §5.1.1 |
 | `tests/…/Modules.Tenancy.Tests/SubscriptionPeriodTests.cs` (BE#36) | `ExpiresAt` riyaziyyatı saatsız/bazasız: uzatma, təsdiq, sərhəd (dəqiq an), müddətsiz mağaza, blok/deblok müddətə toxunmur |
 | `tests/…/Modules.Auth.Tests/PlatformAdminRoleTests.cs` (BE#36) | Rol adı/kodu və rezerv edilmiş tenant id-nin toqquşmaması |
@@ -427,11 +427,17 @@ Bütün tarix hesabı `Tenant` domain entity-sindədir və "indi"ni **arqument k
 
 Hamısı `/api/admin/*`, hamısı `PlatformAdminOnly`. Siyahı və validasiya qaydaları: `docs/api/API-OVERVIEW.md`.
 
+**Sahə adları (BE#42).** Abunə müddəti hər yerdə `periodMonths`-dur: `POST /api/admin/tenants`, `.../approve` və `.../payments` sorğularında da, `SubscriptionPaymentDto` cavabında da. Stats sahəsi `collectedThisMonth`-dur. Əvvəlki `months` / `thisMonthCollected` adları QA dövründə düzəldildi; endpoint-lərin hələ istehlakçısı olmadığı üçün geriyə uyğunluq alias-ı əlavə edilmədi.
+
+**Axtarışda mədəniyyət qaydası (BE#40).** `GET /api/admin/tenants?search=` C# tərəfdə `ToLower()` ÇAĞIRMIR — müqayisə tamamilə `LIKE` + DB collation-ına buraxılıb. Səbəb: host mədəniyyəti `az-Latn-AZ`-dır və orada `'I'.ToLower()` `'ı'` (U+0131) verir, SQL Server-in `LOWER()`-i isə `'i'` — iki tərəfli kiçiltmə böyük `I` daşıyan hər termin üçün heç vaxt tutmurdu. Sərbəst mətn olduğu üçün `%`, `_`, `[` escape olunur (`ESCAPE '\'`), yoxsa tək bir `%` bütün platformanı siyahılayardı. **Eyni tələ layihənin başqa yerlərində də var** (`CreateExpenseTypeHandler` — ayrıca task); yeni kod yazanda registr normallaşdırması üçün ya `ToLowerInvariant()`, ya da collation istifadə olunmalıdır, `ToLower()` YOX.
+
 `SubscriptionPayment` **qəsdən `ITenantScoped` deyil**: bu, platforma səviyyəli billing qeydidir, mağaza datası deyil. Onu tenant-scoped etsəydik, tenant konteksti olmayan admin heç nə görməzdi və məhz bypass-sız olmalı modula `IgnoreQueryFilters()` gətirməli olardıq (§5.1).
 
 ---
 
 ## Last Updated
+
+2026-08-16 — BE#40/41/42 (BE#36 QA düzəlişləri): §2.4 sətir 6-nın kodu `SubscriptionExpired` oldu; §9.5-ə axtarış mədəniyyəti və sahə adları qaydaları əlavə olundu.
 
 2026-08-16 — BE#36 (Mərhələ 2: qeydiyyat, platforma admini, abunə və avto-blok).
 
