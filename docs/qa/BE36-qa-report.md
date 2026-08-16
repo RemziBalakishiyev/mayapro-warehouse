@@ -317,3 +317,415 @@ CurrentCulture=az-Latn-AZ | "QAAXTARIS".ToLower()=qaaxtarıs | ToLowerInvariant(
 BUG-2 və BUG-3 üçün iki məqbul yol var: (a) kodu AC-yə uyğunlaşdırmaq, (b) AC-ni rəsmi olaraq yeniləyib frontend taskının kontraktını sənədə (`ERROR-CONTRACT.md`, `API-OVERVIEW.md`) bağlamaq. Hansı seçilirsə, **frontend taskı başlamazdan əvvəl** qərar verilməlidir.
 
 Qalan bütün sahələr — təhlükəsizlik, təcrid, abunə riyaziyyatı, atomiklik, arxitektura qorunması, sənədləşdirmə — QA tərəfindən müstəqil təsdiqləndi və **qəbul edilir**.
+
+---
+---
+
+# RETEST — BE#36 (QA dövrü 2)
+
+**Tarix:** 2026-08-16
+**QA Agent:** qa-tester
+**Test edilən commit:** `f67ae84` — "fix: BE#40 axtaris medeniyyeti, BE#41 error kodu, BE#42 sahe adlari"
+**Branch:** `task/BE#36-abune-ve-platforma-admin` (origin ilə eyni səviyyədə)
+**PR:** https://github.com/RemziBalakishiyev/mayapro-warehouse/pull/39
+**Əvvəlki dövr:** commit `5cf5e30`, nəticə FAILED (BUG-1/2/3 → BE#40/BE#41/BE#42)
+
+> Bu bölmə əvvəlki dövrün nəticələrini ƏVƏZ ETMİR — onlar yuxarıda olduğu kimi saxlanılıb.
+> `src/MayaPro.WarehouseApi.Api/appsettings.json`-dakı istifadəçinin lokal `Cors:FrontendOrigin` dəyişikliyinə
+> yenə toxunulmayıb və commit edilməyib.
+
+---
+
+## R1. Retest xülasəsi
+
+| Göstərici | Dəyər |
+|---|---|
+| Bağlanmalı bug | 3 — **BE#40 ✅ · BE#41 ✅ · BE#42 ✅** (hamısı RETEST PASS) |
+| Acceptance Criteria | 26 — **26 ✅ / 0 ❌** (əvvəl 24 ✅ / 2 ❌) |
+| Test case | 22 — **22 ✅ / 0 ❌ / 0 ⚠️** (əvvəl 21 ✅ / 1 ❌) |
+| Avtomatlaşdırılmış testlər | **703/703 yaşıl** (0 fail, 0 skip) — baza 695 + QA-nın 8 yeni retest testi |
+| Build | `Build succeeded. 0 Warning(s) 0 Error(s)` |
+| Test bütövlüyü | ✅ heç bir test silinməyib/zəiflədilməyib/`Skip` edilməyib — əksinə gücləndirilib |
+| Sənədlər | ✅ 4 sənədin hamısı + `AUTH-FLOW.md` düzəlişləri əks etdirir |
+| Yeni bloklayıcı bug | **0** |
+| Yeni bloklamayan müşahidə | 2 (OBS-5, OBS-6) |
+| **Yekun qərar** | **QA PASSED** |
+
+---
+
+## R2. İcra olunan əmrlər və faktiki nəticələr
+
+### R2.1 Branch yenilənməsi
+
+```
+$ git -C <backend> fetch origin
+$ git -C <backend> log --oneline -3 HEAD
+f67ae84 fix: BE#40 axtaris medeniyyeti, BE#41 error kodu, BE#42 sahe adlari
+4571a20 docs: BE#36 QA report
+5cf5e30 refactor(BE#36): cover Manager/Seller rejection on the platform admin surface (TC-5)
+
+$ git -C <backend> status --short
+ M src/MayaPro.WarehouseApi.Api/appsettings.json      <-- istifadəçinin lokal dəyişikliyi, TOXUNULMADI
+?? tests/.../Be36QaRetestTests.cs                     <-- QA-nın yeni test faylı
+```
+
+Lokal branch `origin/task/BE#36-abune-ve-platforma-admin` ilə eyni commit-dədir (`f67ae84`).
+
+### R2.2 Build
+
+```
+$ dotnet build
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+Time Elapsed 00:01:03.74
+```
+
+### R2.3 Tam test paketi
+
+```
+$ dotnet test
+Passed! - Failed: 0, Passed:  43, Skipped: 0, Total:  43 - SharedKernel.Tests.dll
+Passed! - Failed: 0, Passed:   8, Skipped: 0, Total:   8 - Modules.Tenancy.Tests.dll
+Passed! - Failed: 0, Passed:  57, Skipped: 0, Total:  57 - Modules.Reports.Tests.dll
+Passed! - Failed: 0, Passed:   9, Skipped: 0, Total:   9 - Modules.DayEnd.Tests.dll
+Passed! - Failed: 0, Passed:  20, Skipped: 0, Total:  20 - Modules.Customers.Tests.dll
+Passed! - Failed: 0, Passed:  46, Skipped: 0, Total:  46 - Modules.Exports.Tests.dll
+Passed! - Failed: 0, Passed:  12, Skipped: 0, Total:  12 - Modules.Suppliers.Tests.dll
+Passed! - Failed: 0, Passed:  50, Skipped: 0, Total:  50 - Modules.Sales.Tests.dll
+Passed! - Failed: 0, Passed:  74, Skipped: 0, Total:  74 - Modules.Products.Tests.dll
+Passed! - Failed: 0, Passed:  54, Skipped: 0, Total:  54 - Modules.Expenses.Tests.dll
+Passed! - Failed: 0, Passed:  54, Skipped: 0, Total:  54 - Modules.Auth.Tests.dll
+Passed! - Failed: 0, Passed: 276, Skipped: 0, Total: 276 - IntegrationTests.dll (55 s)
+```
+
+**Cəm: 703/703 yaşıl, 0 uğursuz, 0 skipped.**
+
+Say hesabı (tələb olunan baza **695** təsdiqləndi):
+
+| Mərhələ | İnteqrasiya | Ümumi |
+|---|---|---|
+| QA dövrü 1 sonu (`4571a20`) | 267 | 694 |
+| Developer `f67ae84` (+1: TC-18 reqressiya testi) | 268 | **695 ← baza, təsdiqləndi** |
+| QA dövrü 2 (+8: `Be36QaRetestTests`) | 276 | **703** |
+
+Say **azalmayıb**, fail/skip yoxdur.
+
+### R2.4 QA-nın bu dövrdə əlavə etdiyi testlər
+
+`tests/MayaPro.WarehouseApi.IntegrationTests/Be36QaRetestTests.cs` (8 test, hamısı yaşıl):
+
+```
+Passed Be36QaRetestTests.Be40_Search_Ignores_Register_On_Name_Owner_And_Phone_Including_Capital_I
+Passed Be36QaRetestTests.Be40_Like_Metacharacters_Are_Literal_Text_Not_Wildcards
+Passed Be36QaRetestTests.Be40_Empty_Blank_And_Overlong_Search_Terms_Are_Handled
+Passed Be36QaRetestTests.Be41_Expired_Subscription_Is_403_SubscriptionExpired_At_Login_And_Mid_Session
+Passed Be36QaRetestTests.Be42_Payment_Accepts_PeriodMonths_And_Rejects_The_Retired_Months_Name
+Passed Be36QaRetestTests.Be42_Create_Tenant_Reads_PeriodMonths_And_Ignores_The_Retired_Name
+Passed Be36QaRetestTests.Be42_Stats_Field_Is_Named_CollectedThisMonth_On_The_Wire
+Passed Be36QaRetestTests.Be36_Full_Subscription_Arc_On_The_Corrected_Contract
+```
+
+Bu testlər **qəsdən** production sabitlərini (`WireFormat.ErrorCodes.SubscriptionExpired` və s.) istifadə
+etmir — hər kontrakt sətri hərfi yazılıb, ki sabitin adı dəyişsə test razılaşmasın, qırılsın.
+
+### R2.5 Müvəqqəti probe (icra olundu, sonra silindi)
+
+`tests/.../QaRetestProbe.cs` — xam HTTP status/body matrisini çap etmək üçün. Ölçmədən sonra silindi;
+`git status` yalnız yuxarıdakı iki sətri göstərir.
+
+---
+
+## R3. Bug-bu-bug retest nəticələri
+
+### BE#40 (BUG-1, AC-14 / TC-18) — **RETEST PASS ✅**
+
+**Düzəliş:** `GetTenantsHandler` C# tərəfdə `.ToLower()` çağırmır; müqayisə `EF.Functions.Like` + DB
+collation-ına buraxılıb, `%`, `_`, `[`, `\` isə `ESCAPE '\'` ilə literal kimi axtarılır.
+
+**Əvvəlki təkrarlama addımları EYNİLƏ yenidən icra olundu.** Faktiki ölçmə (marker mağaza
+`QaAxtarise6ae6fa6Magaza`, sahibkar `QaSahibkare6ae6fa6Ismayilov`, telefon `0700000001`):
+
+```
+search='QaAxtarise6ae6fa6'    -> HTTP 200  rows=1  marker=YES     (ad, olduğu kimi)
+search='QAAXTARISE6AE6FA6'    -> HTTP 200  rows=1  marker=YES     <-- əvvəl 0 idi, İNDİ TAPILIR
+search='qaaxtarise6ae6fa6'    -> HTTP 200  rows=1  marker=YES
+search='QaSahibkare6ae6fa6'   -> HTTP 200  rows=1  marker=YES     (sahibkar adı)
+search='QASAHIBKARE6AE6FA6'   -> HTTP 200  rows=1  marker=YES     <-- əvvəl 0 idi, İNDİ TAPILIR
+search='qasahibkare6ae6fa6'   -> HTTP 200  rows=1  marker=YES
+search='0700000001'           -> HTTP 200  rows=1  marker=YES     (telefon)
+```
+
+Hər üç axtarış sahəsi (ad, sahibkar, telefon) × hər üç registr (olduğu kimi / böyük / kiçik) = **9/9 eyni
+nəticə**. Böyük `I` daşıyan terminlər artıq işləyir. Avtomatlaşdırılmış təsdiq:
+`Be36QaRetestTests.Be40_Search_Ignores_Register_On_Name_Owner_And_Phone_Including_Capital_I` +
+developer-in `PlatformAdminApiTests.Tenant_Search_Ignores_Register_Even_For_Terms_Containing_A_Capital_I`.
+
+**ƏLAVƏ (yeni risk — LIKE escape) düşmən yoxlaması.** Bazada iki nəzarət mağazası: adi `QaEscape…Magaza`
+və hərfən `%`/`_` daşıyan `QaLikee6ae6fa650%Endirim_A`.
+
+```
+search='%'                    -> HTTP 200  rows=1  marker=no  literal%=YES   <-- platformanı SİYAHILAMIR
+search='_'                    -> HTTP 200  rows=1  marker=no  literal%=YES
+search='['                    -> HTTP 200  rows=0
+search=']'                    -> HTTP 200  rows=0
+search='\'                    -> HTTP 200  rows=0
+search='\%'                   -> HTTP 200  rows=0
+search='50%'  (URL: 50%25)    -> HTTP 200  rows=1  literal%=YES              <-- literal uyğunluq İŞLƏYİR
+search='%_[\'                 -> HTTP 200  rows=0
+search='[]'                   -> HTTP 200  rows=0
+search='%%%'                  -> HTTP 200  rows=0
+search='___'                  -> HTTP 200  rows=0
+search=''      (boş)          -> HTTP 200  rows=3  (filtr yoxdur — bütün mağazalar)
+search='   '   (yalnız boşluq)-> HTTP 200  rows=3  (filtr yoxdur)
+search=<1000 simvol 'a'>      -> HTTP 200  rows=0
+search=<1000 simvol '%'>      -> HTTP 200  rows=0
+search=<999 simvol '\'>       -> HTTP 200  rows=0
+```
+
+**Heç bir sorğuda 500 / SQL xətası yoxdur** — 26 düşmən terminin hamısı HTTP 200.
+
+Wildcard istiqaməti ayrıca yoxlanıldı (escape düşsəydi bunlar qırılardı):
+
+```
+search='QaEscape…M_gaza'      -> rows=0   ('_' 'a' hərfini əvəz ETMİR)
+search='QaEscape…%Magaza'     -> rows=0   ('%' "hər şey" demək DEYİL)
+search='[Qq]aAxtaris…'        -> rows=0   ('[…]' simvol sinfi kimi işləmir)
+```
+
+Escape sırası da düzgündür: `\` əvvəl, sonra `%`, `_`, `[` — əks halda yeni əlavə olunan escape-lər ikinci
+dəfə escape olunardı. `]` escape edilmir, lakin T-SQL-də mötərizə ifadəsindən kənarda `]` onsuz da
+literaldır, yəni bu boşluq deyil (yuxarıdakı `']'` və `'[]'` sətirləri bunu təsdiqləyir).
+
+**Performans qeydi:** `LIKE '%term%'` indeksdən istifadə etmir, lakin əvvəlki `LOWER(sütun) LIKE '%…%'`
+variantı da etmirdi (üstəlik sütun üzərində funksiya vardı) — reqressiya yoxdur, əksinə yaxşılaşmadır.
+
+---
+
+### BE#41 (BUG-2, AC-16 / TC-3) — **RETEST PASS ✅**
+
+**Düzəliş:** kod `Auth.SubscriptionExpiredForbidden` → **`SubscriptionExpired`**; dəyər
+`WireFormat.ErrorCodes.SubscriptionExpired` sabitindədir və həm `TenantGateMiddleware`, həm
+`LoginHandler` oradan oxuyur. Suffiks konvensiyasından kənar olduğu üçün 403
+`ResultExtensions.StatusCodeFor`-da **adı ilə** xəritələnib.
+
+Developer-in qeyd etdiyi risk (login yolunun 400-ə düşməsi) **ayrıca yoxlanıldı** — hər iki yol:
+
+**1) Mid-session (mövcud token, authenticated endpoint):** mağaza açıq ikən login edilib token alınıb,
+sonra `ExpiresAt` keçmişə çəkilib.
+
+```
+GET /api/products (mövcud token) -> HTTP 403
+  body: {"code":"SubscriptionExpired","message":"Abunəliyiniz bitib — əlaqə: 0509999999"}
+```
+
+Eyni nəticə `/api/auth/me`, `/api/customers`, `/api/sales` üçün də təsdiqləndi (hamısı 403).
+
+**2) Login:**
+
+```
+POST /api/auth/login -> HTTP 403           <-- 400 DEYİL, risk gerçəkləşməyib
+  body: {"code":"SubscriptionExpired","message":"Abunəliyiniz bitib — əlaqə: 0509999999"}
+```
+
+- Status **hər iki yolda 403** ✅
+- Kod **məhz `SubscriptionExpired`**, `Auth.` prefiksi YOXDUR ✅ (test `Assert.DoesNotContain("Auth.", code)`
+  ilə açıq yoxlayır)
+- Login cavabında token yoxdur ✅
+- Mağazanın statusu bazada `Active` qalır (tarix hökmdür, status dəyişmir) ✅
+- Mesajdakı telefon konfiqurasiyadan gəlir (`0509999999`) ✅
+
+Avtomatlaşdırılmış təsdiq: `Be36QaRetestTests.Be41_Expired_Subscription_Is_403_SubscriptionExpired_At_Login_And_Mid_Session`
+(login cavabı xam JSON üzərində `"code":"SubscriptionExpired"` sətri ilə yoxlanır) +
+`PlatformAdminApiTests.An_Expired_Subscription_Blocks_Every_Authenticated_Call`.
+
+**Digər error kodlarına təsir yoxdur:** suffiks qaydası pozulmayıb — `SharedKernel.Tests` 43/43,
+`Modules.Auth.Tests` 54/54, bütün paket yaşıl; `Auth.TenantPendingApprovalForbidden` və
+`Auth.TenantBlockedForbidden` dəyişməyib (uçdan-uca axın testində təsdiqləndi).
+
+---
+
+### BE#42 (BUG-3, AC-14 / AC-15) — **RETEST PASS ✅**
+
+**Düzəliş:** sorğu DTO-larında `Months` → `PeriodMonths`, stats cavabında
+`ThisMonthCollected` → `CollectedThisMonth`. Alias yoxdur.
+
+**Tələb olunan ssenari — `{"amount":50,"periodMonths":1}`:**
+
+```
+POST /api/admin/tenants/{id}/payments  {"amount":50,"periodMonths":1}  -> HTTP 200
+  body: {"id":"a20b5aae-…","name":"QA Probe Odenis …","status":"Active",
+         "expiresAt":"2026-11-16T01:57:23.7266261","monthlyFee":0.00,"isExpired":false}
+  ExpiresAt before = 2026-10-16T01:57:23.7266261Z
+  ExpiresAt after  = 2026-11-16T01:57:23.7266261      <-- DƏQİQ 1 ay uzandı ✅
+```
+
+Ödəniş sətri yazılır və `GET …/payments` onu `periodMonths = 1`, `amount = 50` ilə qaytarır ✅
+
+**Köhnə adların qalmadığı təsdiqləndi (alias yoxdur):**
+
+```
+POST …/payments {"amount":50,"months":1} -> HTTP 400
+  body: {"code":"General.Validation","message":"Ay sayı 1 ilə 120 arasında olmalıdır"}
+POST …/approve  {"months":1}             -> HTTP 400
+  body: {"code":"General.Validation","message":"Ay sayı 1 ilə 120 arasında olmalıdır"}
+```
+
+Rədd edilən sorğular heç nə yazmır (tarixçədə hələ də tək sətir) ✅
+
+`POST /api/admin/tenants` üçün: `periodMonths: 6` → `ExpiresAt = now + 6 ay` ✅; köhnə adla (`months: 6`)
+göndərildikdə sahə bağlanmır və mağaza **müddətsiz** yaranır (`ExpiresAt = null`) — yəni gizli alias yoxdur ✅
+
+**Stats sahəsi (xam JSON üzərində yoxlanıldı, DTO deserializasiyası ilə deyil):**
+
+```
+GET /api/admin/stats -> {"activeCount":5,"pendingCount":0,"blockedCount":0,
+                         "expiredCount":1,"collectedThisMonth":50.00}
+```
+
+`collectedThisMonth` var ✅ · `thisMonthCollected` yoxdur ✅
+
+**Bütün koda/testə sweep:** `SubscriptionExpiredForbidden`, `thisMonthCollected`, `ThisMonthCollected`
+sətirləri `src/` və `tests/` altında **funksional kod kimi qalmayıb** — qalan yeganə istinadlar
+sənədlərdəki tarixçə qeydləri, `AuthErrors.cs`-dəki izahedici XML şərh və bu QA reportunun özüdür.
+Daxili domain metodlarında (`Tenant.Approve(utcNow, months)`, `TenantProvisioning(..., months, ...)`)
+`months` parametr adı qalır — bunlar **wire kontraktı deyil**, DTO-lardan kənar C# imzalarıdır, ona görə
+AC pozuntusu deyil.
+
+---
+
+## R4. AC matrisi (retest sonrası)
+
+Əvvəlki dövrdə ✅ olan 24 AC yenidən yoxlanıldı və hamısı ✅ qaldı (tam paket yaşıl + aşağıdakı adresli
+təsdiqlər). Yalnız dəyişən sətirlər göstərilir; qalanları üçün §2-yə bax.
+
+| AC | Əvvəl | İndi | Retest dəlili |
+|---|---|---|---|
+| **AC-14** 8 admin endpoint-i (`search` case-insensitive, `periodMonths`, `collectedThisMonth`) | ❌ | **✅** | §R3 BE#40 (9/9 registr matrisi) + BE#42 (200 + 1 ay uzanma, köhnə ad 400, xam stats JSON) |
+| **AC-16** Middleware 403 + `code = "SubscriptionExpired"` | ❌ | **✅** | §R3 BE#41 — hər iki yolda 403 + dəqiq kod, xam body ilə |
+| **AC-15** Kontrakt intizamı (route, camelCase, ISO, `{code,message}`, 404/400) | ✅ | ✅ | `Approve_Validates_Its_Input_And_Its_Target`, `Payment_Validates_Amount_Period_And_Target`, `Block_And_Unblock…`; validasiya mesajları yeni sahə adı ilə də düzgün 400 verir |
+| **AC-21/22/23** Arxitektura testi + allow-list | ✅ | ✅ | `IgnoreQueryFiltersArchitectureTests` 3/3 yaşıl (276-lıq inteqrasiya paketinin içində); allow-list dəyişməyib |
+| **AC-24** `docs/multi-tenancy.md` | ✅ | ✅ | §9.5-ə iki yeni qayda bloku əlavə olunub (§R6) |
+| **AC-26** Build + testlər | ✅ | ✅ | 0 warning / 0 error; 703/703 yaşıl |
+
+Qalan AC-lər (AC-1…AC-13, AC-17…AC-20, AC-25) dəyişikliklərdən təsirlənməyib və onları örtən testlərin
+hamısı yaşıldır. AC-2 və AC-5 əvvəlki dövrdə olduğu kimi sənədləşdirilmiş hərfi deviasiya ilə ✅.
+
+**Yekun: 26 ✅ · 0 ❌**
+
+---
+
+## R5. TC matrisi (retest sonrası)
+
+| TC | Əvvəl | İndi | Retest dəlili |
+|---|---|---|---|
+| **TC-18** axtarış: ad / sahibkar / telefon, fərqli registrlə | ❌ | **✅** | §R3 BE#40 — 3 sahə × 3 registr = 9/9; üstəlik escape düşmən matrisi |
+| **TC-3** ExpiresAt keçmiş → istənilən API 403 | ✅ (kod deviasiyası) | **✅ (deviasiya bağlandı)** | Kod artıq məhz `SubscriptionExpired` |
+| **TC-1, TC-2, TC-4** əsas abunə axını | ✅ | ✅ | `Be36QaRetestTests.Be36_Full_Subscription_Arc_On_The_Corrected_Contract` — register→**201**→login **403** (`Auth.TenantPendingApprovalForbidden`)→approve(`periodMonths`)→login **200**→expiry→**403 `SubscriptionExpired`**→ödəniş(`periodMonths`)→eyni token ilə **200** |
+| **TC-5** Owner/Manager/Seller → 403, anonim → 401 | ✅ | ✅ | `An_Ordinary_Owner_Is_Forbidden…`, `Manager_And_Seller_Are_Also_Forbidden…`, `The_Admin_Surface_Is_Closed_To_Anonymous_Callers` yaşıl |
+| **TC-15** validasiya 400 + heç nə yazılmır | ✅ | ✅ | `Payment_Validates_Amount_Period_And_Target` + `Tc15_A_Negative_Period_Is_Rejected_And_Writes_Nothing` — hər ikisi yeni sahə adı ilə yenilənib və yaşıl |
+| **TC-17** `collectedThisMonth` keçən ayı saymır | ✅ | ✅ | `Tc17_This_Months_Takings_Exclude_A_Payment_From_Last_Month` (yeni sahə adı ilə) |
+| **TC-20** arxitektura testi süni pozuntuda qırılır | ✅ | ✅ | Dövr 1-də canlı təkrarlandı (§4.1); allow-list və skaner bu commit-də toxunulmayıb |
+| TC-6…TC-14, TC-16, TC-19, TC-21, TC-22 | ✅ | ✅ | Örtən testlərin hamısı yaşıl; PlatformAdmin sızma yoxlaması (`Platform_Admin_Passes_The_Tenant_Gate_But_Sees_No_Shop_Data`, `Platform_Admin_Reads_No_Sales_Either`) təsdiqləndi |
+
+**Yekun: 22 ✅ · 0 ❌**
+
+---
+
+## R6. Reqressiya və test bütövlüyü
+
+### R6.1 Reqressiya
+
+- **BE#35 testləri:** `TenantIsolationApiTests`, `TenantQueryFilterCoverageTests` — yaşıl.
+- **Arxitektura qorunması:** `IgnoreQueryFiltersArchitectureTests` (3 test) — yaşıl, allow-list dəyişməyib.
+- **PlatformAdmin sızma yoxlaması:** `/api/products`, `/api/customers`, `/api/sales` admin tokeni ilə boş —
+  yaşıl (fail-closed model toxunulmayıb).
+- **Bütün modullar:** Products / Sales / Customers / Suppliers / Expenses / Reports / DayEnd / Exports /
+  Auth / Tenancy / SharedKernel — hamısı yaşıl, say azalmayıb.
+
+### R6.2 Test bütövlüyü (`git diff 4571a20..HEAD -- tests/` oxundu)
+
+| Yoxlama | Nəticə |
+|---|---|
+| `Be36QaGapTests.cs` silinib? | **Xeyr** — 6 testin hamısı yerində |
+| `PlatformAdminApiTests.cs` silinib? | **Xeyr** — bütün testlər yerində, **+1 yeni** (TC-18 reqressiyası) |
+| Assert-lər zəiflədilib? | **Xeyr** — yalnız sahə adları (`months` → `periodMonths`, `ThisMonthCollected` → `CollectedThisMonth`) və gözlənilən error kodu yenilənib; assert **sayı və gücü** azalmayıb |
+| `Skip` əlavə olunub? | **Xeyr** — bütün `tests/` ağacında bir dənə də `Skip =` yoxdur (qrep təsdiqi), `dotnet test` 0 skipped |
+| Assert-lər gücləndirilib? | **Bəli** — `PlatformAdminApiTests`-də `Assert.Equal("SubscriptionExpired", …)` sabit əvəzinə **hərfi sətir** kimi yazılıb (developer-in şərhi: "sabit yerini dəyişsə test qırılmalıdır"); yeni TC-18 testi `%`/`_` escape-ini də iddia edir |
+
+`Be36QaGapTests`-dəki TC-18 haqqında şərh düzgün yenilənib: test artıq düzəlişlə birlikdə
+`PlatformAdminApiTests`-dədir.
+
+---
+
+## R7. Sənədlərin yoxlanılması
+
+| Sənəd | Nəticə | Dəlil |
+|---|---|---|
+| `docs/api/ERROR-CONTRACT.md` | ✅ | Suffiks cədvəlindən sonra açıq **«Konvensiyanın yeganə istisnası (BE#41)»** bloku; §-dəki 403 cədvəlində kod `SubscriptionExpired`-ə dəyişib; `Last Updated`-də BE#41 sətri. Yeni error yazanlara «bu istisnanı NÜMUNƏ GÖTÜRMƏ» xəbərdarlığı da var |
+| `docs/changes/CHANGELOG.md` | ✅ | `2026-08-16` altında ayrıca **«BE#36 QA düzəlişləri»** bloku — üç bug ayrı-ayrı, kök səbəb + həll + **«Wire dəyişikliyi, alias YOXDUR»** qeydi ilə; BE#43 (pre-existing əkiz) istinadı da var |
+| `docs/multi-tenancy.md` §9.5 | ✅ | İki yeni qayda bloku: **«Sahə adları (BE#42)»** və **«Axtarışda mədəniyyət qaydası (BE#40)»** (sonuncu gələcək kod üçün açıq qayda qoyur: `ToLower()` YOX, `ToLowerInvariant()` və ya collation). §2.4 cədvəlinin 6-cı sətri yenilənib; §-dəki test cədvəlinə BE#40 reqressiyası əlavə olunub; `Last Updated` yenilənib |
+| `docs/api/API-OVERVIEW.md` | ✅ | Admin endpoint cədvəlində `{periodMonths}` və `collectedThisMonth`; login 403 sətrində `SubscriptionExpired`; `search` sətrinə collation/escape izahı; ayrıca **«Sahə adları (BE#42)»** abzası; `Last Updated` yenilənib |
+| `docs/flows/AUTH-FLOW.md` (əlavə) | ✅ | 3-cü addımda kod `SubscriptionExpired`-ə dəyişib |
+
+Sənəd ↔ kod uyğunluğu tamdır; əvvəlki dövrdə qeyd etdiyim «sənəd–AC uyğunsuzluğu» aradan qalxıb.
+
+---
+
+## R8. Yeni tapılan buglar
+
+**Bloklayıcı yeni bug: YOXDUR.** Bug taskı yaradılmadı (tapşırığa uyğun).
+
+İki bloklamayan müşahidə:
+
+- **OBS-5 (Severity: Low, test örtüyü).** `ResultExtensions.StatusCodeFor`-a əlavə olunan **adla xəritələmə**
+  budağının (`SubscriptionExpired` → 403) `SharedKernel.Tests`-də unit testi yoxdur — `ResultExtensionsTests`
+  hələ də yalnız suffiks qaydasını yoxlayır (43 test, say dəyişməyib). Budaq inteqrasiya səviyyəsində
+  örtülüdür (login 403 testləri) və QA-nın `Be41_…` testi onu birbaşa iddia edir, ona görə real risk aşağıdır.
+  Bir sətirlik `[InlineData("SubscriptionExpired", 403)]` boşluğu bağlayardı.
+- **OBS-6 (Severity: Low, pre-existing, BE#36-ya aid deyil).** Cavablarda `DateTime` sahələri `Z` şəkilçisi
+  və ya offset olmadan serializasiya olunur (məs. `"expiresAt":"2026-11-16T01:57:23.7266261"`). Dəyər UTC-dir,
+  lakin layihədə qlobal JSON tarix konvertoru konfiqurasiya olunmayıb, ona görə frontend-də
+  `new Date(...)` bunu **lokal vaxt** kimi oxuya bilər. Bu, BE#36-nın gətirdiyi deviasiya deyil — bütün
+  API səthində eyni davranışdır (`ISO 8601` tələbi hərfən pozulmur, çünki offset-siz forma da ISO 8601-dir).
+  Frontend abunə ekranı `expiresAt`-ı göstərəcəyi üçün ayrıca platforma-səviyyəli qərara layiqdir.
+
+Əvvəlki dövrün OBS-1…OBS-4 müşahidələri qüvvədə qalır (bu commit onlara toxunmayıb) və heç biri bloklayıcı
+deyil.
+
+---
+
+## R9. Bu dövrdə icra OLUNMAYAN yoxlamalar və səbəbləri
+
+| Yoxlama | Vəziyyət | Səbəb |
+|---|---|---|
+| `dotnet run` ilə ayrıca qaldırılmış proses üzərində canlı `curl` smoke | **İcra olunmadı** | Dövr 1-dəki səbəb qüvvədədir: fon prosesini mühit dəyişənləri ilə başlatmaq bu QA mühitində icazə tələb edir. **Əvəzedici tam ekvivalentdir** — `WarehouseApiFactory` real hostu (bütün middleware, auth pipeline, migration-lar) real SQL Server (`MayaProWarehouse_Test`) üzərində qaldırır; yuxarıdakı bütün status kodları və xam JSON body-lər **faktiki HTTP sorğularından** götürülüb, in-memory provider və mock istifadə edilməyib |
+| Fərqli DB collation / provayder (PostgreSQL, `CS_AS` collation) altında BE#40 davranışı | **İcra olunmadı** | Düzəliş registr uyğunluğunu **DB collation-ına** həvalə edir, yəni davranış collation-dan asılıdır. Test bazası layihənin standart SQL Server collation-ındadır (case-insensitive) və istehsal da odur; başqa provayder konfiqurasiya olunmayıb. **Qalıq risk:** case-sensitive collation-lı bir mühitdə axtarış registrə həssas olar — bu, sənəddə qeyd olunmağa layiq fərziyyədir |
+| `SubscriptionPayments` cədvəlində `%`/`_` daşıyan **mövcud istehsal datası** üzərində escape davranışı | **İcra olunmadı** | Test bazası hər işdə sıfırlanır; süni marker mağazalar (`…50%Endirim_A`) ilə hər iki istiqamət (literal uyğunluq + wildcard rədd) örtüldü |
+| Qeydiyyatda paralel yarış (eyni telefonla eyni anda iki `register`) | **İcra olunmadı** | Dövr 1-dəki kimi: açıq qalıq risk kimi qəbul edilib və Mərhələ 3-ə təxirə salınıb (`multi-tenancy.md` §4.1/§8); AC siyahısında yoxdur, determinist ölçmək üçün yük aləti lazımdır |
+| Rate-limit davranışı | **Tətbiq olunmur** | AC-25 rate-limit OLMADIĞINI sənədləşdirməyi tələb edir — ödənilib; funksiya Mərhələ 3-dədir |
+| Frontend e2e (abunə ekranı, admin konsolu UI) | **Tətbiq olunmur** | BE#36 backend taskıdır; `frontend/` folderinə toxunulmayıb |
+| Yük / performans ölçməsi (`LIKE '%…%'` böyük tenant sayında) | **İcra olunmadı** | AC-lərdə performans hədəfi yoxdur; test bazasında mağaza sayı azdır. Qeyd: yeni sorğu köhnəsindən daha pis deyil (§R3) |
+
+---
+
+## R10. Yekun qərar (retest)
+
+**QA PASSED.**
+
+| Bug | Retest nəticəsi |
+|---|---|
+| **BE#40** — axtarış `az-Latn-AZ`-də böyük `I` üçün sınırdı (AC-14, TC-18) | ✅ **PASS** — 3 sahə × 3 registr = 9/9; üstəlik 26 düşmən escape termini, 0 × HTTP 500 |
+| **BE#41** — `SubscriptionExpired` kod sətri (AC-16, TC-3) | ✅ **PASS** — mid-session **403** + login **403** (400 riski gerçəkləşməyib), kod məhz `SubscriptionExpired` |
+| **BE#42** — `periodMonths` / `collectedThisMonth` (AC-14/15) | ✅ **PASS** — 200 + dəqiq 1 ay uzanma; köhnə adlar 400 / bağlanmır; xam JSON-da `collectedThisMonth` |
+
+- Acceptance Criteria: **26/26 ✅**
+- Test case: **22/22 ✅**
+- Avtomatlaşdırılmış testlər: **703/703 yaşıl** (baza 695 təsdiqləndi, 0 fail, 0 skip)
+- Build: 0 warning / 0 error
+- Test bütövlüyü: pozulmayıb — silinmə/zəiflətmə/`Skip` yoxdur, əksinə gücləndirilib
+- Sənədlər: 4 tələb olunan sənədin hamısı + `AUTH-FLOW.md` düzəlişləri əks etdirir
+- Yeni bloklayıcı bug: **yoxdur** (2 × Low müşahidə: OBS-5, OBS-6)
+
+Merge qapısı qeydi: layihə qaydasına görə task yalnız PR #39 **MERGED** olduqdan sonra `Done`-a keçə bilər.
+Bu QA dövrü statusu dəyişmir — verdikt orchestrator-a ötürülür.
