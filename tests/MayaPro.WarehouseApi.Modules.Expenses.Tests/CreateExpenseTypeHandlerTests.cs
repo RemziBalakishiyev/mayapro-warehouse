@@ -76,6 +76,44 @@ public sealed class CreateExpenseTypeHandlerTests
     }
 
     [Theory]
+    [InlineData("internet")]      // all lower
+    [InlineData("Internet")]      // mixed case
+    [InlineData("INTERNET")]      // exact match, same as stored
+    public async Task Duplicate_Check_Is_Case_Insensitive_For_Names_Containing_A_Latin_I(string attempt)
+    {
+        // BE#43 (TC-1/TC-2) — under the host's az-Latn-AZ culture, the old `name.ToLower()` turned 'I' into
+        // 'ı' (dotless, U+0131) instead of 'i', so a stored "INTERNET" never matched an attempted "internet".
+        await using ExpensesDbContext db = NewDb();
+        db.ExpenseTypes.Add(ExpenseType.Create("INTERNET"));
+        await db.SaveChangesAsync();
+
+        var handler = new CreateExpenseTypeHandler(db, new CreateExpenseTypeValidator());
+
+        var result = await handler.Handle(new CreateExpenseTypeCommand(attempt), default);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(ExpenseErrors.ExpenseTypeDuplicate, result.Error);
+        Assert.Equal(1, await db.ExpenseTypes.CountAsync());
+    }
+
+    [Fact]
+    public async Task A_Latin_I_And_An_Azerbaijani_Dotted_I_Are_Different_Letters_Not_Duplicates()
+    {
+        // BE#43 (TC-3) — the fix must not overcorrect into treating the Azerbaijani dotted capital 'İ'
+        // (U+0130) as the same letter as the Latin 'I' (U+0049). "İdeal" and "Ideal" start with genuinely
+        // different characters, so both must be creatable — this is the regression guard for TC-4 as well.
+        await using ExpensesDbContext db = NewDb();
+        var handler = new CreateExpenseTypeHandler(db, new CreateExpenseTypeValidator());
+
+        var first = await handler.Handle(new CreateExpenseTypeCommand("İdeal"), default);
+        var second = await handler.Handle(new CreateExpenseTypeCommand("Ideal"), default);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(2, await db.ExpenseTypes.CountAsync());
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("   ")]
     public async Task Empty_Name_Fails_Validation(string name)
