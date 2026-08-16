@@ -508,6 +508,25 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
             $"/api/admin/tenants/{shop.TenantId}/payments", new { amount = 1m, months = 1 })).StatusCode);
     }
 
+    /// <summary>
+    /// TC-5 — the policy is role-based, not just "not Owner": Manager and Seller (the demo shop's other two
+    /// seeded roles) are refused exactly like Owner is, never treated as more or less trusted here.
+    /// </summary>
+    [Fact]
+    public async Task Manager_And_Seller_Are_Also_Forbidden_From_The_Admin_Surface()
+    {
+        using HttpClient manager = await _factory.AuthenticatedClientAsync(
+            IntegrationTestHelpers.ManagerPhone, IntegrationTestHelpers.DemoPassword);
+        using HttpClient seller = await _factory.AuthenticatedClientAsync(
+            IntegrationTestHelpers.SellerPhone, IntegrationTestHelpers.DemoPassword);
+
+        foreach (HttpClient client in new[] { manager, seller })
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/admin/tenants")).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/admin/stats")).StatusCode);
+        }
+    }
+
     /// <summary>An anonymous caller gets 401 from the console, not a hint about what lives there.</summary>
     [Fact]
     public async Task The_Admin_Surface_Is_Closed_To_Anonymous_Callers()
