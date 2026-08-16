@@ -44,6 +44,29 @@ internal static class TenantTestFixture
         return new TenantHandle(tenantId, storeName, ownerPhone, password, userId);
     }
 
+    /// <summary>
+    /// BE#36 — forces a shop's subscription end date. Used to put a period in the past (auto-block) or in
+    /// the future without waiting for a real month to pass; <c>null</c> restores the open-ended state.
+    /// Writes the column directly because the domain deliberately exposes no "set an arbitrary expiry"
+    /// method — production code only ever approves, extends or clears.
+    /// </summary>
+    public static async Task SetExpiryAsync(Guid tenantId, DateTime? expiresAtUtc)
+    {
+        await using TenancyDbContext tenancy = NewContext<TenancyDbContext>(o => new TenancyDbContext(o));
+
+        Tenant tenant = await tenancy.Tenants.SingleAsync(t => t.Id == tenantId);
+        tenancy.Entry(tenant).Property(nameof(Tenant.ExpiresAt)).CurrentValue = expiresAtUtc;
+
+        await tenancy.SaveChangesAsync();
+    }
+
+    /// <summary>Reads a shop back — the admin-endpoint tests assert on the persisted state, not on the DTO.</summary>
+    public static async Task<Tenant> GetTenantAsync(Guid tenantId)
+    {
+        await using TenancyDbContext tenancy = NewContext<TenancyDbContext>(o => new TenancyDbContext(o));
+        return await tenancy.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId);
+    }
+
     /// <summary>Adds one more user to an existing shop — used by the duplicate-phone login tests.</summary>
     public static async Task<Guid> AddUserAsync(
         Guid tenantId,

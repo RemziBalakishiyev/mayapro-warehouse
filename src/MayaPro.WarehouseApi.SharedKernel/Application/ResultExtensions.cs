@@ -1,3 +1,4 @@
+using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.AspNetCore.Http;
 
 namespace MayaPro.WarehouseApi.SharedKernel.Application;
@@ -33,6 +34,12 @@ public static class ResultExtensions
 
     private static int StatusCodeFor(string code)
     {
+        // BE#41: the one code mapped by name rather than by suffix. "SubscriptionExpired" is frozen by
+        // the specification (the frontend hard-codes it), so it cannot carry the "...Forbidden" suffix
+        // the rule below keys on — and without this line the login refusal would answer 400, not 403.
+        if (string.Equals(code, WireFormat.ErrorCodes.SubscriptionExpired, StringComparison.Ordinal))
+            return StatusCodes.Status403Forbidden;
+
         // Convention: error code suffix drives the HTTP status. Modules stay HTTP-agnostic.
         // Checked before the generic "NotFound" rule below: "...TokenNotFound" also ends with
         // "NotFound", but a stale/unknown import token is a 410 (Gone), not a 404.

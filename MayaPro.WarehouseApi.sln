@@ -61,6 +61,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MayaPro.WarehouseApi.Module
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MayaPro.WarehouseApi.Modules.Tenancy", "src\Modules\MayaPro.WarehouseApi.Modules.Tenancy\MayaPro.WarehouseApi.Modules.Tenancy.csproj", "{CECB0AA9-0E9C-4519-BD9B-F5204600E5CC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MayaPro.WarehouseApi.Modules.Tenancy.Tests", "tests\MayaPro.WarehouseApi.Modules.Tenancy.Tests\MayaPro.WarehouseApi.Modules.Tenancy.Tests.csproj", "{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -371,6 +373,18 @@ Global
 		{CECB0AA9-0E9C-4519-BD9B-F5204600E5CC}.Release|x64.Build.0 = Release|Any CPU
 		{CECB0AA9-0E9C-4519-BD9B-F5204600E5CC}.Release|x86.ActiveCfg = Release|Any CPU
 		{CECB0AA9-0E9C-4519-BD9B-F5204600E5CC}.Release|x86.Build.0 = Release|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Debug|x64.Build.0 = Debug|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Debug|x86.Build.0 = Debug|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Release|x64.ActiveCfg = Release|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Release|x64.Build.0 = Release|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Release|x86.ActiveCfg = Release|Any CPU
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -402,5 +416,6 @@ Global
 		{FD31EF5C-F0AA-4EA3-A142-E976D6F77DD4} = {CA253913-39DE-BFD0-C9A3-4B7EC6FBDF17}
 		{D098C764-4486-4E74-8B21-E3584209554F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{CECB0AA9-0E9C-4519-BD9B-F5204600E5CC} = {EC447DCF-ABFA-6E24-52A5-D7FD48A5C558}
+		{BC5547C4-B2A8-4B7C-9BE4-B7B7E9760A7B} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

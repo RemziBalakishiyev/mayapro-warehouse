@@ -14,9 +14,12 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 | `expenses` | ExpensesDbContext | Expenses, ExpenseTypes | ✅ |
 | `dayend` | DayEndDbContext | Closings | ✅ |
 | `activity` | ActivityDbContext | ActivityLogs | ✅ |
-| `settings` | SettingsDbContext | StoreSettings (singleton sətir, sabit Id) | ❌ (standalone) |
+| `settings` | SettingsDbContext | StoreSettings (mağaza başına bir sətir) | ❌ (standalone) |
+| `tenancy` | TenancyDbContext | Tenants, SubscriptionPayments | ✅ (BE#36) |
 
 \* Transactional = `ITransactionalDbContext` implement edir → paylaşılan UnitOfWork transaction-ına enlist olur. Reports/Exports modullarının cədvəli yoxdur.
+
+**Multi-tenancy (BE#35).** `tenancy` xaricindəki bütün biznes cədvəllərində `TenantId` (`uniqueidentifier`, NOT NULL) sütunu + indeksi var; oxuma EF global query filter, yazma `TenantInterceptor` ilə avtomatik məhdudlaşır. `tenancy` sxemi qəsdən istisnadır: `Tenants` təcridi tərif edən reyestrdir, `SubscriptionPayments` isə platforma səviyyəli billing qeydidir (`TenantId` orada adi Guid sütunudur, FK deyil). Detallar: [`multi-tenancy.md`](../multi-tenancy.md).
 
 ## Konvensiyalar
 
@@ -32,18 +35,24 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 
 ## Vacib indekslər / məhdudiyyətlər
 
-- `identity.Users.Phone` — unique
+- `identity.Users` — `(TenantId, Phone)` unique (BE#35: telefon YALNIZ mağaza daxilində unikaldır; qlobal birmənalılığı qeydiyyatdakı yoxlama təmin edir — `multi-tenancy.md` §4.1). `Users.Role` `nvarchar(20)`-də ad kimi saxlanır: `Owner`/`Manager`/`Seller`/`PlatformAdmin` (BE#36 — platforma admini `TenantId = 00000000-0000-0000-0000-0000000000ff` rezerv id-si ilə, heç bir `tenancy.Tenants` sətrinə uyğun gəlmir; sxem dəyişməyib, BE#36 `identity` üçün miqrasiya yaratmır)
+- `tenancy.Tenants.Status`, `tenancy.Tenants.ExpiresAt` — non-unique (admin siyahısı/statistikası). `ExpiresAt` **nullable** = müddətsiz abunə
+- `tenancy.SubscriptionPayments` — `(TenantId, PaidAt)` və `PaidAt` non-unique indeksləri
 - `identity.SalaryEntries.Date` — non-unique (gün sonu / dashboard kassa sorğusu); `(UserId, Month)` — non-unique (aylıq maaş xülasəsi). `UserId` FK DEYİL (`Expense.ProductId` ilə eyni yanaşma).
 - `dayend.Closings.Date` — unique (bir günə bir bağlanış, race qoruması)
 - `activity.ActivityLogs.CreatedAt` — descending index (feed sorğusu üçün)
 - `sales.Sales.InvoiceToken` — unique filtered (`IS NOT NULL`) — açıq faktura linki tokeni
 - `customers.CustomerDebtAdjustments.CustomerId`, `suppliers.SupplierDebtAdjustments.SupplierId` — non-unique (tarixçə sorğusu üçün; ödəniş cədvəllərində də eyni)
 
-## Seed (yalnız Development)
+## Seed
 
-UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeeder, SupplierSeeder, ExpenseTypeSeeder (7 default xərc növü). Sales/Expenses boş başlayır. Referans: `docs/seed.ts` (frontend seed data-sı).
+**Yalnız Development:** UserSeeder (4 demo istifadəçi, şifrə `demo123`), ProductSeeder, CustomerSeeder, SupplierSeeder, ExpenseTypeSeeder (7 default xərc növü). Sales/Expenses boş başlayır. Referans: `docs/seed.ts` (frontend seed data-sı).
+
+**Hər mühitdə (BE#36):** `PlatformAdminSeeder` — `PlatformAdmin` konfiqurasiya bölməsindən (telefon/şifrə/ad) bir `PlatformAdmin` istifadəçisi yaradır. İdempotentdir (mövcud admin varsa toxunmur, şifrəni yenidən yazmır) və bölmə konfiqurasiya olunmayıbsa heç nə etmir. Production-da `PlatformAdmin__Password` mühit dəyişəni ilə override edilməlidir.
 
 ## Last Updated
+
+2026-08-16 — BE#36: `tenancy.Tenants.ExpiresAt` (nullable = müddətsiz) + `MonthlyFee` (`decimal(18,2)` NOT NULL DEFAULT 0) və yeni `tenancy.SubscriptionPayments` cədvəli (migration `AddSubscriptionFields`, back-fill YOXDUR — mövcud mağazalar müddətsiz qalır). `TenancyDbContext` `ITransactionalDbContext` oldu (qeydiyyat mağaza + sahibkar sətrini bir transaction-da yazır). `UserRole`-a `PlatformAdmin` əlavə olundu — `identity` sxemi üçün miqrasiya lazım gəlmədi.
 
 2026-08-01 — BE#28: `identity.Users.MonthlySalary` sütunu (`decimal(18,2)` NOT NULL DEFAULT 0) + yeni `identity.SalaryEntries` cədvəli (migration `EmployeeSalaryAndSalaryEntries`). `AuthDbContext` öz connection string-indən paylaşılan `IDbConnectionFactory` bağlantısına keçdi və `ITransactionalDbContext` oldu — maaş sətri ilə activity log-u eyni transaction-da yazmaq üçün. `SalaryEntry.Date` (pulun kassadan çıxdığı UTC anı) və `SalaryEntry.Month` (`yyyy-MM`, hansı ayın hesabına) AYRI sahələrdir və bir-birini əvəz etmir.
 

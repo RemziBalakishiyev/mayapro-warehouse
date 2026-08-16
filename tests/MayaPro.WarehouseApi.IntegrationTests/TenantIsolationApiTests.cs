@@ -517,7 +517,10 @@ public sealed class TenantIsolationApiTests : IAsyncLifetime
             "/api/auth/login", new { phone = shop.OwnerPhone, password = shop.OwnerPassword });
         Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
         var error = (await login.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
-        Assert.Equal("Mağaza aktiv deyil", error.Message);
+        // BE#36 replaced the generic "Mağaza aktiv deyil" for this state with a message that tells the
+        // customer what happened and who to call. The generic one now only answers an unknown tenant.
+        Assert.Equal("Auth.TenantBlockedForbidden", error.Code);
+        Assert.StartsWith("Abunəliyiniz bitib", error.Message, StringComparison.Ordinal);
 
         HttpResponseMessage afterBlock = await issued.GetAsync("/api/products");
         Assert.True(

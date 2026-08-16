@@ -17,7 +17,7 @@
 | [api/API-OVERVIEW.md](api/API-OVERVIEW.md) | 40 endpoint-in tam cədvəli (verb, route, icazə) | Endpoint əlavə/dəyişəndə, icazə suallarında | `src/Modules/*/Endpoints/` |
 | [api/ERROR-CONTRACT.md](api/ERROR-CONTRACT.md) | `{code, message}` formatı, suffix→status qaydası, validation | Yeni error/status işlərində | `SharedKernel/Application/ResultExtensions.cs` |
 | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | Stack, host pipeline, IModule, use-case üslubu, test strategiyası | Yeni modul/infrastruktur işlərində | `Api/`, `SharedKernel/` |
-| [multi-tenancy.md](multi-tenancy.md) | Çox mağazalı (multi-tenant) data təcridi: `ICurrentTenant` axını, query filter + interceptor, tenant-scoped unikallıq, təhlükəsizlik auditi, məhdudiyyətlər, gələcək mərhələlər | Tenant/təcrid, yeni cədvəl, anonim və ya background icra yolu işlərində | `SharedKernel/Domain/TenantEntity.cs`, `SharedKernel/Infrastructure/Tenant*`, `Modules.Tenancy/`, `Api/Middleware/TenantGateMiddleware.cs` |
+| [multi-tenancy.md](multi-tenancy.md) | Çox mağazalı (multi-tenant) SaaS: Mərhələ 1 — data təcridi (`ICurrentTenant`, query filter + interceptor, tenant-scoped unikallıq, təhlükəsizlik auditi); Mərhələ 2 — qeydiyyat axını, platforma admini (`TenantId` qərarı), abunə/`ExpiresAt` qaydası, avto-blok, `IgnoreQueryFilters` allowlist testi | Tenant/təcrid, yeni cədvəl, qeydiyyat/abunə/admin, anonim və ya background icra yolu işlərində | `SharedKernel/Domain/TenantEntity.cs`, `SharedKernel/Infrastructure/Tenant*`, `Modules.Tenancy/`, `Api/Middleware/TenantGateMiddleware.cs` |
 | [architecture/MODULES.md](architecture/MODULES.md) | Modul məsuliyyətləri + kontrakt provider/consumer xəritəsi | Modullararası əlaqə qurarkən | `SharedKernel/Contracts/` |
 | [database/DATABASE.md](database/DATABASE.md) | Schema-lar, konvensiyalar, indekslər, migration qaydası, seed | Migration/DB işlərində | `src/Modules/*/Infrastructure/` |
 | [database/ENTITY-RELATIONS.md](database/ENTITY-RELATIONS.md) | Entity xəritəsi, modullararası Id referansları (FK-sız) | Entity/relation dəyişikliyində | `src/Modules/*/Domain/` |
@@ -35,5 +35,6 @@
 
 ## Last Updated
 
+2026-08-16 — `multi-tenancy.md` Mərhələ 2 ilə genişləndi (BE#36: qeydiyyat, platforma admini, abunə).
 2026-08-16 — `multi-tenancy.md` əlavə olundu (BE#35, Mərhələ 1: data təcridi).
 2026-07-25 — sistem qurulanda yaradıldı.

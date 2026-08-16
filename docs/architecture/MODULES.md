@@ -1,10 +1,11 @@
 # Modules — məsuliyyətlər və asılılıqlar
 
-11 modul. Qayda: modul başqa modulun cədvəlinə toxunmur; əlaqə yalnız `SharedKernel.Contracts` interfeysləri ilə.
+12 modul. Qayda: modul başqa modulun cədvəlinə toxunmur; əlaqə yalnız `SharedKernel.Contracts` interfeysləri ilə.
 
 | Modul | Məsuliyyət | Cədvəl sahibi? |
 |---|---|---|
 | **Auth** | Login, JWT, istifadəçilər/işçilər, rollar, işçi maaş hesabı | `identity.Users`, `identity.SalaryEntries` |
+| **Tenancy** | Mağaza (tenant) reyestri, qeydiyyat, platforma admin konsolu, abunə/ödənişlər | `tenancy.Tenants`, `tenancy.SubscriptionPayments` |
 | **Products** | Məhsul kataloqu, stok, real maya, kateqoriyalar | `products.*` |
 | **Sales** | Satış zənciri (create/update/delete), satış tarixçəsi | `sales.Sales` |
 | **Customers** | Müştərilər, borc, ödənişlər, borc tarixçəsi | `customers.*` |
@@ -29,12 +30,16 @@
 | `IDayEndModule` | DayEnd | Reports (`GetLastClosingAsync` — ExpectedCash lövbəri), Sales (`ClosingExistsAsync` — bağlı gün qoruması) |
 | `ISettingsModule` | Settings | Exports (`GetStoreNameAsync`, `GetStoreInfoAsync`) |
 | `IActivityLogger` | Activity (`DbActivityLogger`) | Bütün yazan handler-lər (Products, Sales, Customers, Suppliers, Expenses, DayEnd) |
+| `ITenantDirectory` | Tenancy | Auth (`LoginHandler` — mağaza girə bilərmi?), host (`TenantGateMiddleware` — hər sorğuda). BE#36-dan sonra `TenantInfo` həm də `ExpiresAt` daşıyır, ona görə abunə yoxlaması əlavə sorğu tələb etmir |
+| `IIdentityProvisioning` | Auth | Tenancy (`PhoneExistsAsync` — qlobal telefon yoxlaması; `AddOwnerAsync` — yeni mağazanın ilk Sahibkarı). Auth ↔ Tenancy hər iki istiqamətdə kontraktla danışır; layihə səviyyəsində sikl yoxdur, çünki hər ikisi yalnız SharedKernel-ə baxır |
 
 Yeni kontrakt metodu əlavə edəndə: interfeys `SharedKernel/Contracts/`-da, implementasiya provider modulun `Application/<Modul>ModuleContract.cs`-ində. Kontrakt metodları dəyişikliyi **save etmir** — caller öz UnitOfWork-ündə commit edir (bax ADR-0003).
 
 Kontrakt record-una sahə əlavə etmək də kontrakt dəyişikliyidir: satışın alış qiyməti snapshot-u üçün `ProductStockSnapshot`-a `PurchasePrice` əlavə olundu (provider: Products, istehlakçı: Sales create/update) — modul sərhədini keçən yeganə yol budur, Sales heç vaxt `products` cədvəlini oxumur.
 
 ## Last Updated
+
+2026-08-16 — BE#36: Tenancy modulu HTTP səthi açdı (`POST /api/auth/register` + `/api/admin/*`) və `tenancy.SubscriptionPayments` cədvəlinin sahibi oldu; yeni `IIdentityProvisioning` kontraktı (provider: Auth, istehlakçı: Tenancy); `TenantInfo`-ya `ExpiresAt` əlavə olundu; `TenancyDbContext` paylaşılan transaction-a enlist olur.
 
 2026-08-01 — BE#28: yeni `ISalaryModule` kontraktı (provider: Auth; istehlakçılar: DayEnd, Reports); Auth modulu `identity.SalaryEntries` cədvəlinin də sahibidir və `AuthDbContext` artıq paylaşılan transaction-a enlist olur.
 

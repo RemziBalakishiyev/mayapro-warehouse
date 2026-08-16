@@ -5,6 +5,7 @@ using MayaPro.WarehouseApi.Modules.Auth.Domain;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.Login;
 
@@ -38,7 +39,9 @@ public sealed class LoginHandler(
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     IValidator<LoginCommand> validator,
-    ITenantDirectory? tenantDirectory = null)
+    ITenantDirectory? tenantDirectory = null,
+    IDateProvider? dateProvider = null,
+    IOptions<PlatformAdminOptions>? platformAdmin = null)
 {
     public async Task<Result<LoginResponse>> Handle(LoginCommand command, CancellationToken ct)
     {
@@ -90,21 +93,56 @@ public sealed class LoginHandler(
     }
 
     /// <summary>
-    /// AC-9: only an <c>Active</c> shop may sign in. A blocked or not-yet-approved shop gets a 403 with a
-    /// clear message and no token. The directory is optional so unit tests that predate multi-tenancy can
-    /// still build the handler with four collaborators; in the host it is always registered.
+    /// AC-9 (BE#35) plus the subscription gate (BE#36): only an <c>Active</c> shop whose paid period has not
+    /// lapsed may sign in, and each refusal says why.
+    /// <list type="table">
+    ///   <item><term>PlatformAdmin</term><description>skipped entirely — the platform operator belongs to no
+    ///   shop, so there is no tenant to approve or bill. Its access is guarded by the
+    ///   <c>PlatformAdminOnly</c> policy on <c>/api/admin/*</c> instead.</description></item>
+    ///   <item><term>PendingApproval</term><description>403 "Hesabınız təsdiq gözləyir".</description></item>
+    ///   <item><term>Blocked</term><description>403 "Abunəliyiniz bitib — əlaqə: {telefon}".</description></item>
+    ///   <item><term>Active but expired</term><description>403, same message, distinct code. The status is
+    ///   <b>not</b> changed: <c>ExpiresAt</c> is the verdict, so recording a payment re-opens the shop with no
+    ///   further bookkeeping.</description></item>
+    ///   <item><term>Unknown tenant</term><description>the old generic "Mağaza aktiv deyil" — we do not
+    ///   explain that state to the caller.</description></item>
+    /// </list>
+    /// The collaborators are optional so unit tests that predate multi-tenancy can still build the handler
+    /// with four arguments; in the host they are always registered.
     /// </summary>
     private async Task<Result> EnsureTenantAllowedAsync(User user, CancellationToken ct)
     {
-        if (tenantDirectory is null)
+        if (tenantDirectory is null || user.Role == UserRole.PlatformAdmin)
             return Result.Success();
 
-        // An unknown tenant id is treated exactly like an inactive one: same 403, same message. It should
-        // not happen, and if it does we are not going to explain the difference to the caller.
         TenantInfo? tenant = await tenantDirectory.FindAsync(user.TenantId, ct);
+        if (tenant is null)
+            return Result.Failure(AuthErrors.TenantInactiveForbidden);
 
-        return tenant is { IsActive: true }
-            ? Result.Success()
-            : Result.Failure(AuthErrors.TenantInactiveForbidden);
+        string? supportPhone = platformAdmin?.Value.Phone;
+
+        if (string.Equals(tenant.Status, nameof(TenantRegistrationStatus.PendingApproval), StringComparison.Ordinal))
+            return Result.Failure(AuthErrors.TenantPendingApprovalForbidden);
+
+        if (!tenant.IsActive)
+            return Result.Failure(AuthErrors.TenantBlockedForbidden(supportPhone));
+
+        // Same check the per-request tenant gate makes, repeated here so no token is ever issued to a shop
+        // that would be refused on its very next call.
+        DateTime now = dateProvider?.UtcNow ?? DateTime.UtcNow;
+        return tenant.IsSubscriptionExpired(now)
+            ? Result.Failure(AuthErrors.SubscriptionExpired(supportPhone))
+            : Result.Success();
+    }
+
+    /// <summary>
+    /// Local mirror of the Tenancy module's <c>TenantStatus</c> names — <see cref="TenantInfo.Status"/> is a
+    /// string precisely so Auth does not take a dependency on another module's enum.
+    /// </summary>
+    private enum TenantRegistrationStatus
+    {
+        PendingApproval,
+        Active,
+        Blocked
     }
 }

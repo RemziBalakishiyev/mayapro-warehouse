@@ -78,6 +78,39 @@ public sealed class TenantQueryFilterCoverageTests
     }
 
     /// <summary>
+    /// The <c>tenancy</c> schema is the one place a business table may legitimately skip the tenant marker,
+    /// and this is the closed list of what may do so. Anything else appearing there is a bug.
+    /// <list type="bullet">
+    ///   <item><b>Tenant</b> — the registry the scoping is defined by; filtering it would make it
+    ///   unreadable before the caller's shop is known (BE#35).</item>
+    ///   <item><b>SubscriptionPayment</b> (BE#36) — a platform-level billing record, not shop data. No shop
+    ///   endpoint reads it, and its only reader (the platform admin) has no tenant context at all, so a
+    ///   filter here would mean "the admin sees nothing" and would force an <c>IgnoreQueryFilters()</c>
+    ///   bypass into the very module that must have none. Its <c>TenantId</c> is therefore a plain Guid
+    ///   column, exactly like <c>Sale.CustomerId</c>.</item>
+    /// </list>
+    /// </summary>
+    [Fact]
+    public void Only_The_Documented_Tenancy_Entities_Escape_The_Tenant_Marker()
+    {
+        string[] unscopedByDesign = [nameof(Tenant), nameof(SubscriptionPayment)];
+
+        IModel model = Model<TenancyDbContext>(o => new TenancyDbContext(o));
+
+        List<string> unscoped = model
+            .GetEntityTypes()
+            .Where(e => !e.IsOwned() && !typeof(ITenantScoped).IsAssignableFrom(e.ClrType))
+            .Select(e => e.ClrType.Name)
+            .ToList();
+
+        Assert.Equal(unscopedByDesign.Order(), unscoped.Order());
+
+        // And the pair really is unfiltered — the marker check above would pass on an empty model too.
+        foreach (string name in unscopedByDesign)
+            Assert.Null(model.GetEntityTypes().Single(e => e.ClrType.Name == name).GetQueryFilter());
+    }
+
+    /// <summary>
     /// Every entity in a module that owns tables is tenant-scoped — there is no "global" business table
     /// hiding outside the mechanism. Guards against someone re-adding one by accident.
     /// </summary>
