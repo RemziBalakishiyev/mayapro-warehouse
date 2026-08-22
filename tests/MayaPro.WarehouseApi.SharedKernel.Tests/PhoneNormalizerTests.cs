@@ -158,4 +158,22 @@ public sealed class PhoneNormalizerTests
         Assert.True(result.IsFailure);
         Assert.Equal("Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)", result.Error.Message);
     }
+
+    /// <summary>
+    /// Reviewer-added — some callers (e.g. <c>CreateCustomerValidator</c>) have no <c>MaximumLength</c> rule
+    /// on <c>Phone</c>, so an attacker-controlled body can hand this an arbitrarily long string. It must be
+    /// refused as an ordinary format error, not crash the process: internally, digit extraction stack-allocates
+    /// a buffer sized to the input, and an unbounded length would mean an unbounded (and eventually
+    /// stack-overflowing) allocation.
+    /// </summary>
+    [Fact]
+    public void An_Excessively_Long_Input_Is_Refused_Without_Crashing()
+    {
+        string huge = new('0', 1_000_000);
+
+        Result<string> result = PhoneNormalizer.Normalize(huge);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)", result.Error.Message);
+    }
 }

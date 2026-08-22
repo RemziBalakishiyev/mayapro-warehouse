@@ -54,6 +54,17 @@ public static class PhoneNormalizer
     private const string CountryCode = "994";
 
     /// <summary>
+    /// Upper bound on the raw input <see cref="TryCanonicalize"/> will even look at. No legitimate phone —
+    /// however generously formatted, e.g. <c>"+994 (50) 123-45-67"</c> at 19 characters — comes anywhere near
+    /// this. It exists because none of the callers (some validators have no <c>MaximumLength</c> rule on
+    /// <c>Phone</c> at all) can be trusted to have already bounded the string, and <see cref="OnlyDigits"/>
+    /// stack-allocates a buffer sized to the input: an unbounded, attacker-supplied <c>phone</c> field would
+    /// otherwise turn into an unbounded <c>stackalloc</c> and a process-crashing <see cref="StackOverflowException"/>.
+    /// Anything longer than this is refused as a format error before that buffer is ever touched.
+    /// </summary>
+    private const int MaxRawLength = 64;
+
+    /// <summary>
     /// Normalizes a <b>required</b> phone. Empty input is a failure with <see cref="EmptyMessage"/>;
     /// unparsable input is a failure with <see cref="InvalidFormatMessage"/>.
     /// </summary>
@@ -94,6 +105,9 @@ public static class PhoneNormalizer
     /// </summary>
     private static string? TryCanonicalize(string raw)
     {
+        if (raw.Length > MaxRawLength)
+            return null;
+
         string digits = OnlyDigits(raw);
 
         return digits.Length switch
