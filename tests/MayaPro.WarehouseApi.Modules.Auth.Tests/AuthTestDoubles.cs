@@ -3,6 +3,7 @@ using MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace MayaPro.WarehouseApi.Modules.Auth.Tests;
 
@@ -72,6 +73,25 @@ internal sealed class FakeDateProvider(DateTime? utcNow = null) : IDateProvider
 
     public (DateTime StartUtc, DateTime EndUtc) LocalDayRangeUtc(DateOnly localDate) =>
         (localDate.ToDateTime(TimeOnly.MinValue), localDate.AddDays(1).ToDateTime(TimeOnly.MinValue));
+}
+
+/// <summary>Captures the log entries a handler/seeder wrote so tests can assert on warnings without a mocking
+/// library, mirroring the Customers module's double of the same name.</summary>
+internal sealed class FakeLogger<T> : ILogger<T>
+{
+    public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(
+        LogLevel logLevel,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter) =>
+        Entries.Add((logLevel, formatter(state, exception)));
 }
 
 internal static class AuthTestDb
