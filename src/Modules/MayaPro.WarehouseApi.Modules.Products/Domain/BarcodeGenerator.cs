@@ -7,6 +7,9 @@ namespace MayaPro.WarehouseApi.Modules.Products.Domain;
 /// </summary>
 public static class BarcodeGenerator
 {
+    // BE#48 — kept as "SDK" (from the original store name "Sədərək") even after the "Anbarcı Az" rebrand
+    // (see MayaPro.WarehouseApi.SharedKernel.Domain.BrandInfo remarks): every barcode already printed and
+    // stuck on physical stock carries this prefix, and changing it would make those labels unreadable.
     private const string Prefix = "SDK";
     private const int DigitCount = 7;
     private const int UpperBoundExclusive = 10_000_000; // 10^7 — keeps exactly 7 digits, zero-padded.

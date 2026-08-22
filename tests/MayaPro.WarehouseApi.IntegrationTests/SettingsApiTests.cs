@@ -23,9 +23,11 @@ public sealed class SettingsApiTests : IAsyncLifetime
     {
         HttpClient client = await _factory.AuthenticatedClientAsync();
 
-        // First read materialises the singleton with defaults.
+        // First read materialises the singleton with defaults. BE#48: the seeded store name is the
+        // tenant's own registration name ("İlk Mağaza" — the seed migration's default tenant), not a fixed
+        // brand placeholder.
         var defaults = (await client.GetFromJsonAsync<IntegrationTestHelpers.SettingsDto>("/api/settings"))!;
-        Assert.Equal("Sədərək Anbar", defaults.StoreName);
+        Assert.Equal("İlk Mağaza", defaults.StoreName);
         Assert.Equal("AZN", defaults.Currency);
         Assert.Equal(10, defaults.DefaultMinStock);
         Assert.Equal("az", defaults.Language);
