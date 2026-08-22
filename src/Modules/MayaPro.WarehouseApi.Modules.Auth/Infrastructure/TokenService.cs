@@ -27,7 +27,7 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
 
     private readonly JwtOptions _options = options.Value;
 
-    public string CreateToken(User user)
+    public string CreateToken(User user, bool rememberMe = false)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -41,12 +41,17 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         ];
 
+        // BE#45: "remember me" swaps the short-lived default for Jwt:RememberMeExpiryDays.
+        DateTime expires = rememberMe
+            ? DateTime.UtcNow.AddDays(_options.RememberMeExpiryDays)
+            : DateTime.UtcNow.AddHours(_options.ExpiryHours);
+
         var token = new JwtSecurityToken(
             issuer: _options.Issuer,
             audience: _options.Audience,
             claims: claims,
             notBefore: DateTime.UtcNow,
-            expires: DateTime.UtcNow.AddHours(_options.ExpiryHours),
+            expires: expires,
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
