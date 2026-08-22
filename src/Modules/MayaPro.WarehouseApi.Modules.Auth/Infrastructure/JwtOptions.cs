@@ -13,4 +13,7 @@ public sealed class JwtOptions
     public string Secret { get; init; } = string.Empty;
 
     public int ExpiryHours { get; init; } = 24;
+
+    /// <summary>BE#45 — token lifetime used when the caller opted into "remember me" at login.</summary>
+    public int RememberMeExpiryDays { get; init; } = 30;
 }

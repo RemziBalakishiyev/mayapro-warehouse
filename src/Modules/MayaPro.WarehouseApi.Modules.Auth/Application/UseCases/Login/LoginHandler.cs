@@ -86,7 +86,7 @@ public sealed class LoginHandler(
         if (tenantCheck.IsFailure)
             return Result.Failure<LoginResponse>(tenantCheck.Error);
 
-        string token = tokenService.CreateToken(user);
+        string token = tokenService.CreateToken(user, command.RememberMe);
         var dto = new UserDto(user.Id, user.FullName, user.Phone, user.Role.ToCode());
 
         return Result.Success(new LoginResponse(token, dto));
