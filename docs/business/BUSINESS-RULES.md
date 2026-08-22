@@ -89,6 +89,19 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Kassa təsiri: **yalnız ödənişlər** gün sonu xərc cəminə (`ExpectedCash` düsturunun `Expenses` hissəsinə) və dashboard-un `todayExpenses`/`expectedCash` göstəricilərinə düşür — `date` üzrə, Bakı günü ilə. Tutulmalar heç bir kassa rəqəminə TOXUNMUR.
 - Bütün işçilərin maaş siyahısı hazırda hər autentifikasiya olunmuş rola açıqdır (`GET /api/employees`) — maskalanma ayrıca task mövzusudur.
 
+## Telefon nömrəsi qaydaları (BE#46)
+
+Sistemdəki HƏR telefon **kanonik formada** saxlanılır: 12 rəqəm, `994` ilə başlayır, boşluq/işarə yoxdur (`994501234567`). Tək mənbə: `PhoneNormalizer` (SharedKernel).
+
+- Çevrilmə: bütün qeyri-rəqəm simvollar atılır (yalnız ASCII `0-9` rəqəm sayılır) → `0` ilə başlayan **10 rəqəm** isə `0` düşür, əvvələ `994` gəlir → `994` ilə başlayan **12 rəqəm** olduğu kimi qalır → başqa hər hal XƏTAdır.
+- **9 rəqəmli giriş (`501234567`) qəsdən XƏTADIR** — başda olmayan `0`-ı təxmin etmək istifadəçinin yazmadığı nömrəni uydurmaq deməkdir.
+- Xəta mesajı hərfən: «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)» (400, `General.Validation`).
+- **Optional telefon** (`Customer.Phone`, `Supplier.Phone`, `StoreSettings.Phone`, `Tenant.Phone`): boş/null → DB-də `NULL` (boş sətir YOX), xəta yoxdur. Amma dolu, oxunmayan dəyər yenə 400-dür — «optional» «səhv ola bilər» demək deyil.
+- **Məcburi telefon** (`User.Phone`, qeydiyyat/login): boş giriş mövcud «Telefon boş ola bilməz» mesajını saxlayır.
+- **Login istənilən yazılışla işləyir**: giriş nömrəsi normallaşdırılıb axtarılır, ona görə `0501234567`, `050 123 45 67`, `+994 50 123 45 67` və `994501234567` eyni istifadəçini tapır. Ümumiyyətlə oxuna bilməyən nömrə format xətası YOX, mövcud neytral «Telefon və ya şifrə yanlışdır» cavabını alır — iki fərqli mesaj özü «bu nömrə var/yoxdur» siqnalı olardı.
+- **Dublikat yoxlaması kanonik dəyər üzərindədir**: `+994 (50) 123-45-67` ilə qeydiyyat, `994501234567` artıq varsa, 409 `Tenancy.PhoneAlreadyExists` verir. `IX_Users_TenantId_Phone` (mağaza daxilində unikal) da artıq kanonik dəyərləri qoruyur.
+- **Göstərim**: backend kanonik sətri qaytarır (`994501234567`) — gözəl formatlama (məs. `+994 50 123 45 67`) frontend işidir, bu taskın skopunda deyil. WhatsApp/`wa.me` axınları onsuz da yalnız rəqəm saxladığı üçün kanonik dəyərlə dəyişməz işləyir.
+
 ## Digər
 
 - Settings singleton sətirdir (sabit Id), ilk oxunuşda default-larla yaranır.
@@ -97,6 +110,8 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
+
+2026-08-22 — BE#46: telefon nömrəsi qaydaları ayrıca bölmə oldu (kanonik `994XXXXXXXXX` format, tək `PhoneNormalizer` mənbəyi, login-in istənilən yazılışla işləməsi, dublikat yoxlamasının kanonik dəyər üzərində olması).
 
 2026-08-01 — BE#28: işçi maaşı qaydaları ayrıca bölmə oldu (aylıq maaş, ödəniş/tutulma, date≠month, mənfi qalıq, gün sonu təsiri); rol matrisi və gün sonu düsturu yeniləndi.
 

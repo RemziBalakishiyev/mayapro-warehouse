@@ -6,15 +6,21 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 /// <summary>Shared helpers for driving the API in integration tests (login, seed-independent fixtures).</summary>
 internal static class IntegrationTestHelpers
 {
-    public const string OwnerPhone = "0501112233";   // Sahibkar
-    public const string ManagerPhone = "0552223344"; // Menecer
-    public const string SellerPhone = "0553334455";  // Satıcı
+    /// <summary>
+    /// BE#46 — the seeded demo phones in the canonical form the database now holds (the seeder writes
+    /// <c>0501112233</c> through <c>PhoneNormalizer</c>). Kept canonical so a test can compare a DTO's phone
+    /// directly; signing in with the local <c>050…</c> spelling still works and is proved by
+    /// <c>PhoneFormatApiTests</c>.
+    /// </summary>
+    public const string OwnerPhone = "994501112233";   // Sahibkar  — typed as 0501112233
+    public const string ManagerPhone = "994552223344"; // Menecer   — typed as 0552223344
+    public const string SellerPhone = "994553334455";  // Satıcı    — typed as 0553334455
 
     /// <summary>
     /// The second seeded seller (Günel Quliyeva). No other test touches her, so salary tests can assert
     /// exact figures on her row even though the integration database is shared.
     /// </summary>
-    public const string SecondSellerPhone = "0554445566";
+    public const string SecondSellerPhone = "994554445566"; // typed as 0554445566
 
     public const string DemoPassword = "demo123";
 

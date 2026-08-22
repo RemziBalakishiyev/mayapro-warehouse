@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Auth.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Auth.Domain;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,10 +30,10 @@ public sealed class UserSeeder(AuthDbContext db, IPasswordHasher passwordHasher)
 
         User[] users =
         [
-            User.Create("Rəşad Məmmədov", "0501112233", "resad@sederek.az", hash, UserRole.Owner),
-            User.Create("Nigar Əliyeva", "0552223344", "nigar@sederek.az", hash, UserRole.Manager),
-            User.Create("Elvin Hüseynov", "0553334455", "elvin@sederek.az", hash, UserRole.Seller),
-            User.Create("Günel Quliyeva", "0554445566", "gunel@sederek.az", hash, UserRole.Seller)
+            User.Create("Rəşad Məmmədov", Canonical("0501112233"), "resad@sederek.az", hash, UserRole.Owner),
+            User.Create("Nigar Əliyeva", Canonical("0552223344"), "nigar@sederek.az", hash, UserRole.Manager),
+            User.Create("Elvin Hüseynov", Canonical("0553334455"), "elvin@sederek.az", hash, UserRole.Seller),
+            User.Create("Günel Quliyeva", Canonical("0554445566"), "gunel@sederek.az", hash, UserRole.Seller)
         ];
 
         foreach (User user in users)
@@ -41,4 +42,12 @@ public sealed class UserSeeder(AuthDbContext db, IPasswordHasher passwordHasher)
         db.Users.AddRange(users);
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>
+    /// BE#46 — the demo phones are written in the local form a person would type, and stored in the canonical
+    /// one the column now holds (<c>0501112233</c> → <c>994501112233</c>). Routing them through the shared
+    /// normalizer rather than hard-coding the canonical string keeps the seed and the rule from ever drifting
+    /// apart; signing in still works with whichever spelling the developer types.
+    /// </summary>
+    private static string Canonical(string phone) => PhoneNormalizer.Normalize(phone).Value;
 }

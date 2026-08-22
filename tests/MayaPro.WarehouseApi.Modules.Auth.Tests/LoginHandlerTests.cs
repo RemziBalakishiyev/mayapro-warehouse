@@ -10,7 +10,12 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Tests;
 public sealed class LoginHandlerTests
 {
     private const string CorrectPassword = "demo123";
+
+    /// <summary>The owner's phone as a person types it.</summary>
     private const string OwnerPhone = "0501112233";
+
+    /// <summary>BE#46 — the same number as <c>identity.Users.Phone</c> stores it.</summary>
+    private const string OwnerPhoneCanonical = "994501112233";
 
     [Fact]
     public async Task Login_With_Correct_Password_Returns_Token()
@@ -22,8 +27,78 @@ public sealed class LoginHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.False(string.IsNullOrWhiteSpace(result.Value.Token));
-        Assert.Equal(OwnerPhone, result.Value.User.Phone);
+        Assert.Equal(OwnerPhoneCanonical, result.Value.User.Phone);
         Assert.Equal(RoleCode.Owner, result.Value.User.Role);
+    }
+
+    /// <summary>
+    /// BE#46, TC-24/TC-25 — the row is stored canonically, and the person signing in may type the number any
+    /// way they like. This is the whole point of normalizing on the way in: a shop that registered years ago
+    /// as <c>0501112233</c> keeps working when its owner types <c>+994 50 111 22 33</c>.
+    /// </summary>
+    [Theory]
+    [InlineData("0501112233")]
+    [InlineData("050 111 22 33")]
+    [InlineData("+994 50 111 22 33")]
+    [InlineData("994501112233")]
+    [InlineData("(050) 111-22-33")]
+    public async Task Any_Spelling_Of_The_Stored_Number_Signs_In(string typed)
+    {
+        await using AuthDbContext db = await CreateDbWithOwnerAsync(isActive: true);
+        LoginHandler handler = CreateHandler(db);
+
+        var result = await handler.Handle(new LoginCommand(typed, CorrectPassword), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(OwnerPhoneCanonical, result.Value.User.Phone);
+    }
+
+    /// <summary>
+    /// BE#46, TC-26 — a phone that is not a phone gets the ordinary "wrong credentials" refusal, not a format
+    /// complaint. Answering differently would tell an attacker which strings are even worth trying.
+    /// </summary>
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("501112233")]
+    [InlineData("abc")]
+    public async Task An_Unparsable_Phone_Gets_The_Neutral_Refusal_Not_A_Format_Error(string typed)
+    {
+        await using AuthDbContext db = await CreateDbWithOwnerAsync(isActive: true);
+        LoginHandler handler = CreateHandler(db);
+
+        var result = await handler.Handle(new LoginCommand(typed, CorrectPassword), default);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AuthErrors.InvalidCredentials, result.Error);
+    }
+
+    /// <summary>BE#46, TC-27 — an empty phone keeps its own, pre-existing validation message.</summary>
+    [Fact]
+    public async Task An_Empty_Phone_Still_Says_So()
+    {
+        await using AuthDbContext db = await CreateDbWithOwnerAsync(isActive: true);
+        LoginHandler handler = CreateHandler(db);
+
+        var result = await handler.Handle(new LoginCommand("", CorrectPassword), default);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Telefon boş ola bilməz", result.Error.Message);
+    }
+
+    /// <summary>
+    /// BE#46, TC-28 — normalizing does not disturb BE#35: a deactivated account is still told it is
+    /// deactivated, whichever spelling was typed.
+    /// </summary>
+    [Fact]
+    public async Task A_Deactivated_Account_Still_Says_So_When_The_Old_Format_Is_Typed()
+    {
+        await using AuthDbContext db = await CreateDbWithOwnerAsync(isActive: false);
+        LoginHandler handler = CreateHandler(db);
+
+        var result = await handler.Handle(new LoginCommand("050 111 22 33", CorrectPassword), default);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AuthErrors.UserInactive, result.Error);
     }
 
     [Fact]
@@ -105,7 +180,7 @@ public sealed class LoginHandlerTests
 
         var db = new AuthDbContext(options);
         string hash = Hasher.Hash(CorrectPassword);
-        db.Users.Add(User.Create("Rəşad Məmmədov", OwnerPhone, null, hash, UserRole.Owner, isActive));
+        db.Users.Add(User.Create("Rəşad Məmmədov", OwnerPhoneCanonical, null, hash, UserRole.Owner, isActive));
         await db.SaveChangesAsync();
         return db;
     }

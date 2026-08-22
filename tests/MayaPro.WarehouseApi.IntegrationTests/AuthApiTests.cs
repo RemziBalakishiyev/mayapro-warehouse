@@ -11,7 +11,12 @@ namespace MayaPro.WarehouseApi.IntegrationTests;
 [Collection(ApiCollection.Name)]
 public sealed class AuthApiTests : IAsyncLifetime
 {
+    /// <summary>The owner's phone as a person types it — the local form, not the stored one.</summary>
     private const string OwnerPhone = "0501112233";
+
+    /// <summary>BE#46 — the same number as the database (and therefore every DTO) now holds it.</summary>
+    private const string OwnerPhoneCanonical = "994501112233";
+
     private const string DemoPassword = "demo123";
 
     private readonly WarehouseApiFactory _factory;
@@ -50,7 +55,8 @@ public sealed class AuthApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, meResponse.StatusCode);
         UserDto? me = await meResponse.Content.ReadFromJsonAsync<UserDto>();
         Assert.NotNull(me);
-        Assert.Equal(OwnerPhone, me!.Phone);
+        // Signed in with the local spelling; the profile answers with the canonical one.
+        Assert.Equal(OwnerPhoneCanonical, me!.Phone);
         Assert.Equal("sahib", me.Role);
     }
 

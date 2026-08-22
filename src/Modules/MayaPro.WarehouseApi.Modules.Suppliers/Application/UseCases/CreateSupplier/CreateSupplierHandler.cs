@@ -25,7 +25,12 @@ public sealed class CreateSupplierHandler(
         if (!validation.IsValid)
             return Result.Failure<SupplierDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
-        var supplier = Supplier.Create(command.Name, command.ContactName, command.Phone, command.Note, command.Debt);
+        // BE#46 — optional phone: blank stays NULL, present-but-unparsable is a 400 before anything is written.
+        Result<string?> phone = PhoneNormalizer.NormalizeOptional(command.Phone);
+        if (phone.IsFailure)
+            return Result.Failure<SupplierDto>(phone.Error);
+
+        var supplier = Supplier.Create(command.Name, command.ContactName, phone.Value, command.Note, command.Debt);
 
         // One transaction so the supplier, its opening-balance adjustment and the activity log commit together.
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);

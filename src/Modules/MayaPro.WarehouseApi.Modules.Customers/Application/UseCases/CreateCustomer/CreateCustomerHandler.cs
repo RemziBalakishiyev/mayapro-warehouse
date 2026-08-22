@@ -25,7 +25,14 @@ public sealed class CreateCustomerHandler(
         if (!validation.IsValid)
             return Result.Failure<CustomerDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
-        var customer = Customer.Create(command.Name, command.Phone, command.Note, command.InitialDebt);
+        // BE#46 — the phone is optional, so a blank one is fine and lands as NULL; a phone that is present but
+        // unparsable is a 400 before anything is written. Stored canonically, it is what the WhatsApp debt
+        // reminder turns into a wa.me link without any further cleaning.
+        Result<string?> phone = PhoneNormalizer.NormalizeOptional(command.Phone);
+        if (phone.IsFailure)
+            return Result.Failure<CustomerDto>(phone.Error);
+
+        var customer = Customer.Create(command.Name, phone.Value, command.Note, command.InitialDebt);
 
         // One transaction so the customer, its opening-balance adjustment and the activity log commit together.
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);

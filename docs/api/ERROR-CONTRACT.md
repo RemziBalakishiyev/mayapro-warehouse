@@ -51,7 +51,9 @@ Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location 
   | abunə müddəti keçib (status hələ `Active`) | 403 | `SubscriptionExpired` | «Abunəliyiniz bitib — əlaqə: {admin telefonu}» |
 
   Admin telefonu `PlatformAdmin:Phone` konfiqurasiyasındandır; təyin olunmayıbsa mesaj «Abunəliyiniz bitib — dəstək ilə əlaqə saxlayın» olur. `PlatformAdmin` rolu ilə gələn token qapıdan keçir (heç bir mağazaya aid deyil). Detallar: [`multi-tenancy.md`](../multi-tenancy.md)
-- **BE#36 — Tenancy**: `Tenancy.PhoneAlreadyExists` → 409 («Bu telefon nömrəsi artıq qeydiyyatdadır», qeydiyyat qlobal telefon yoxlaması) · `Tenancy.TenantNotFound` → 404 («Mağaza tapılmadı»)
+- **BE#36 — Tenancy**: `Tenancy.PhoneAlreadyExists` → 409 («Bu telefon nömrəsi artıq qeydiyyatdadır», qeydiyyat qlobal telefon yoxlaması; BE#46-dan sonra müqayisə **kanonik** dəyər üzərindədir — `+994 (50) 123-45-67` mövcud `994501234567`-ni tapır) · `Tenancy.TenantNotFound` → 404 («Mağaza tapılmadı»)
+- **BE#46 — telefon formatı**: `General.Validation` → **400**, mesaj hərfən «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)». Telefon qəbul edən HƏR endpoint-dən gələ bilər: `POST`/`PUT /api/customers`, `POST`/`PUT /api/suppliers`, `PUT /api/settings`, `POST /api/auth/register`, `POST /api/admin/tenants`. Qəbul edilən yazılışlar: `994XXXXXXXXX`, `0XXXXXXXXX` və bunların boşluq/`+`/`-`/`(`/`)`/`.` ilə yazılmış variantları; **9 rəqəmli `501234567` qəsdən rədd olunur**. Boş optional telefon xəta DEYİL (`NULL` yazılır); boş məcburi telefon köhnə «Telefon boş ola bilməz» mesajını saxlayır.
+  **`POST /api/auth/login` istisnadır**: oxuna bilməyən nömrə format mesajını YOX, mövcud neytral `Auth.InvalidCredentials` → «Telefon və ya şifrə yanlışdır» cavabını alır — iki fərqli mesaj «bu nömrə mövcuddur/yoxdur» siqnalı olardı. Boş telefon yenə 400 «Telefon boş ola bilməz».
 
 ## Gözlənilməz xətalar
 
@@ -62,6 +64,8 @@ Uğur: `ToHttpResult()` → 200; `ToCreatedResult(location)` → 201 + Location 
 Hər modulun `Domain/<Modul>Errors.cs` faylı var (məs. `SaleErrors`, `CustomerErrors`, `ProductErrors`) — mövcud kodların siyahısı üçün həmin fayllara bax.
 
 ## Last Updated
+
+2026-08-22 — BE#46: telefon formatı xətası (`General.Validation`, 400, «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)») bütün telefon qəbul edən endpoint-lərə əlavə olundu; login-də format xətası neytral `Auth.InvalidCredentials` ilə örtülür; `Tenancy.PhoneAlreadyExists` müqayisəsi kanonik dəyər üzərindədir.
 
 2026-08-16 — BE#41: abunə müddəti keçmiş mağazanın kodu `Auth.SubscriptionExpiredForbidden` → **`SubscriptionExpired`** (spesifikasiyada dondurulmuş sətir); suffiks konvensiyasından qəsdən kənarda qalan yeganə kod, 403-ü adı ilə xəritələnir.
 

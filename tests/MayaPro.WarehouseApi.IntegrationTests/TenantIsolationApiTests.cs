@@ -716,5 +716,10 @@ internal static class TenantPhones
 {
     private static int _sequence;
 
-    public static string Next() => $"07{Interlocked.Increment(ref _sequence):D8}";
+    /// <summary>
+    /// BE#46 — minted directly in the canonical <c>994…</c> form, so a test can compare the number it
+    /// registered with the number the API hands back without normalizing at every assertion. Registering with
+    /// a local <c>07…</c> spelling is covered by the dedicated login/format tests instead.
+    /// </summary>
+    public static string Next() => $"9947{Interlocked.Increment(ref _sequence):D8}";
 }
