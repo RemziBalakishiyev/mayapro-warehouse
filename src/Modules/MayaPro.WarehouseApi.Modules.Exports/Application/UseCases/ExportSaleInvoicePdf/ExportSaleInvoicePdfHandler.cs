@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
+using MayaPro.WarehouseApi.SharedKernel.Domain;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -196,7 +197,7 @@ public sealed class ExportSaleInvoicePdfHandler(
         container.Column(col =>
         {
             col.Item().AlignCenter().Text("Təşəkkür edirik!").FontSize(10);
-            col.Item().AlignCenter().Text("MayaPro sistemi ilə hazırlanıb").FontSize(7).FontColor(Colors.Grey.Medium);
+            col.Item().AlignCenter().Text($"{BrandInfo.Name} sistemi ilə hazırlanıb").FontSize(7).FontColor(Colors.Grey.Medium);
         });
     }
 

@@ -12,6 +12,12 @@ namespace MayaPro.WarehouseApi.Modules.Settings.Domain;
 /// tenant from ever accumulating two. The legacy fixed id survives only as
 /// <see cref="LegacySingletonId"/>, which the data migration reuses for the default tenant's row.
 /// </para>
+/// <para>
+/// BE#48: there is no fixed default store name anymore. <see cref="CreateDefault"/> takes the name to seed
+/// the first-ever row with — callers pass the tenant's own registration name (see
+/// <c>StoreNameSeed</c>/<c>ITenantDirectory</c>) rather than a hard-coded placeholder, so a brand-new shop
+/// sees its own name on first read.
+/// </para>
 /// </summary>
 public sealed class StoreSettings : TenantEntity
 {
@@ -21,7 +27,6 @@ public sealed class StoreSettings : TenantEntity
     /// </summary>
     public static readonly Guid LegacySingletonId = new("11111111-1111-1111-1111-111111111111");
 
-    public const string DefaultStoreName = "Sədərək Anbar";
     public const string DefaultCurrency = "AZN";
     public const string DefaultLanguage = "az";
     public const int DefaultMinStockValue = 10;
@@ -53,7 +58,7 @@ public sealed class StoreSettings : TenantEntity
         Language = language;
     }
 
-    public string StoreName { get; private set; } = DefaultStoreName;
+    public string StoreName { get; private set; } = string.Empty;
 
     public string? OwnerName { get; private set; }
 
@@ -72,9 +77,13 @@ public sealed class StoreSettings : TenantEntity
 
     public string Language { get; private set; } = DefaultLanguage;
 
-    /// <summary>Builds a tenant's settings row with default values, used on its first access.</summary>
-    public static StoreSettings CreateDefault() =>
-        new(DefaultStoreName, null, DefaultWhatsappTemplate, DefaultCurrency, DefaultMinStockValue, DefaultLanguage);
+    /// <summary>
+    /// Builds a tenant's settings row with default values, used on its first access.
+    /// <paramref name="storeName"/> is the name to seed the row with — the tenant's own registration name
+    /// in practice, never a fixed brand placeholder (BE#48).
+    /// </summary>
+    public static StoreSettings CreateDefault(string storeName) =>
+        new(storeName, null, DefaultWhatsappTemplate, DefaultCurrency, DefaultMinStockValue, DefaultLanguage);
 
     public void Update(
         string storeName,

@@ -31,7 +31,9 @@ public sealed class UpdateSettingsHandler(
         StoreSettings? settings = await db.StoreSettings.FirstOrDefaultAsync(ct);
         if (settings is null)
         {
-            settings = StoreSettings.CreateDefault();
+            // The row is about to be overwritten by Update() below with the caller's own StoreName, so the
+            // seed value here never surfaces — passing it straight through avoids a needless tenant lookup.
+            settings = StoreSettings.CreateDefault(command.StoreName);
             db.StoreSettings.Add(settings);
         }
 
