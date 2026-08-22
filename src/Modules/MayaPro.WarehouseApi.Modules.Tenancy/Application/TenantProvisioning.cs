@@ -42,7 +42,15 @@ public sealed class TenantProvisioning(
         decimal monthlyFee,
         CancellationToken ct)
     {
-        string normalizedPhone = phone.Trim();
+        // BE#46 — canonical before anything else. Both the duplicate check below and the two rows written
+        // afterwards use the same 994XXXXXXXXX string, so a shop registered as "+994 50 123 45 67" and one
+        // registered as "0501234567" collide here, at registration, instead of becoming two accounts that
+        // then fight over the same login.
+        Result<string> normalized = PhoneNormalizer.Normalize(phone);
+        if (normalized.IsFailure)
+            return Result.Failure<Tenant>(normalized.Error);
+
+        string normalizedPhone = normalized.Value;
 
         // Global, across every shop — see IIdentityProvisioning.PhoneExistsAsync for why it has to be.
         if (await identity.PhoneExistsAsync(normalizedPhone, ct))

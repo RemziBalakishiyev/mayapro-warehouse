@@ -25,13 +25,19 @@ public sealed class UpdateCustomerHandler(
         if (!validation.IsValid)
             return Result.Failure<CustomerDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
+        // BE#46 — canonical or refused, checked before the row is loaded so a bad phone cannot leave the
+        // existing value half-edited.
+        Result<string?> phone = PhoneNormalizer.NormalizeOptional(command.Phone);
+        if (phone.IsFailure)
+            return Result.Failure<CustomerDto>(phone.Error);
+
         Customer? customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == command.Id, ct);
         if (customer is null)
             return Result.Failure<CustomerDto>(CustomerErrors.NotFound);
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
-        customer.Update(command.Name, command.Phone, command.Note);
+        customer.Update(command.Name, phone.Value, command.Note);
 
         await activityLogger.LogAsync("Müştərini düzəltdi", customer.Name, currentUser.UserId, ct);
 

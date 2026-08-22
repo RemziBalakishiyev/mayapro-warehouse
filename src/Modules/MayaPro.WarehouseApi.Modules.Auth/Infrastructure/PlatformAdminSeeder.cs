@@ -43,9 +43,15 @@ public sealed class PlatformAdminSeeder(
         if (exists)
             return;
 
+        // BE#46 — the configured phone is stored canonically, so the admin can sign in typing it any way they
+        // like. A configured value that cannot be canonicalized is seeded verbatim rather than crashing every
+        // boot: a mistyped operator phone should not take a whole installation offline, and login will simply
+        // never match it — which is visible, fixable and strictly better than a start-up loop.
+        Result<string> canonicalPhone = PhoneNormalizer.Normalize(settings.Phone);
+
         User admin = User.Create(
             settings.FullName,
-            settings.Phone.Trim(),
+            canonicalPhone.IsSuccess ? canonicalPhone.Value : settings.Phone.Trim(),
             email: null,
             passwordHasher.Hash(settings.Password),
             UserRole.PlatformAdmin);

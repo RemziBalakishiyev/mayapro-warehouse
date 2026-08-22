@@ -25,6 +25,8 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 Qeydiyyatdan sonrakı login cavabları: `PendingApproval` → 403 `Auth.TenantPendingApprovalForbidden` «Hesabınız təsdiq gözləyir»; `Blocked` → 403 `Auth.TenantBlockedForbidden` «Abunəliyiniz bitib — əlaqə: {admin telefonu}»; abunə müddəti keçib → 403 `SubscriptionExpired` (eyni mesaj; prefikssiz ad qəsdəndir — `ERROR-CONTRACT.md`).
 
+**Telefon formatı (BE#46).** Telefon qəbul edən hər endpoint girişi **kanonik** `994XXXXXXXXX` formasına salır və o formada saxlayır: `POST`/`PUT /api/customers`, `POST`/`PUT /api/suppliers`, `PUT /api/settings`, `POST /api/auth/register`, `POST /api/admin/tenants`. Qəbul edilən yazılışlar `994…` (12 rəqəm) və `0…` (10 rəqəm) ilə onların `+`/boşluq/`-`/`(`/`)` variantlarıdır; başqa hər hal → 400 «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)». **Cavab DTO-ları da kanonik dəyəri qaytarır** (`customerDto.phone`, `supplierDto.phone`, `userDto.phone`, `settingsDto.phone`, tenant sətirləri) — sahə adları/tipləri dəyişməyib, yalnız məzmun bir formaya gəldi. `POST /api/auth/login` girişi eyni qayda ilə normallaşdırıb axtarır, ona görə köhnə formatda yazılmış nömrə ilə giriş işləyir; oxuna bilməyən nömrə format xətası yox, neytral «Telefon və ya şifrə yanlışdır» alır. Qaydanın tam mətni: `docs/business/BUSINESS-RULES.md` → «Telefon nömrəsi qaydaları».
+
 **Maaş sistemi (BE#28).** `GET /api/employees` cavabına additiv `monthlySalary` sahəsi əlavə olundu (təyin edilməyibsə `0`, heç vaxt null); mövcud sahələr dəyişməyib.
 
 `type` dondurulmuş wire dəyəridir: `"payment"` (maaş/avans ödənişi — kassadan real pul çıxır) və ya `"deduction"` (yemək/yol/cərimə — yalnız işçinin hesabından tutulur, kassaya TOXUNMUR). `month` `yyyy-MM` formatındadır və göndərilmirsə cari Bakı ayı (ADR-0005) götürülür. Sətrin `date` sahəsi (pulun çıxdığı an) və `month` sahəsi (hansı ayın hesabına) AYRIDIR: keçən ayın maaşını bu gün ödəmək `date = bu gün`, `month = keçən ay` deməkdir — gün sonu/dashboard `date`-ə, maaş xülasəsi `month`-a baxır.
@@ -152,6 +154,8 @@ Validasiya: `periodMonths` 1–120 arası (kənar → 400), `amount` > 0 və ≤
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-08-22 — BE#46: telefon qəbul edən bütün endpoint-lər girişi kanonik `994XXXXXXXXX` formasına salır və cavab DTO-ları da o formada qaytarır (sahə adları/tipləri dəyişməyib); yeni 400 mesajı «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)»; login istənilən yazılışla işləyir.
 
 2026-08-16 — BE#40/41/42 (BE#36 QA düzəlişləri): admin axtarışı registrdən asılı deyil (`az-Latn-AZ` `'I'` problemi); abunə kodu `SubscriptionExpired`; sorğu sahəsi `months` → `periodMonths`, stats sahəsi `thisMonthCollected` → `collectedThisMonth` (alias yoxdur).
 

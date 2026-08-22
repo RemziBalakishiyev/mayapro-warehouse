@@ -50,10 +50,25 @@ public sealed class LoginHandler(
             return Result.Failure<LoginResponse>(
                 Error.Validation(validation.Errors[0].ErrorMessage));
 
+        // BE#46 — look the user up by the canonical phone, because that is what the column now holds. This is
+        // what lets somebody who registered as "0501234567" sign in typing "+994 50 123 45 67" (or any other
+        // spelling of the same number) and land in their own shop.
+        //
+        // A number that cannot be canonicalized at all is NOT reported as a format error: doing so would
+        // answer a different message for "not a phone" than for "a phone nobody has", and an attacker reads
+        // that difference as a hint about which numbers exist. The neutral refusal is the same one an unknown
+        // phone gets. (An empty phone still gets its own 400 — the validator above caught it, and "you left
+        // the field blank" tells nobody anything about the database.)
+        Result<string> canonicalPhone = PhoneNormalizer.Normalize(command.Phone);
+        if (canonicalPhone.IsFailure)
+            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
+
+        string phone = canonicalPhone.Value;
+
         // See the type remarks: the tenant filter is bypassed here on purpose — login has no tenant yet.
         List<User> candidates = await db.Users
             .IgnoreQueryFilters()
-            .Where(u => u.Phone == command.Phone)
+            .Where(u => u.Phone == phone)
             .ToListAsync(ct);
 
         if (candidates.Count == 0)

@@ -618,7 +618,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
     {
         var me = (await _admin.GetFromJsonAsync<MeDto>("/api/auth/me"))!;
 
-        Assert.Equal(WarehouseApiFactory.PlatformAdminPhone, me.Phone);
+        Assert.Equal(WarehouseApiFactory.PlatformAdminCanonicalPhone, me.Phone);
         Assert.Equal("platform_admin", me.Role);
         Assert.Equal(WarehouseApiFactory.PlatformAdminName, me.FullName);
     }
@@ -633,7 +633,7 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         using HttpClient again = await _factory.PlatformAdminClientAsync();
         var me = (await again.GetFromJsonAsync<MeDto>("/api/auth/me"))!;
 
-        Assert.Equal(WarehouseApiFactory.PlatformAdminPhone, me.Phone);
+        Assert.Equal(WarehouseApiFactory.PlatformAdminCanonicalPhone, me.Phone);
     }
 
     // --- Helpers ----------------------------------------------------------------------------------

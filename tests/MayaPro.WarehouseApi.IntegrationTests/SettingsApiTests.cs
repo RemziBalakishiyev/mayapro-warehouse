@@ -54,7 +54,8 @@ public sealed class SettingsApiTests : IAsyncLifetime
         Assert.Equal("Yeni Mağaza", updated.StoreName);
         Assert.Equal("Rəşad", updated.OwnerName);
         Assert.Equal("Sədərək TM, sıra 12, mağaza 34", updated.Address);
-        Assert.Equal("0501234567", updated.Phone);
+        // BE#46 — sent as "0501234567", stored and returned canonically.
+        Assert.Equal("994501234567", updated.Phone);
         Assert.Equal(25, updated.DefaultMinStock);
 
         // The change is persisted (still a single row — read reflects the update).
@@ -63,7 +64,7 @@ public sealed class SettingsApiTests : IAsyncLifetime
         Assert.Equal("USD", reread.Currency);
         Assert.Equal("en", reread.Language);
         Assert.Equal("Sədərək TM, sıra 12, mağaza 34", reread.Address);
-        Assert.Equal("0501234567", reread.Phone);
+        Assert.Equal("994501234567", reread.Phone);
     }
 
     [Fact]

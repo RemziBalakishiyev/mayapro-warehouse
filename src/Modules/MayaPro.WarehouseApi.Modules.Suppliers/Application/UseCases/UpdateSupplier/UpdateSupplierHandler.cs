@@ -25,13 +25,18 @@ public sealed class UpdateSupplierHandler(
         if (!validation.IsValid)
             return Result.Failure<SupplierDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
+        // BE#46 — canonical or refused, before the row is loaded.
+        Result<string?> phone = PhoneNormalizer.NormalizeOptional(command.Phone);
+        if (phone.IsFailure)
+            return Result.Failure<SupplierDto>(phone.Error);
+
         Supplier? supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == command.Id, ct);
         if (supplier is null)
             return Result.Failure<SupplierDto>(SupplierErrors.NotFound);
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
-        supplier.Update(command.Name, command.ContactName, command.Phone, command.Note);
+        supplier.Update(command.Name, command.ContactName, phone.Value, command.Note);
 
         await activityLogger.LogAsync("Təchizatçını düzəltdi", supplier.Name, currentUser.UserId, ct);
 

@@ -21,6 +21,13 @@ public sealed class UpdateSettingsHandler(
         if (!validation.IsValid)
             return Result.Failure<SettingsDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
+        // BE#46 — the store phone printed on invoice headers is stored canonically like every other phone.
+        // Checked before the settings row is created, so a bad phone never leaves a half-written default row
+        // behind on the very first save.
+        Result<string?> phone = PhoneNormalizer.NormalizeOptional(command.Phone);
+        if (phone.IsFailure)
+            return Result.Failure<SettingsDto>(phone.Error);
+
         StoreSettings? settings = await db.StoreSettings.FirstOrDefaultAsync(ct);
         if (settings is null)
         {
@@ -32,7 +39,7 @@ public sealed class UpdateSettingsHandler(
             command.StoreName,
             command.OwnerName,
             command.Address,
-            command.Phone,
+            phone.Value,
             command.WhatsappTemplate,
             command.Currency,
             command.DefaultMinStock,

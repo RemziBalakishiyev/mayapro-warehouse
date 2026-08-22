@@ -2,6 +2,7 @@ using MayaPro.WarehouseApi.Modules.Auth.Domain;
 using MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
 using MayaPro.WarehouseApi.Modules.Tenancy.Domain;
 using MayaPro.WarehouseApi.Modules.Tenancy.Infrastructure;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,7 +36,11 @@ internal static class TenantTestFixture
 
         await using (TenancyDbContext tenancy = NewContext<TenancyDbContext>(o => new TenancyDbContext(o)))
         {
-            tenancy.Tenants.Add(Tenant.CreateWithId(tenantId, storeName, ownerName, ownerPhone, status));
+            // BE#46 — the fixture writes rows the registration flow would otherwise write, so it must store
+            // the phone the same way that flow does: canonically. Tests keep passing whatever spelling reads
+            // best; login normalizes the value they type, so both ends still meet.
+            tenancy.Tenants.Add(Tenant.CreateWithId(
+                tenantId, storeName, ownerName, Canonical(ownerPhone), status));
             await tenancy.SaveChangesAsync();
         }
 
@@ -77,7 +82,8 @@ internal static class TenantTestFixture
     {
         await using AuthDbContext auth = NewContext<AuthDbContext>(o => new AuthDbContext(o));
 
-        User user = User.Create(fullName, phone, null, new BCryptPasswordHasher().Hash(password), role);
+        User user = User.Create(
+            fullName, Canonical(phone), null, new BCryptPasswordHasher().Hash(password), role);
         user.AssignTenant(tenantId);
         auth.Users.Add(user);
         await auth.SaveChangesAsync();
@@ -119,6 +125,9 @@ internal static class TenantTestFixture
         await using TContext context = NewContext(factory);
         return await query(context);
     }
+
+    /// <summary>BE#46 — the one rule for how a phone is stored, borrowed from production.</summary>
+    private static string Canonical(string phone) => PhoneNormalizer.Normalize(phone).Value;
 
     private static TContext NewContext<TContext>(Func<DbContextOptions<TContext>, TContext> factory)
         where TContext : DbContext

@@ -25,6 +25,13 @@ public sealed class WarehouseApiFactory : WebApplicationFactory<Program>
     /// </summary>
     public const string PlatformAdminPhone = "0509999999";
 
+    /// <summary>
+    /// BE#46 — what the seeder actually stores for <see cref="PlatformAdminPhone"/>. The configured value
+    /// keeps its local spelling on purpose: it proves the seeder canonicalizes, and it is still the string
+    /// the "əlaqə: …" support message quotes, because that one comes straight from configuration.
+    /// </summary>
+    public const string PlatformAdminCanonicalPhone = "994509999999";
+
     public const string PlatformAdminPassword = "platform-admin-test-pass";
 
     public const string PlatformAdminName = "Platforma Admini";

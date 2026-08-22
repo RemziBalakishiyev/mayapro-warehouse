@@ -1,5 +1,6 @@
 using MayaPro.WarehouseApi.Modules.Auth.Application.Abstractions;
 using MayaPro.WarehouseApi.Modules.Auth.Domain;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Contracts;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,7 +28,13 @@ internal sealed class IdentityProvisioningContract(IAuthDbContext db, IPasswordH
 {
     public async Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken = default)
     {
-        string normalized = phone.Trim();
+        // BE#46 — ask the question in the canonical form the column is stored in, otherwise "+994 50 123 45 67"
+        // would look free while "994501234567" already owns that login. Callers normalize first; this repeats
+        // it because the contract is public and "is this phone taken?" must not depend on who asks. An input
+        // that cannot be canonicalized is compared verbatim: it can match no stored row, which is the truthful
+        // answer, and refusing it is the caller's job (they return the format error before ever getting here).
+        Result<string> canonical = PhoneNormalizer.Normalize(phone);
+        string normalized = canonical.IsSuccess ? canonical.Value : phone.Trim();
 
         return await db.Users
             .IgnoreQueryFilters()
@@ -41,7 +48,13 @@ internal sealed class IdentityProvisioningContract(IAuthDbContext db, IPasswordH
         string password,
         CancellationToken cancellationToken = default)
     {
-        User owner = User.Create(fullName, phone, null, passwordHasher.Hash(password), UserRole.Owner);
+        // BE#46 — the login identifier goes in canonically or not at all. The caller already normalized, so
+        // the fallback is unreachable in practice; keeping it means a future caller cannot silently write a
+        // row that login would then never find.
+        Result<string> canonical = PhoneNormalizer.Normalize(phone);
+        string normalizedPhone = canonical.IsSuccess ? canonical.Value : phone.Trim();
+
+        User owner = User.Create(fullName, normalizedPhone, null, passwordHasher.Hash(password), UserRole.Owner);
         owner.AssignTenant(tenantId);
 
         db.Users.Add(owner);
