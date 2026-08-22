@@ -51,11 +51,26 @@ public sealed class GetTenantsHandler(TenancyDbContext db, IDateProvider datePro
             // The fix is to stop translating case at all: LIKE resolves case (and accents) through the
             // column's collation, which is case-insensitive, so the same term matches in any register
             // without a culture ever entering the picture.
-            string pattern = $"%{EscapeLikePattern(query.Search.Trim())}%";
+            string term = query.Search.Trim();
+            string pattern = $"%{EscapeLikePattern(term)}%";
+
+            // BE#51 — since BE#46, Phone is stored canonically (994501234567), so an admin typing the
+            // number the way a human would (0501234567, +994 50 123 45 67, 050 123-45-67, …) never
+            // matches the raw LIKE above. PhoneNormalizer knows every shape a *complete* phone can take,
+            // so if the term canonicalizes we also match on the exact canonical value.
+            //
+            // A term that is not a full phone number — a name/e-mail that happens to contain digits, or a
+            // deliberate partial fragment such as "5012345" — fails to canonicalize (wrong digit count) and
+            // simply falls through to the LIKE fallback below, exactly as before this fix.
+            string? canonicalPhone = PhoneNormalizer.Normalize(term) is { IsSuccess: true } normalized
+                ? normalized.Value
+                : null;
+
             tenants = tenants.Where(t =>
                 EF.Functions.Like(t.Name, pattern, LikeEscape) ||
                 (t.OwnerName != null && EF.Functions.Like(t.OwnerName, pattern, LikeEscape)) ||
-                (t.Phone != null && EF.Functions.Like(t.Phone, pattern, LikeEscape)));
+                (t.Phone != null && (EF.Functions.Like(t.Phone, pattern, LikeEscape) ||
+                                      (canonicalPhone != null && t.Phone == canonicalPhone))));
         }
 
         List<Tenant> rows = await tenants.OrderBy(t => t.Name).ToListAsync(ct);
