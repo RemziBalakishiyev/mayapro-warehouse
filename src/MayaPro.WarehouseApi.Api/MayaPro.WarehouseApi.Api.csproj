@@ -26,4 +26,9 @@
     <ProjectReference Include="..\Modules\MayaPro.WarehouseApi.Modules.Tenancy\MayaPro.WarehouseApi.Modules.Tenancy.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- BE#50: PhoneMigrationLogTests exercises ModuleExtensions' internal migration-logging helpers directly. -->
+    <InternalsVisibleTo Include="MayaPro.WarehouseApi.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

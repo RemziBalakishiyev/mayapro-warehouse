@@ -1,5 +1,8 @@
 using System.Reflection;
+using MayaPro.WarehouseApi.SharedKernel.Application;
 using MayaPro.WarehouseApi.SharedKernel.Infrastructure;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 
 namespace MayaPro.WarehouseApi.Api.Extensions;
 
@@ -44,14 +47,33 @@ public static class ModuleExtensions
     /// clash with the hand-rolled BeginTransaction flow) — each attempt uses a fresh scope so a failed
     /// attempt never reuses a half-open connection.
     /// </summary>
-    private static async Task MigrateModuleWithRetryAsync(IServiceProvider services, IModule module)
+    /// <remarks>
+    /// BE#50: the <c>NormalizePhoneNumbers</c> data migrations (and any future migration that does the same)
+    /// report their result via <c>RAISERROR(..., 0, 1) WITH NOWAIT</c>, which only reaches
+    /// <see cref="SqlConnection.InfoMessage"/> — EF Core never forwards it to <see cref="ILogger"/>. Nothing
+    /// listened for that event in the real start-up path, so those lines never reached the app's own log
+    /// output. The scope's shared connection (the same one every module <c>DbContext</c> in this scope writes
+    /// through, via <see cref="IDbConnectionFactory"/>) is listened on for the duration of this one migration
+    /// run and unsubscribed immediately after, so nothing outlives the run.
+    /// </remarks>
+    internal static async Task MigrateModuleWithRetryAsync(IServiceProvider services, IModule module)
     {
         const int maxAttempts = 3;
+        ILogger logger = services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("MayaPro.WarehouseApi.Api.Extensions.ModuleExtensions");
+
         for (int attempt = 1; ; attempt++)
         {
             try
             {
                 await using AsyncServiceScope scope = services.CreateAsyncScope();
+
+                var connection = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>()
+                    .GetConnection() as SqlConnection;
+                using IDisposable? subscription = connection is null
+                    ? null
+                    : ListenForMigrationLog(connection, logger);
+
                 await module.MigrateAsync(scope.ServiceProvider);
                 return;
             }
@@ -60,6 +82,55 @@ public static class ModuleExtensions
                 await Task.Delay(TimeSpan.FromSeconds(attempt * 2));
             }
         }
+    }
+
+    /// <summary>
+    /// BE#50 — subscribes <paramref name="logger"/> to <paramref name="connection"/>'s
+    /// <see cref="SqlConnection.InfoMessage"/> event and returns an <see cref="IDisposable"/> that removes the
+    /// handler again. A line reporting one or more unreadable values (<c>cevrile bilmedi: M</c>, M &gt; 0) is
+    /// logged as a <see cref="LogLevel.Warning"/> — an operator otherwise has no way to know a row was left
+    /// untouched; every other line is <see cref="LogLevel.Information"/>.
+    /// </summary>
+    internal static IDisposable ListenForMigrationLog(SqlConnection connection, ILogger logger)
+    {
+        SqlInfoMessageEventHandler handler = (_, e) =>
+        {
+            foreach (SqlError error in e.Errors)
+            {
+                if (TryGetUnconvertibleCount(error.Message, out int unconvertible) && unconvertible > 0)
+                    logger.LogWarning("{MigrationMessage}", error.Message);
+                else
+                    logger.LogInformation("{MigrationMessage}", error.Message);
+            }
+        };
+
+        connection.InfoMessage += handler;
+        return new MigrationLogSubscription(connection, handler);
+    }
+
+    /// <summary>
+    /// Pulls the <c>cevrile bilmedi: M</c> count out of a migration's result line (see the
+    /// <c>NormalizePhoneNumbers</c> migrations, BE#46). Returns <see langword="false"/> for any line that
+    /// does not carry that marker, so unrelated <c>InfoMessage</c> lines still get logged (as Information)
+    /// rather than dropped.
+    /// </summary>
+    internal static bool TryGetUnconvertibleCount(string message, out int count)
+    {
+        const string marker = "cevrile bilmedi: ";
+
+        count = 0;
+        int markerIndex = message.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0)
+            return false;
+
+        string digits = new(message[(markerIndex + marker.Length)..].TakeWhile(char.IsDigit).ToArray());
+        return int.TryParse(digits, out count);
+    }
+
+    private sealed class MigrationLogSubscription(SqlConnection connection, SqlInfoMessageEventHandler handler)
+        : IDisposable
+    {
+        public void Dispose() => connection.InfoMessage -= handler;
     }
 
     /// <summary>
