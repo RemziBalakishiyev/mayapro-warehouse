@@ -415,6 +415,59 @@ public sealed class PlatformAdminApiTests : IAsyncLifetime
         Assert.DoesNotContain(await SearchTenantsAsync("_"), t => t.Name == storeName);
     }
 
+    /// <summary>
+    /// BE#51 — since BE#46, <c>Phone</c> is stored canonically (<c>994501234567</c>). An admin typing the
+    /// number the way a human actually would — local with a leading zero, with punctuation, with a leading
+    /// <c>+</c>, or already canonical — must all find the same shop, because <c>PhoneNormalizer</c>
+    /// canonicalizes the search term before it is compared, in addition to the raw <c>LIKE</c> fallback.
+    /// </summary>
+    [Fact]
+    public async Task Tenant_Search_Finds_A_Phone_Typed_In_Any_Local_Spelling()
+    {
+        string canonicalPhone = TenantPhones.Next();
+        TenantTestFixture.TenantHandle shop =
+            await TenantTestFixture.CreateTenantAsync("BE51 Telefon Axtarışı", canonicalPhone);
+
+        // Strip the "994" country code to rebuild the local "0…" spelling the fixture normalized away.
+        string localDigits = canonicalPhone[3..];
+        string local = $"0{localDigits}";
+        string localWithPunctuation =
+            $"0{localDigits[..2]} {localDigits[2..5]}-{localDigits[5..7]}-{localDigits[7..]}";
+        string withPlus = $"+{canonicalPhone}";
+
+        foreach (string term in new[] { local, localWithPunctuation, withPlus, canonicalPhone })
+        {
+            TenantRow row = Assert.Single(await SearchTenantsAsync(term));
+            Assert.Equal(shop.TenantId, row.Id);
+            Assert.Equal(canonicalPhone, row.Phone);
+        }
+    }
+
+    /// <summary>
+    /// BE#51 — a term that cannot canonicalize into a full phone (wrong digit count) must keep falling back
+    /// to the raw <c>LIKE</c>, so a deliberate partial search — the admin remembers only part of the number —
+    /// still works exactly as it did before this fix.
+    /// </summary>
+    [Fact]
+    public async Task Tenant_Search_By_A_Phone_Fragment_Still_Works()
+    {
+        string canonicalPhone = TenantPhones.Next();
+        TenantTestFixture.TenantHandle shop =
+            await TenantTestFixture.CreateTenantAsync("BE51 Fraqment Axtarışı", canonicalPhone);
+
+        // An interior slice, six digits long — neither the ten-digit local nor the twelve-digit canonical
+        // length, so PhoneNormalizer refuses it and the raw LIKE fallback is what has to find the row.
+        //
+        // Assert.Contains rather than Assert.Single: TenantPhones hands out sequential, zero-padded numbers,
+        // so with a low counter value this exact fragment can legitimately also appear inside other shops'
+        // phones created earlier in the same run. What AC-3 promises is that the fragment still finds *this*
+        // shop, not that it finds only this shop.
+        string fragment = canonicalPhone.Substring(4, 6);
+
+        List<TenantRow> rows = await SearchTenantsAsync(fragment);
+        Assert.Contains(rows, r => r.Id == shop.TenantId);
+    }
+
     /// <summary>The admin can create a shop that is usable immediately — no approval round trip.</summary>
     [Fact]
     public async Task Admin_Created_Shop_Is_Active_At_Once_And_Its_Owner_Can_Sign_In()
