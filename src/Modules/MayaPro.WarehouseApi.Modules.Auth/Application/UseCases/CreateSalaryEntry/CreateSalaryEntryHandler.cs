@@ -44,12 +44,14 @@ public sealed class CreateSalaryEntryHandler(
         else if (!SalaryMonth.TryParse(command.Month, out month))
             return Result.Failure<SalaryEntryDto>(SalaryErrors.InvalidMonth);
 
-        User? user = await db.Users.FirstOrDefaultAsync(u => u.Id == command.UserId, ct);
-        if (user is null)
-            return Result.Failure<SalaryEntryDto>(AuthErrors.UserNotFound);
+        // BE#57 — "who was paid" is a payroll record. "Who paid" stays currentUser.UserId below; the two
+        // ids come from different tables and must never be swapped.
+        Employee? employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == command.EmployeeId, ct);
+        if (employee is null)
+            return Result.Failure<SalaryEntryDto>(EmployeeErrors.NotFound);
 
         var entry = SalaryEntry.Create(
-            user.Id,
+            employee.Id,
             type,
             command.Amount,
             command.Note,
@@ -63,7 +65,7 @@ public sealed class CreateSalaryEntryHandler(
 
         await activityLogger.LogAsync(
             "Maaş əməliyyatı",
-            $"{user.FullName} — {entry.Amount:0.00} AZN {ActionWord(type)}",
+            $"{employee.FullName} — {entry.Amount:0.00} AZN {ActionWord(type)}",
             currentUser.UserId,
             ct);
 

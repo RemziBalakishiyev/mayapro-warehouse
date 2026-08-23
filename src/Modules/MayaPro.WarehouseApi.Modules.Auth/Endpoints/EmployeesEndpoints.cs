@@ -1,9 +1,12 @@
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.CreateEmployee;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.CreateSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.DeleteSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetEmployees;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalaryEntries;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalarySummary;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.SetEmployeeActive;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.SetEmployeeSalary;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.UpdateEmployee;
 using MayaPro.WarehouseApi.SharedKernel.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -11,10 +14,18 @@ using Microsoft.AspNetCore.Routing;
 
 namespace MayaPro.WarehouseApi.Modules.Auth.Endpoints;
 
+/// <summary>
+/// <c>/api/employees</c> — the payroll register and its salary account (BE#28 + BE#57).
+/// <para>
+/// There is deliberately <b>no</b> <c>DELETE /api/employees/{id}</c>: an employee who has left is
+/// deactivated, because deleting the row would take that person's salary history — and the cash that really
+/// did leave the drawer — with it. <c>POST /{id}/deactivate</c> is the replacement.
+/// </para>
+/// </summary>
 internal static class EmployeesEndpoints
 {
     // Match the host's role policies: setting a salary and deleting a salary line are owner decisions;
-    // recording one is day-to-day management work.
+    // maintaining the payroll register and recording a payment are day-to-day management work.
     private const string OwnerOnly = "OwnerOnly";
     private const string OwnerOrManager = "OwnerOrManager";
 
@@ -24,9 +35,22 @@ internal static class EmployeesEndpoints
             .WithTags("Employees")
             .RequireAuthorization(); // open to every role for now
 
+        // Includes deactivated employees, flagged with isActive: false — see GetEmployeesHandler.
         group.MapGet("/", async (GetEmployeesHandler handler, CancellationToken ct) =>
                 Results.Ok(await handler.Handle(ct)))
             .WithName("GetEmployees");
+
+        group.MapPost("/", async (
+                CreateEmployeeCommand command,
+                CreateEmployeeHandler handler,
+                CancellationToken ct) =>
+            {
+                var result = await handler.Handle(command, ct);
+                string location = result.IsSuccess ? $"/api/employees/{result.Value.Id}" : "/api/employees";
+                return result.ToCreatedResult(location);
+            })
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("CreateEmployee");
 
         // Literal segment; the sibling routes below are constrained to {id:guid}, so "salary-summary" can
         // never be read as an employee id (same approach as BE#21's /open-debts).
@@ -37,6 +61,32 @@ internal static class EmployeesEndpoints
                 (await handler.Handle(month, ct)).ToHttpResult())
             .RequireAuthorization(OwnerOrManager)
             .WithName("GetSalarySummary");
+
+        group.MapPut("/{id:guid}", async (
+                Guid id,
+                UpdateEmployeeCommand command,
+                UpdateEmployeeHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(command with { Id = id }, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("UpdateEmployee");
+
+        // Idempotent state statements, not toggles: repeating either one is still a 200.
+        group.MapPost("/{id:guid}/deactivate", async (
+                Guid id,
+                SetEmployeeActiveHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, isActive: false, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("DeactivateEmployee");
+
+        group.MapPost("/{id:guid}/activate", async (
+                Guid id,
+                SetEmployeeActiveHandler handler,
+                CancellationToken ct) =>
+                (await handler.Handle(id, isActive: true, ct)).ToHttpResult())
+            .RequireAuthorization(OwnerOrManager)
+            .WithName("ActivateEmployee");
 
         group.MapPut("/{id:guid}/salary", async (
                 Guid id,

@@ -19,7 +19,7 @@ public sealed class SalaryEntry : TenantEntity
     private SalaryEntry() { }
 
     private SalaryEntry(
-        Guid userId,
+        Guid employeeId,
         SalaryEntryType type,
         decimal amount,
         string? note,
@@ -27,7 +27,7 @@ public sealed class SalaryEntry : TenantEntity
         string month,
         Guid? createdByUserId)
     {
-        UserId = userId;
+        EmployeeId = employeeId;
         Type = type;
         Amount = amount;
         Note = note;
@@ -36,8 +36,12 @@ public sealed class SalaryEntry : TenantEntity
         CreatedByUserId = createdByUserId;
     }
 
-    /// <summary>The employee this line belongs to.</summary>
-    public Guid UserId { get; private set; }
+    /// <summary>
+    /// The payroll record this line belongs to — an <see cref="Employee"/> since BE#57, never a login account.
+    /// "Who was paid" and "who paid" are two different questions: this is the first,
+    /// <see cref="CreatedByUserId"/> is the second, and they must never be merged.
+    /// </summary>
+    public Guid EmployeeId { get; private set; }
 
     public SalaryEntryType Type { get; private set; }
 
@@ -51,15 +55,16 @@ public sealed class SalaryEntry : TenantEntity
     /// <summary>The accounting month (<c>yyyy-MM</c>) this line is booked against.</summary>
     public string Month { get; private set; } = string.Empty;
 
+    /// <summary>The login account that recorded the line (<c>ICurrentUser.UserId</c>) — who handed the money over.</summary>
     public Guid? CreatedByUserId { get; private set; }
 
     public static SalaryEntry Create(
-        Guid userId,
+        Guid employeeId,
         SalaryEntryType type,
         decimal amount,
         string? note,
         DateTime date,
         string month,
         Guid? createdByUserId) =>
-        new(userId, type, amount, note, date, month, createdByUserId);
+        new(employeeId, type, amount, note, date, month, createdByUserId);
 }

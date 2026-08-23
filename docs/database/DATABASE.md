@@ -6,7 +6,7 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 
 | Schema | DbContext | Cədvəllər | Transactional* |
 |---|---|---|---|
-| `identity` | AuthDbContext | Users, SalaryEntries | ✅ |
+| `identity` | AuthDbContext | Users, Employees, SalaryEntries | ✅ |
 | `products` | ProductsDbContext | Products, Categories | ✅ |
 | `sales` | SalesDbContext | Sales | ✅ |
 | `customers` | CustomersDbContext | Customers, CustomerPayments, CustomerDebtAdjustments | ✅ |
@@ -41,7 +41,8 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 - `identity.Users` — `(TenantId, Phone)` unique (BE#35: telefon YALNIZ mağaza daxilində unikaldır; qlobal birmənalılığı qeydiyyatdakı yoxlama təmin edir — `multi-tenancy.md` §4.1). **BE#46-dan sonra indeks kanonik dəyərləri qoruyur** — indeksin adı və sütunları DƏYİŞMƏYİB, sadəcə tərkibi bir formaya gəldi, ona görə eyni mağazada `0501234567` və `+994 50 123 45 67` artıq eyni sətir sayılır. `Users.Role` `nvarchar(20)`-də ad kimi saxlanır: `Owner`/`Manager`/`Seller`/`PlatformAdmin` (BE#36 — platforma admini `TenantId = 00000000-0000-0000-0000-0000000000ff` rezerv id-si ilə, heç bir `tenancy.Tenants` sətrinə uyğun gəlmir; sxem dəyişməyib, BE#36 `identity` üçün miqrasiya yaratmır)
 - `tenancy.Tenants.Status`, `tenancy.Tenants.ExpiresAt` — non-unique (admin siyahısı/statistikası). `ExpiresAt` **nullable** = müddətsiz abunə
 - `tenancy.SubscriptionPayments` — `(TenantId, PaidAt)` və `PaidAt` non-unique indeksləri
-- `identity.SalaryEntries.Date` — non-unique (gün sonu / dashboard kassa sorğusu); `(UserId, Month)` — non-unique (aylıq maaş xülasəsi). `UserId` FK DEYİL (`Expense.ProductId` ilə eyni yanaşma).
+- `identity.SalaryEntries.Date` — non-unique (gün sonu / dashboard kassa sorğusu); `(EmployeeId, Month)` — non-unique (aylıq maaş xülasəsi; BE#57-dən əvvəl `(UserId, Month)` idi). `EmployeeId` FK DEYİL (`Expense.ProductId` ilə eyni yanaşma) — maaş tarixçəsi işçi sətrindən asılı olmadan yaşamalıdır.
+- `identity.Employees` (BE#57) — yalnız `TenantId` indeksi. **`Phone` üzərində unikal indeks QƏSDƏN yoxdur**: burada telefon əlaqə nömrəsidir, login identifikatoru deyil (müqayisə üçün `identity.Users` → `IX_Users_TenantId_Phone` unikaldır). Sütunlar: `FullName` nvarchar(200) NOT NULL, `Phone` nvarchar(30) NULL, `Position` nvarchar(100) NOT NULL (sərbəst mətn, rol kodu deyil), `MonthlySalary` decimal(18,2) NOT NULL DEFAULT 0, `Note` nvarchar(500) NULL, `IsActive` bit NOT NULL. `PasswordHash`/`Role`/`Email` sütunları YOXDUR.
 - `dayend.Closings.Date` — unique (bir günə bir bağlanış, race qoruması)
 - `activity.ActivityLogs.CreatedAt` — descending index (feed sorğusu üçün)
 - `sales.Sales.InvoiceToken` — unique filtered (`IS NOT NULL`) — açıq faktura linki tokeni
@@ -54,6 +55,8 @@ Tək SQL Server DB (`MayaProWarehouse`), connection string: `ConnectionStrings:D
 **Hər mühitdə (BE#36):** `PlatformAdminSeeder` — `PlatformAdmin` konfiqurasiya bölməsindən (telefon/şifrə/ad) bir `PlatformAdmin` istifadəçisi yaradır. İdempotentdir (mövcud admin varsa toxunmur, şifrəni yenidən yazmır) və bölmə konfiqurasiya olunmayıbsa heç nə etmir. Production-da `PlatformAdmin__Password` mühit dəyişəni ilə override edilməlidir.
 
 ## Last Updated
+
+2026-08-23 — BE#57: `identity.Employees` cədvəli (maaş uçotu registri) + `SplitEmployeeFromUser` data miqrasiyası. Ardıcıllıq məcburidir və dizaynın özüdür: cədvəl yaradılır → `SalaryEntries.EmployeeId` **nullable** əlavə olunur → qeyri-Owner (və maaş datası olan istənilən) `Users` sətirlərindən Employee köçürülür və maaş sətirləri onlara bağlanır → sahibsiz sətirlər (silinmiş hesab; `UserId`-də FK yox idi) hər tenant üçün bir «Naməlum işçi (köçürülmüş)» qeydinə bağlanır → `EmployeeId IS NULL` qalıbsa migration **THROW** edir (transaction geri qayıdır, heç nə silinmir) → **yalnız bundan sonra** `SalaryEntries.UserId`, köhnə `(UserId, Month)` indeksi və `identity.Users.MonthlySalary` silinir. `SalaryEntries` sətir sayı və `Amount/Type/Date/Month/Note/CreatedByUserId` dəyərləri dəyişmir; `Users` sətirləri silinmir/deaktiv edilmir. `Down()` yalnız sxemi geri qaytarır — köhnə sütun MƏZMUNU bərpa olunmur (səbəb migration-ın XML şərhində).
 
 2026-08-23 — BE#50: `NormalizePhoneNumbers` miqrasiyalarının `RAISERROR` nəticə sətri startup-da artıq `ILogger`-ə ötürülür (`ModuleExtensions.MigrateModuleWithRetryAsync` `SqlConnection.InfoMessage`-ə abunə olur, `cevrile bilmedi > 0` `Warning`, əks halda `Information`) — əvvəllər real deploy-da heç görünmürdü, yalnız test helper-i abunə idi.
 

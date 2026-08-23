@@ -4,7 +4,7 @@
 
 | Modul | Məsuliyyət | Cədvəl sahibi? |
 |---|---|---|
-| **Auth** | Login, JWT, istifadəçilər/işçilər, rollar, işçi maaş hesabı | `identity.Users`, `identity.SalaryEntries` |
+| **Auth** | Login, JWT, giriş hesabları, rollar; işçi (maaş uçotu) reyestri və maaş hesabı | `identity.Users`, `identity.Employees`, `identity.SalaryEntries` |
 | **Tenancy** | Mağaza (tenant) reyestri, qeydiyyat, platforma admin konsolu, abunə/ödənişlər | `tenancy.Tenants`, `tenancy.SubscriptionPayments` |
 | **Products** | Məhsul kataloqu, stok, real maya, kateqoriyalar | `products.*` |
 | **Sales** | Satış zənciri (create/update/delete), satış tarixçəsi | `sales.Sales` |
@@ -38,6 +38,8 @@ Yeni kontrakt metodu əlavə edəndə: interfeys `SharedKernel/Contracts/`-da, i
 Kontrakt record-una sahə əlavə etmək də kontrakt dəyişikliyidir: satışın alış qiyməti snapshot-u üçün `ProductStockSnapshot`-a `PurchasePrice` əlavə olundu (provider: Products, istehlakçı: Sales create/update) — modul sərhədini keçən yeganə yol budur, Sales heç vaxt `products` cədvəlini oxumur.
 
 ## Last Updated
+
+2026-08-23 — BE#57: Auth modulu `identity.Employees` cədvəlinin də sahibi oldu — işçi (maaş uçotu) reyestri giriş hesablarından ayrıldı. `ISalaryModule` kontraktının şəkli dəyişmədi (yalnız `SalaryPaymentRow.UserId` → `EmployeeId` adlandı), ona görə DayEnd/Reports istehlakçılarının rəqəmləri eynidir.
 
 2026-08-16 — BE#36: Tenancy modulu HTTP səthi açdı (`POST /api/auth/register` + `/api/admin/*`) və `tenancy.SubscriptionPayments` cədvəlinin sahibi oldu; yeni `IIdentityProvisioning` kontraktı (provider: Auth, istehlakçı: Tenancy); `TenantInfo`-ya `ExpiresAt` əlavə olundu; `TenancyDbContext` paylaşılan transaction-a enlist olur.
 

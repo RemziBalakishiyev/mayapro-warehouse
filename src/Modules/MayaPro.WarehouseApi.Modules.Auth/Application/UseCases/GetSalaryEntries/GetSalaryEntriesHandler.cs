@@ -14,7 +14,7 @@ namespace MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalaryEntrie
 /// </summary>
 public sealed class GetSalaryEntriesHandler(IAuthDbContext db, IDateProvider dateProvider)
 {
-    public async Task<Result<IReadOnlyList<SalaryEntryDto>>> Handle(Guid userId, string? month, CancellationToken ct)
+    public async Task<Result<IReadOnlyList<SalaryEntryDto>>> Handle(Guid employeeId, string? month, CancellationToken ct)
     {
         string filter;
         if (string.IsNullOrWhiteSpace(month))
@@ -22,12 +22,12 @@ public sealed class GetSalaryEntriesHandler(IAuthDbContext db, IDateProvider dat
         else if (!SalaryMonth.TryParse(month, out filter))
             return Result.Failure<IReadOnlyList<SalaryEntryDto>>(SalaryErrors.InvalidMonth);
 
-        if (!await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId, ct))
-            return Result.Failure<IReadOnlyList<SalaryEntryDto>>(AuthErrors.UserNotFound);
+        if (!await db.Employees.AsNoTracking().AnyAsync(e => e.Id == employeeId, ct))
+            return Result.Failure<IReadOnlyList<SalaryEntryDto>>(EmployeeErrors.NotFound);
 
         List<SalaryEntry> entries = await db.SalaryEntries
             .AsNoTracking()
-            .Where(e => e.UserId == userId && e.Month == filter)
+            .Where(e => e.EmployeeId == employeeId && e.Month == filter)
             .OrderByDescending(e => e.Date)
             .ToListAsync(ct);
 

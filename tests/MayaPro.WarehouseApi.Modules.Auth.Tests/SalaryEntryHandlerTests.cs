@@ -2,6 +2,7 @@ using MayaPro.WarehouseApi.Modules.Auth.Application.Contracts;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.CreateSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.DeleteSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalaryEntries;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalarySummary;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.SetEmployeeSalary;
 using MayaPro.WarehouseApi.Modules.Auth.Domain;
 using MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
@@ -37,7 +38,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Create_Stores_The_Line_And_Returns_It()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         (CreateSalaryEntryHandler handler, FakeActivityLogger log, FakeUnitOfWork uow) = Creator(db);
 
         var result = await handler.Handle(
@@ -45,7 +46,7 @@ public sealed class SalaryEntryHandlerTests
 
         Assert.True(result.IsSuccess);
         SalaryEntryDto dto = result.Value;
-        Assert.Equal(employee.Id, dto.UserId);
+        Assert.Equal(employee.Id, dto.EmployeeId);
         Assert.Equal(Payment, dto.Type);
         Assert.Equal(100m, dto.Amount);
         Assert.Equal("Avans", dto.Note);
@@ -68,7 +69,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Create_Without_Month_Uses_The_Current_Business_Month()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         (CreateSalaryEntryHandler handler, _, _) = Creator(db);
 
         var result = await handler.Handle(
@@ -85,7 +86,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Create_Keeps_Cash_Date_And_Accounting_Month_Independent()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         (CreateSalaryEntryHandler handler, _, _) = Creator(db);
 
         var result = await handler.Handle(
@@ -100,7 +101,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Create_With_Unknown_Type_Is_Rejected()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         (CreateSalaryEntryHandler handler, FakeActivityLogger log, _) = Creator(db);
 
         var result = await handler.Handle(
@@ -119,7 +120,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Create_With_Non_Positive_Amount_Is_Rejected(decimal amount)
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         (CreateSalaryEntryHandler handler, _, _) = Creator(db);
 
         var result = await handler.Handle(
@@ -134,7 +135,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Create_With_Malformed_Month_Is_Rejected()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         (CreateSalaryEntryHandler handler, _, _) = Creator(db);
 
         var result = await handler.Handle(
@@ -156,8 +157,71 @@ public sealed class SalaryEntryHandlerTests
             new CreateSalaryEntryCommand(Guid.NewGuid(), Payment, 10m, null, null), default);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(AuthErrors.UserNotFound, result.Error);
+        Assert.Equal(EmployeeErrors.NotFound, result.Error);
         Assert.Empty(db.SalaryEntries);
+    }
+
+    /// <summary>
+    /// BE#57 / TC-11 — a login account's id is not an employee id. Recording a payment against a user who
+    /// happens to exist (and even shares the employee's name) is "İşçi tapılmadı", not an accidental hit on
+    /// the wrong register.
+    /// </summary>
+    [Fact]
+    public async Task Create_Against_A_Login_Account_Id_Is_Not_Found()
+    {
+        await using AuthDbContext db = AuthTestDb.New();
+        await db.AddEmployeeAsync();
+        User account = await db.AddUserAsync("Günel Quliyeva", "0554445566", UserRole.Seller);
+        (CreateSalaryEntryHandler handler, _, _) = Creator(db);
+
+        var result = await handler.Handle(
+            new CreateSalaryEntryCommand(account.Id, Payment, 10m, null, null), default);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EmployeeErrors.NotFound, result.Error);
+        Assert.Empty(db.SalaryEntries);
+    }
+
+    /// <summary>
+    /// BE#57 — "who was paid" and "who paid" come from different registers and must not be merged: the line
+    /// carries the employee's id, while CreatedByUserId carries the signed-in account's.
+    /// </summary>
+    [Fact]
+    public async Task Create_Separates_Who_Was_Paid_From_Who_Paid()
+    {
+        await using AuthDbContext db = AuthTestDb.New();
+        Employee employee = await db.AddEmployeeAsync();
+        var recordedBy = Guid.NewGuid();
+        var handler = new CreateSalaryEntryHandler(
+            db, new FakeUnitOfWork(db), new CreateSalaryEntryValidator(), new FakeActivityLogger(),
+            new FakeCurrentUser(recordedBy), Clock);
+
+        var result = await handler.Handle(
+            new CreateSalaryEntryCommand(employee.Id, Payment, 100m, null, March), default);
+
+        Assert.Equal(employee.Id, result.Value.EmployeeId);
+        Assert.Equal(recordedBy, result.Value.CreatedByUserId);
+        Assert.NotEqual(result.Value.EmployeeId, result.Value.CreatedByUserId);
+    }
+
+    /// <summary>
+    /// TC-5 — a deactivated employee can still be paid off. Somebody who left mid-month is still owed the
+    /// days they worked, so the final settlement must not be blocked, and it must show up in the summary.
+    /// </summary>
+    [Fact]
+    public async Task Create_For_A_Deactivated_Employee_Is_Allowed()
+    {
+        await using AuthDbContext db = AuthTestDb.New();
+        Employee employee = await db.AddEmployeeAsync(monthlySalary: 600m, isActive: false);
+        (CreateSalaryEntryHandler handler, _, _) = Creator(db);
+
+        var result = await handler.Handle(
+            new CreateSalaryEntryCommand(employee.Id, Payment, 300m, "Son haqq-hesab", March), default);
+
+        Assert.True(result.IsSuccess);
+
+        var summary = await new GetSalarySummaryHandler(db, Clock).Handle(March, default);
+        Assert.Equal(300m, Assert.Single(summary.Value).PaidTotal);
     }
 
     /// <summary>AC6 — the listing is filtered by month and ordered newest first.</summary>
@@ -165,7 +229,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Entries_Are_Filtered_By_Month_Newest_First()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 100m, March, new DateTime(2026, 3, 1, 9, 0, 0, DateTimeKind.Utc));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Deduction, 30m, March, new DateTime(2026, 3, 5, 9, 0, 0, DateTimeKind.Utc));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 250m, "2026-04");
@@ -182,7 +246,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Entries_For_An_Empty_Month_Are_An_Empty_List()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
 
         var result = await new GetSalaryEntriesHandler(db, Clock).Handle(employee.Id, "2030-01", default);
 
@@ -199,7 +263,7 @@ public sealed class SalaryEntryHandlerTests
         var result = await new GetSalaryEntriesHandler(db, Clock).Handle(Guid.NewGuid(), March, default);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(AuthErrors.UserNotFound, result.Error);
+        Assert.Equal(EmployeeErrors.NotFound, result.Error);
     }
 
     /// <summary>AC7 — the owner's delete removes the line and logs it in the same transaction.</summary>
@@ -207,7 +271,7 @@ public sealed class SalaryEntryHandlerTests
     public async Task Delete_Removes_The_Line_And_Logs_It()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 100m, March);
         SalaryEntry entry = await db.SalaryEntries.SingleAsync();
 
@@ -230,8 +294,8 @@ public sealed class SalaryEntryHandlerTests
     public async Task Delete_Through_Another_Employees_Route_Is_Not_Found()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User a = await db.AddEmployeeAsync("Günel Quliyeva", "0554445566");
-        User b = await db.AddEmployeeAsync("Elvin Hüseynov", "0553334455");
+        Employee a = await db.AddEmployeeAsync("Günel Quliyeva", "0554445566");
+        Employee b = await db.AddEmployeeAsync("Elvin Hüseynov", "0553334455");
         await db.AddEntryAsync(a.Id, SalaryEntryType.Payment, 100m, March);
         SalaryEntry entry = await db.SalaryEntries.SingleAsync();
 
@@ -248,14 +312,14 @@ public sealed class SalaryEntryHandlerTests
     public async Task Set_Salary_Stores_The_Amount()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
 
         var result = await new SetEmployeeSalaryHandler(db, new SetEmployeeSalaryValidator())
             .Handle(new SetEmployeeSalaryCommand(employee.Id, 600m), default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(600m, result.Value.MonthlySalary);
-        Assert.Equal(600m, (await db.Users.SingleAsync()).MonthlySalary);
+        Assert.Equal(600m, (await db.Employees.SingleAsync()).MonthlySalary);
     }
 
     /// <summary>TC24 — a negative salary is rejected and the stored value is untouched.</summary>
@@ -263,13 +327,13 @@ public sealed class SalaryEntryHandlerTests
     public async Task Set_Negative_Salary_Is_Rejected()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync(monthlySalary: 600m);
+        Employee employee = await db.AddEmployeeAsync(monthlySalary: 600m);
 
         var result = await new SetEmployeeSalaryHandler(db, new SetEmployeeSalaryValidator())
             .Handle(new SetEmployeeSalaryCommand(employee.Id, -1m), default);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(600m, (await db.Users.SingleAsync()).MonthlySalary);
+        Assert.Equal(600m, (await db.Employees.SingleAsync()).MonthlySalary);
     }
 
     /// <summary>TC19 — setting the salary of an employee who does not exist is not found.</summary>
@@ -282,6 +346,6 @@ public sealed class SalaryEntryHandlerTests
             .Handle(new SetEmployeeSalaryCommand(Guid.NewGuid(), 600m), default);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(AuthErrors.UserNotFound, result.Error);
+        Assert.Equal(EmployeeErrors.NotFound, result.Error);
     }
 }

@@ -28,5 +28,10 @@ public interface ISalaryModule
 /// <summary>
 /// A single salary payment as seen by reports: the business-zone date the money left the drawer, the
 /// employee it was paid to and the amount. Deductions are never represented here.
+/// <para>
+/// BE#57 renamed <c>UserId</c> to <see cref="EmployeeId"/>: it identifies a payroll record in
+/// <c>identity.Employees</c>, never a login account. The cash figures every consumer computes from these rows
+/// are unaffected — only the name of the id changed.
+/// </para>
 /// </summary>
-public sealed record SalaryPaymentRow(DateOnly Date, Guid UserId, string FullName, decimal Amount);
+public sealed record SalaryPaymentRow(DateOnly Date, Guid EmployeeId, string FullName, decimal Amount);

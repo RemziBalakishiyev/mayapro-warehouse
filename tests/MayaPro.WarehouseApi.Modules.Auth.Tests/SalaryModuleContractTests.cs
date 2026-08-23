@@ -31,7 +31,7 @@ public sealed class SalaryModuleContractTests
     public async Task Day_Total_Sums_Only_That_Days_Payments()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 100m, Month, At(1, 9));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 50m, Month, At(1, 15));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Deduction, 30m, Month, At(1, 16));
@@ -58,7 +58,7 @@ public sealed class SalaryModuleContractTests
     public async Task Deductions_Alone_Never_Reach_The_Cash_Figures()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Deduction, 30m, Month, At(1, 9));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Deduction, 12m, Month, At(1, 11));
 
@@ -74,7 +74,7 @@ public sealed class SalaryModuleContractTests
     public async Task Day_Boundary_Follows_The_Business_Time_Zone_Not_Utc()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         await db.AddEntryAsync(
             employee.Id, SalaryEntryType.Payment, 70m, Month, new DateTime(2026, 8, 1, 20, 30, 0, DateTimeKind.Utc));
 
@@ -89,7 +89,7 @@ public sealed class SalaryModuleContractTests
     public async Task Payments_Are_Reported_With_The_Employee_Name_In_Date_Order()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync("Günel Quliyeva", "0554445566");
+        Employee employee = await db.AddEmployeeAsync("Günel Quliyeva", "0554445566");
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 200m, Month, At(2, 9));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 100m, Month, At(1, 9));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Deduction, 30m, Month, At(1, 10));
@@ -100,7 +100,25 @@ public sealed class SalaryModuleContractTests
         Assert.Equal(100m, rows[0].Amount);
         Assert.Equal(200m, rows[1].Amount);
         Assert.All(rows, r => Assert.Equal("Günel Quliyeva", r.FullName));
-        Assert.All(rows, r => Assert.Equal(employee.Id, r.UserId));
+        Assert.All(rows, r => Assert.Equal(employee.Id, r.EmployeeId));
+    }
+
+    /// <summary>
+    /// BE#57 / AC-10 — the name is a lookup, never a join. A payment whose payroll record has vanished still
+    /// reports (with a blank name), because the money left the drawer either way and day-end's cash figure
+    /// must not silently shrink.
+    /// </summary>
+    [Fact]
+    public async Task A_Payment_Without_A_Payroll_Record_Still_Reports()
+    {
+        await using AuthDbContext db = AuthTestDb.New();
+        await db.AddEntryAsync(Guid.NewGuid(), SalaryEntryType.Payment, 55m, Month, At(1, 9));
+
+        SalaryPaymentRow row = Assert.Single(await Contract(db).GetPaymentsAsync(null, null));
+
+        Assert.Equal(55m, row.Amount);
+        Assert.Equal(string.Empty, row.FullName);
+        Assert.Equal(55m, await Contract(db).GetDayPaymentsTotalAsync(Day));
     }
 
     /// <summary>Both range bounds are inclusive days, so a bound day's payments are in, neighbours are out.</summary>
@@ -108,7 +126,7 @@ public sealed class SalaryModuleContractTests
     public async Task Range_Bounds_Are_Inclusive_Days()
     {
         await using AuthDbContext db = AuthTestDb.New();
-        User employee = await db.AddEmployeeAsync();
+        Employee employee = await db.AddEmployeeAsync();
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 10m, Month, At(1, 9));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 20m, Month, At(2, 9));
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 40m, Month, At(3, 9));
