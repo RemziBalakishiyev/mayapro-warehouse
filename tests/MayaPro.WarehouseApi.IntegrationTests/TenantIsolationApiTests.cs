@@ -425,6 +425,59 @@ public sealed class TenantIsolationApiTests : IAsyncLifetime
         Assert.Empty(feedA.Select(a => a.Id).Intersect(feedB.Select(a => a.Id)));
     }
 
+    /// <summary>
+    /// BE#57 / TC-15 — the payroll register is scoped like everything else. Shop A never sees B's employees,
+    /// and reaching for one of them — to edit it, to retire it, or to pay it — is a 404, not a 403: a 403
+    /// would confirm that the id exists somewhere.
+    /// </summary>
+    [Fact]
+    public async Task Payroll_Is_Scoped_To_The_Callers_Shop()
+    {
+        Guid mine = await CreateEmployeeAsync(_clientA, "Aysel Məmmədova", "Satıcı");
+        Guid theirs = await CreateEmployeeAsync(_clientB, "Rüfət Nəsirov", "Fəhlə");
+
+        // Both shops are brand new, so each list is exactly one row long.
+        Assert.Equal(mine, Assert.Single(await EmployeesAsync(_clientA)).Id);
+        Assert.Equal(theirs, Assert.Single(await EmployeesAsync(_clientB)).Id);
+
+        await AssertNotFoundAsync(await _clientA.PutAsJsonAsync(
+            $"/api/employees/{theirs}", new { fullName = "Oğurlanmış", phone = (string?)null, position = "Satıcı", note = (string?)null }));
+        await AssertNotFoundAsync(await _clientA.PostAsync($"/api/employees/{theirs}/deactivate", null));
+        await AssertNotFoundAsync(await _clientA.PostAsync($"/api/employees/{theirs}/activate", null));
+        await AssertNotFoundAsync(await _clientA.PostAsJsonAsync(
+            $"/api/employees/{theirs}/salary-entries", new { type = "payment", amount = 10m, note = (string?)null, month = "2026-03" }));
+        await AssertNotFoundAsync(await _clientA.GetAsync($"/api/employees/{theirs}/salary-entries?month=2026-03"));
+
+        // Nothing changed on the other side of the wall.
+        IntegrationTestHelpers.EmployeeDto untouched = Assert.Single(await EmployeesAsync(_clientB));
+        Assert.Equal("Rüfət Nəsirov", untouched.FullName);
+        Assert.True(untouched.IsActive);
+
+        // …and the salary summary is scoped with it.
+        List<IntegrationTestHelpers.SalarySummaryDto> summaryA =
+            (await _clientA.GetFromJsonAsync<List<IntegrationTestHelpers.SalarySummaryDto>>(
+                "/api/employees/salary-summary?month=2026-03"))!;
+        Assert.Equal(mine, Assert.Single(summaryA).EmployeeId);
+    }
+
+    private static async Task<List<IntegrationTestHelpers.EmployeeDto>> EmployeesAsync(HttpClient client) =>
+        (await client.GetFromJsonAsync<List<IntegrationTestHelpers.EmployeeDto>>("/api/employees"))!;
+
+    private static async Task<Guid> CreateEmployeeAsync(HttpClient client, string fullName, string position)
+    {
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/employees", new { fullName, phone = (string?)null, position, monthlySalary = 0m, note = (string?)null });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.EmployeeDto>())!.Id;
+    }
+
+    private static async Task AssertNotFoundAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.ErrorDto>())!;
+        Assert.Equal("Employee.NotFound", error.Code);
+    }
+
     /// <summary>TC-26 — an export carries the caller's rows only.</summary>
     [Fact]
     public async Task Product_Export_Only_Contains_The_Callers_Shop()

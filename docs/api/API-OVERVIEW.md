@@ -6,15 +6,18 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 
 **Multi-tenancy (BE#35/BE#36).** Autentifikasiya olunmuş HƏR sorğu tenant qapısından keçir: token `tenantId` daşımırsa 401; mağaza tapılmır/təsdiq gözləyir/bloklanıb/abunə müddəti bitibsə 403 (kodlar `docs/api/ERROR-CONTRACT.md`-də). Yeganə istisna `PlatformAdmin` rolu ilə gələn tokendir — o, heç bir mağazaya aid deyil, ona görə qapıdan keçir, lakin mağaza datasını GÖRMÜR (query filter boş qaytarır). Detallar: `docs/multi-tenancy.md`.
 
-## Endpoint-lər (62)
+## Endpoint-lər (66)
 
 ### Auth (`/api/auth`, `/api/employees`)
 | Verb | Route | Auth | Qeyd |
 |---|---|---|---|
 | POST | `/api/auth/login` | anon | `{phone, password}` → `{token, user}` |
 | POST | `/api/auth/register` | anon | `{storeName, ownerName, phone, password}` → 201 `{tenantId, storeName, status, message}` |
-| GET | `/api/auth/me` | auth | Cari istifadəçi |
-| GET | `/api/employees` | auth | İşçi siyahısı (`monthlySalary` daxil) |
+| GET | `/api/auth/me` | auth | Cari **giriş hesabı** |
+| GET | `/api/employees` | auth | İşçi (maaş uçotu) siyahısı — deaktivlər də daxil, `isActive` ilə |
+| POST | `/api/employees` | O+M | `{fullName, phone?, position, monthlySalary?, note?}` → 201 |
+| PUT | `/api/employees/{id}` | O+M | `{fullName, phone?, position, note?}` → 200 — **`monthlySalary` YOXDUR** (BE#59) |
+| POST | `/api/employees/{id}/deactivate` · `/activate` | O+M | 200, idempotent (silmə YOXDUR) |
 | PUT | `/api/employees/{id}/salary` | O | `{monthlySalary}` → yenilənmiş işçi sətri |
 | GET | `/api/employees/salary-summary?month=` | O+M | Hər işçi üzrə aylıq maaş hesabı |
 | POST | `/api/employees/{id}/salary-entries` | O+M | `{type, amount, note?, month?}` → 201 |
@@ -27,15 +30,25 @@ Qeydiyyatdan sonrakı login cavabları: `PendingApproval` → 403 `Auth.TenantPe
 
 **Telefon formatı (BE#46).** Telefon qəbul edən hər endpoint girişi **kanonik** `994XXXXXXXXX` formasına salır və o formada saxlayır: `POST`/`PUT /api/customers`, `POST`/`PUT /api/suppliers`, `PUT /api/settings`, `POST /api/auth/register`, `POST /api/admin/tenants`. Qəbul edilən yazılışlar `994…` (12 rəqəm) və `0…` (10 rəqəm) ilə onların `+`/boşluq/`-`/`(`/`)` variantlarıdır; başqa hər hal → 400 «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)». **Cavab DTO-ları da kanonik dəyəri qaytarır** (`customerDto.phone`, `supplierDto.phone`, `userDto.phone`, `settingsDto.phone`, tenant sətirləri) — sahə adları/tipləri dəyişməyib, yalnız məzmun bir formaya gəldi. `POST /api/auth/login` girişi eyni qayda ilə normallaşdırıb axtarır, ona görə köhnə formatda yazılmış nömrə ilə giriş işləyir; oxuna bilməyən nömrə format xətası yox, neytral «Telefon və ya şifrə yanlışdır» alır. Qaydanın tam mətni: `docs/business/BUSINESS-RULES.md` → «Telefon nömrəsi qaydaları».
 
-**Maaş sistemi (BE#28).** `GET /api/employees` cavabına additiv `monthlySalary` sahəsi əlavə olundu (təyin edilməyibsə `0`, heç vaxt null); mövcud sahələr dəyişməyib.
+**İşçi ≠ istifadəçi (BE#57 — BREAKING).** İşçi sistemə GİRMİR: o, yalnız maaş uçotu qeydidir. `identity.Users` (giriş hesabı: telefon = login, şifrə, rol) ilə `identity.Employees` (maaş qeydi) ayrıldı və `/api/employees` artıq **Employees** üzərində işləyir. Ona görə:
+
+- `EmployeeDto` = `{id, fullName, phone (nullable), position, monthlySalary, isActive, note, createdAt}` — **`role` sahəsi SİLİNDİ** (işçinin rolu yoxdur, çünki login-i yoxdur), yerinə sərbəst mətn `position` («Satıcı», «Fəhlə», «Sürücü») gəldi.
+- `EmployeeSalarySummaryDto`: `userId` → **`employeeId`**, `role` → **`position`**. `SalaryEntryDto`: `userId` → **`employeeId`**; `createdByUserId` DƏYİŞMƏYİB — o, pulu VERƏN giriş hesabıdır (`ICurrentUser`), ödəniş ALAN isə `employeeId`-dir.
+- **Razılaşdırılmış maaş yalnız `PUT /api/employees/{id}/salary` (O) ilə dəyişir** (BE#59). `PUT /api/employees/{id}` (O+M) body-si `monthlySalary` sahəsini QƏBUL ETMİR — göndərilsə də nəzərə alınmır (naməlum sahə kimi). İki səbəb: (1) redaktə formasının təbii body-si (`{fullName, position}`) sahəni göndərmir və köhnə davranışda o, `0` kimi bind olunub razılaşdırılmış maaşı səssizcə silirdi (keçmiş ayların `remaining` sütunu mənfiyə düşürdü); (2) sahə O+M route-da qaldıqca menecer OwnerOnly maaş qaydasını sadəcə başqa marşrutdan keçirdi. İşçi YARADILARKƏN `monthlySalary?` hələ də verilə bilər (başlanğıc dəyər, default `0`).
+- `phone` opsionaldır və **unikal DEYİL** (login identifikatoru deyil): eyni nömrə ilə iki işçi yaratmaq 409 deyil, hər ikisi 201 alır. Verilibsə BE#46 qaydası ilə kanonik saxlanılır, boş/omitted → `null`, oxunmayan → 400.
+- Silmə endpoint-i yoxdur — maaş tarixçəsi qorunsun deyə işçi yalnız deaktiv edilir və siyahıda `isActive: false` ilə qalır (maaş xülasəsindən DƏ çıxarılmır, əks halda keçmiş ayların hesabatı dəyişərdi). Deaktiv işçiyə son haqq-hesab yazmaq İCAZƏLİDİR.
+- `Sales.soldByUserId` və activity `employeeId`/`userName` giriş hesabına aiddir — **toxunulmayıb**.
+- Wire dəyər sabitləri (`payment`/`deduction`, rol kodları) dəyişməyib (ADR-0006). Frontend `role`/`userId` istifadə edən yerlərdə yenilənməlidir (ayrıca FE task).
+
+**Maaş sistemi (BE#28).** `GET /api/employees` cavabında `monthlySalary` təyin edilməyibsə `0`, heç vaxt null.
 
 `type` dondurulmuş wire dəyəridir: `"payment"` (maaş/avans ödənişi — kassadan real pul çıxır) və ya `"deduction"` (yemək/yol/cərimə — yalnız işçinin hesabından tutulur, kassaya TOXUNMUR). `month` `yyyy-MM` formatındadır və göndərilmirsə cari Bakı ayı (ADR-0005) götürülür. Sətrin `date` sahəsi (pulun çıxdığı an) və `month` sahəsi (hansı ayın hesabına) AYRIDIR: keçən ayın maaşını bu gün ödəmək `date = bu gün`, `month = keçən ay` deməkdir — gün sonu/dashboard `date`-ə, maaş xülasəsi `month`-a baxır.
 
-`salary-summary` hər işçi üçün bir sətir qaytarır (`userId, fullName, role, monthlySalary, paidTotal, deductionTotal, remaining`); sətri olmayan işçi də `0/0/monthlySalary` ilə görünür. `remaining = monthlySalary − paidTotal − deductionTotal` MƏNFİ ola bilər — «artıq ödənilib» deməkdir, xəta deyil.
+`salary-summary` hər işçi üçün bir sətir qaytarır (`employeeId, fullName, position, monthlySalary, paidTotal, deductionTotal, remaining`); sətri olmayan işçi də `0/0/monthlySalary` ilə görünür. `remaining = monthlySalary − paidTotal − deductionTotal` MƏNFİ ola bilər — «artıq ödənilib» deməkdir, xəta deyil. Sətirlərin sırası `GET /api/employees` ilə eynidir (`createdAt` desc, bərabərlikdə `id`).
 
 Kassa təsiri: `payment` sətirləri gün sonu bağlanışında mövcud `expenses` rəqəminin İÇİNƏ əlavə olunur və dashboard-un `todayExpenses`/`expectedCash` sahələrinə düşür. `deduction` heç birinə düşmür. **BE#33:** həmin `payment` cəmi indi ayrıca da görünür — `GET /api/reports/summary`-nin cavabına (istənilən `period` üçün) additiv `salaryExpenses` sahəsi, `POST /api/closings` və `GET /api/closings*`-in cavabına additiv `ClosingDto.salaryExpenses` sahəsi əlavə olundu (`expenses = generalExpenses + productExpenses + salaryExpenses`; `Expenses`/`ExpectedCash`-in özü DƏYİŞMƏYİB, sadəcə artıq mövcud rəqəmin bir hissəsi ayrıca göstərilir).
 
-400 halları: `Salary.InvalidType` («Maaş əməliyyatının növü yanlışdır»), `Salary.InvalidMonth` («Ay formatı yanlışdır (yyyy-MM)»), «Məbləğ sıfırdan böyük olmalıdır», «Qeyd 500 simvoldan uzun ola bilməz», «Maaş mənfi ola bilməz». 404 halları: `Auth.UserNotFound`, `Salary.EntryNotFound` (sətir yoxdursa VƏ YA route-dakı işçiyə aid deyilsə — cross-user sızma yoxdur).
+400 halları: `Salary.InvalidType` («Maaş əməliyyatının növü yanlışdır»), `Salary.InvalidMonth` («Ay formatı yanlışdır (yyyy-MM)»), «Məbləğ sıfırdan böyük olmalıdır», «Qeyd 500 simvoldan uzun ola bilməz», «Maaş mənfi ola bilməz», «Ad boş ola bilməz» / «Ad 200 simvoldan uzun ola bilməz», «Vəzifə boş ola bilməz» / «Vəzifə 100 simvoldan uzun ola bilməz», telefon format xətası. 404 halları: **`Employee.NotFound`** («İşçi tapılmadı» — BE#57-dən əvvəl bu `Auth.UserNotFound` idi; maaş route-ları artıq giriş hesablarına baxmır, ona görə giriş hesabının id-si ilə çağırış da 404-dür), `Salary.EntryNotFound` (sətir yoxdursa VƏ YA route-dakı işçiyə aid deyilsə — cross-employee sızma yoxdur). Başqa mağazanın `employeeId`-si ilə hər çağırış 404-dür (403 yox).
 
 ### Products (`/api/products`, `/api/categories`)
 | Verb | Route | Auth |
@@ -154,6 +167,8 @@ Validasiya: `periodMonths` 1–120 arası (kənar → 400), `amount` > 0 və ≤
 Dəqiq DTO sahələri üçün: modulun `Application/Contracts/*Dto.cs` faylları; frontend tipləri `docs/index.ts` (kontraktın frontend tərəfi); test wire assert-ləri `tests/.../WireFormatApiTests.cs`.
 
 ## Last Updated
+
+2026-08-23 — BE#57 (**BREAKING**): işçi ilə giriş hesabı ayrıldı. Yeni `identity.Employees` registri və 4 yeni endpoint (`POST /api/employees`, `PUT /{id}`, `POST /{id}/deactivate|activate`); silmə endpoint-i qəsdən YOXDUR. `EmployeeDto`-dan `role` çıxdı, `position` (sərbəst mətn) gəldi, `phone` nullable və unikal deyil; `EmployeeSalarySummaryDto.userId` → `employeeId`, `role` → `position`; `SalaryEntryDto.userId` → `employeeId` (`createdByUserId` dəyişməyib). Maaş route-larının 404-ü `Auth.UserNotFound` → `Employee.NotFound`. Kassa/hesabat rəqəmləri, `soldByUserId`, activity sahələri və wire dəyər sabitləri DƏYİŞMƏYİB.
 
 2026-08-22 — BE#46: telefon qəbul edən bütün endpoint-lər girişi kanonik `994XXXXXXXXX` formasına salır və cavab DTO-ları da o formada qaytarır (sahə adları/tipləri dəyişməyib); yeni 400 mesajı «Telefon nömrəsi düzgün formatda deyil (məs: 050 123 45 67)»; login istənilən yazılışla işləyir.
 

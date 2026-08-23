@@ -9,7 +9,7 @@ Rollar: **Owner** (`sahib`), **Manager** (`menecer`), **Seller** (`satici`). JWT
 - Seller edə bilər: satış (yaratma), müştəri yaratma/ödəniş qəbulu, stok korreksiyası, kateqoriya əlavəsi, baxış/export.
 - Yalnız Owner+Manager: məhsul CRUD, satış düzəlişi/silinməsi, təchizatçı yazıları, xərclər, müştəri düzəlişi, nisyə sətri silmə.
 - Yalnız Owner: gün bağlama, settings dəyişmə, müştəri/təchizatçı silmə, işçinin aylıq maaşını təyin etmə, maaş sətri silmə.
-- Owner+Manager (əlavə): maaş sətri yazma və maaş xülasəsinə baxış.
+- Owner+Manager (əlavə): maaş sətri yazma və maaş xülasəsinə baxış; işçi qeydi yaratma/düzəltmə/deaktiv-aktiv etmə (BE#57). İşçi siyahısına baxış istənilən rola açıqdır.
 
 Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 
@@ -80,9 +80,14 @@ Dəqiq endpoint-icazə cədvəli: `docs/api/API-OVERVIEW.md`.
 - Bir günə bir bağlanış: `DayEnd.AlreadyClosed` (409); real qoruma `Date` üzərində unique index-dir.
 - "Bu gün" = Asia/Baku günü (ADR-0005).
 
-## İşçi maaşı qaydaları (BE#28)
+## İşçi maaşı qaydaları (BE#28, BE#57)
 
-- Hər işçinin razılaşdırılmış aylıq maaşı var (`monthlySalary`, default `0` — «hələ təyin edilməyib»). Yalnız Owner dəyişir; mənfi ola bilməz.
+- **İşçi sistemə GİRMİR (BE#57).** İki ayrı reyestr var: **giriş hesabı** (`User` — telefon = login, şifrə, rol) və **işçi/maaş qeydi** (`Employee` — ad, əlaqə telefonu, vəzifə, aylıq maaş). Anbardar, fəhlə və sürücü üçün maaş uçotu aparmaq üçün onlara hesab AÇILMIR; əksinə, sahibkarın öz hesabı var, amma maaş qeydi olmaya bilər. `/api/employees` və maaş xülasəsi Employee üzərində işləyir.
+- İşçinin telefonu **opsionaldır və unikal deyil** — o, əlaqə nömrəsidir, login identifikatoru deyil (bir ailənin iki üzvü eyni nömrədə ola bilər). Giriş hesabının telefonu isə mağaza daxilində unikaldır.
+- Vəzifə (`position`) sərbəst mətndir («Satıcı», «Fəhlə», «Sürücü») və rol kodu ilə (`sahib`/`menecer`/`satici`) qarışdırılmamalıdır — icazələr yalnız giriş hesabının rolundan gəlir.
+- **İşçi silinmir, deaktiv edilir.** Maaş tarixçəsi mağazanın mühasibat qeydidir; sətri silmək kassadan həqiqətən çıxmış pulu yoxa çıxarardı. Deaktiv işçi siyahıda `isActive: false` ilə qalır və maaş xülasəsindən də çıxarılmır (əks halda keçmiş ayların hesabatı geriyə dönük dəyişərdi). Deaktiv işçiyə son haqq-hesab ödəmək İCAZƏLİDİR.
+- «Kimə ödənildi» (`employeeId`) və «kim ödədi» (`createdByUserId`) fərqli suallardır: birincisi maaş qeydidir, ikincisi əməliyyatı yazan giriş hesabıdır. Satışdakı `soldByUserId` da giriş hesabıdır.
+- Hər işçinin razılaşdırılmış aylıq maaşı var (`monthlySalary`, default `0` — «hələ təyin edilməyib»). Yalnız Owner dəyişir; mənfi ola bilməz. **Dəyişmənin yeganə yolu `PUT /api/employees/{id}/salary`-dir (BE#59):** işçi qeydinin redaktəsi (`PUT /api/employees/{id}`, O+M) maaşa toxunmur — ad/vəzifə düzəltmək «nə qədər borcluyuq» sualına cavab vermir və menecerin redaktə icazəsi maaş icazəsi demək deyil. Redaktə body-sində `monthlySalary` gəlsə belə nəzərə alınmır.
 - Maaş hesabına iki cür sətir düşür: **ödəniş** (`payment` — maaş/avans, kassadan real pul çıxır) və **tutulma** (`deduction` — yemək, yol, cərimə; pul çıxmır, işçinin hesabından tutulur). Sətir yazmaq Owner+Manager, silmək yalnız Owner işidir.
 - Sətrin İKİ tarixi var və bir-birini əvəz etmir: **`date`** pulun kassadan çıxdığı andır, **`month`** (`yyyy-MM`) hansı ayın hesabına yazıldığıdır. Keçən ayın maaşını bu gün ödəmək = bugünkü `date` + keçən ayın `month`-u.
 - Aylıq hesab: `remaining = monthlySalary − paidTotal − deductionTotal`. MƏNFİ dəyər normaldır — «artıq ödənilib» deməkdir, kəsilmir və xəta vermir. Heç bir sətri olmayan işçi də xülasədə görünür.
@@ -110,6 +115,8 @@ Sistemdəki HƏR telefon **kanonik formada** saxlanılır: 12 rəqəm, `994` il�
 - Bütün yazma əməliyyatları activity log yazır (siyahı: `src/Modules/*/Application/UseCases/*/`); log caller-in transaction-ında commit olur.
 
 ## Last Updated
+
+2026-08-23 — BE#57: «işçi ≠ istifadəçi» qaydası əlavə olundu (işçi sistemə girmir, telefonu unikal deyil, vəzifə sərbəst mətndir, işçi silinmir yalnız deaktiv edilir, «kimə ödənildi» ≠ «kim ödədi»); rol matrisinə işçi qeydinin idarəsi (O+M) əlavə olundu.
 
 2026-08-22 — BE#46: telefon nömrəsi qaydaları ayrıca bölmə oldu (kanonik `994XXXXXXXXX` format, tək `PhoneNormalizer` mənbəyi, login-in istənilən yazılışla işləməsi, dublikat yoxlamasının kanonik dəyər üzərində olması).
 

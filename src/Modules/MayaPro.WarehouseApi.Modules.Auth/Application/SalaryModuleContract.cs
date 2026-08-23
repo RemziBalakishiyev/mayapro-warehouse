@@ -43,20 +43,21 @@ internal sealed class SalaryModuleContract(IAuthDbContext db, IDateProvider date
 
         var rows = await query
             .OrderBy(e => e.Date)
-            .Select(e => new { e.Date, e.UserId, e.Amount })
+            .Select(e => new { e.Date, e.EmployeeId, e.Amount })
             .ToListAsync(cancellationToken);
 
         // Names are resolved in a separate lookup rather than an inner join, so a payment can never drop out
-        // of the report (and out of the dashboard's cash maths) because of a missing user row.
-        Dictionary<Guid, string> names = await db.Users
+        // of the report (and out of the dashboard's cash maths) because of a missing employee row. BE#57
+        // keeps this stance: the money left the drawer whether or not the payroll record is still there.
+        Dictionary<Guid, string> names = await db.Employees
             .AsNoTracking()
-            .ToDictionaryAsync(u => u.Id, u => u.FullName, cancellationToken);
+            .ToDictionaryAsync(e => e.Id, e => e.FullName, cancellationToken);
 
         return rows
             .Select(r => new SalaryPaymentRow(
                 dateProvider.ToLocalDate(r.Date),
-                r.UserId,
-                names.TryGetValue(r.UserId, out string? name) ? name : string.Empty,
+                r.EmployeeId,
+                names.TryGetValue(r.EmployeeId, out string? name) ? name : string.Empty,
                 r.Amount))
             .ToList();
     }

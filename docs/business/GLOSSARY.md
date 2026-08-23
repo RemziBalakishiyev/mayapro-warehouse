@@ -18,6 +18,8 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 | **Qaimə-faktura** | Satış üçün A5 PDF sənəd, № formatı `SF-yyyyMMdd-XXXXXX` (Exports modulu) |
 | **Bağlanış (Closing)** | Gün sonu kassa üzləşdirməsi. `ExpectedCash = OpeningCash + CashSales − Expenses`; `Difference = ActualCash − ExpectedCash` |
 | **Dondurulmuş mal (frozen stock)** | 30/60/90 gün satılmayan məhsullar (Reports) |
+| **Giriş hesabı (User)** | Sistemə girə bilən hesab: telefon = login identifikatoru (mağaza daxilində unikal), şifrə hash-i, rol. Satış/activity/gün sonu qeydlərindəki «kim etdi» sahələri buna işarə edir |
+| **İşçi (Employee)** | Maaş uçotu qeydi — BE#57-dən sonra giriş hesabından AYRIDIR. İşçi sistemə girmir: şifrəsi/rolu yoxdur, telefonu opsional və unikal deyil, vəzifəsi (`position`) sərbəst mətndir. Silinmir, yalnız deaktiv edilir (maaş tarixçəsi qorunur) |
 | **Sahibkar (sahib)** | Mağaza sahibi rolu — tam səlahiyyət (wire: `role = "sahib"`) |
 | **Satıcı (satici)** | Satış edən işçi rolu — məhdud səlahiyyət (wire: `"satici"`) |
 | **Menecer** | Wire formatda mövcud rol dəyəri (`"menecer"`) |
@@ -27,6 +29,8 @@ Bazar (Sədərək) anbar-satış konteksti. Wire-dakı Azərbaycanca dəyərlər
 | **Açıq faktura linki** | Satışın sabit tokenli auth-suz PDF linki (`/api/public/invoices/{token}`) — WhatsApp-la paylaşmaq üçün; IP başına 30/dəq limit |
 
 ## Last Updated
+
+2026-08-23 — BE#57: «Giriş hesabı (User)» və «İşçi (Employee)» terminləri ayrıldı — bu iki söz indiyə qədər eyni cədvəl sətrini bildirirdi.
 
 2026-07-27 — BE#4: «Xərc növü (ExpenseType)» və «Xərc mənbəyi (Source)» terminləri əlavə olundu; köhnə sabit «Xərc kateqoriyaları» sətri çıxarıldı (artıq idarə olunan növlərdir, wire-da frozen deyil).
 

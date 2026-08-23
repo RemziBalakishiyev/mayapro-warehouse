@@ -12,7 +12,8 @@ public sealed class SalaryEntryConfiguration : IEntityTypeConfiguration<SalaryEn
 
         builder.HasKey(e => e.Id);
 
-        builder.Property(e => e.UserId).IsRequired();
+        // BE#57 — the payroll record the line belongs to (was UserId until the split).
+        builder.Property(e => e.EmployeeId).IsRequired();
 
         // Persisted by name ("Payment"/"Deduction") for a readable, reorder-safe column.
         builder.Property(e => e.Type)
@@ -30,8 +31,8 @@ public sealed class SalaryEntryConfiguration : IEntityTypeConfiguration<SalaryEn
 
         builder.Property(e => e.Note).HasMaxLength(500);
 
-        // The cash-side lookup (day-end / dashboard) reads Date; the summary reads (UserId, Month).
+        // The cash-side lookup (day-end / dashboard) reads Date; the summary reads (EmployeeId, Month).
         builder.HasIndex(e => e.Date);
-        builder.HasIndex(e => new { e.UserId, e.Month });
+        builder.HasIndex(e => new { e.EmployeeId, e.Month });
     }
 }

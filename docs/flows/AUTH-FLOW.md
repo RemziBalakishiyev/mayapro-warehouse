@@ -25,9 +25,12 @@ Claims: `sub` (user id), `name`, `role` (**enum adı**: Owner/Manager/Seller/Pla
 - Dev seeder (`UserSeeder`, yalnız Development + boş cədvəldə): Owner `0501112233`, Manager `0552223344`, Seller `0553334455`, `0554445566` — hamısının şifrəsi `demo123`.
 - **Platforma admini** (`PlatformAdminSeeder`, BE#36) — **hər mühitdə**, `PlatformAdmin` konfiqurasiya bölməsindən (telefon/şifrə/ad), idempotent. Heç bir mağazaya aid deyil (rezerv `TenantId`), ona görə mağaza datasını görmür.
 - Mağaza qeydiyyatı ilk `Owner` istifadəçisini yaradır (yuxarıda).
-- `GET /api/auth/me` — cari profil; `GET /api/employees` — cari mağazanın istifadəçiləri (hər rola açıq).
+- `GET /api/auth/me` — cari **giriş hesabı** profili.
+- `GET /api/employees` isə giriş hesablarını YOX, mağazanın maaş uçotu reyestrini (`identity.Employees`) qaytarır (BE#57) — işçi sistemə girmir, ona görə orada rol/şifrə anlayışı yoxdur. Login axını bu reyestrə heç vaxt baxmır.
 
 ## Last Updated
+
+2026-08-23 — BE#57: `GET /api/employees` artıq giriş hesablarını deyil, ayrıca işçi (maaş uçotu) reyestrini qaytarır; login axını, rollar və `/api/auth/*` cavabları dəyişməyib.
 
 2026-08-16 — BE#36: qeydiyyat axını, `PlatformAdmin` rolu + `PlatformAdminOnly` policy, login-in statusa görə ayrılmış 403-ləri.
 

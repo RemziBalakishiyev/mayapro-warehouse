@@ -17,17 +17,17 @@ public sealed class DeleteSalaryEntryHandler(
     IActivityLogger activityLogger,
     ICurrentUser currentUser)
 {
-    public async Task<Result> Handle(Guid userId, Guid entryId, CancellationToken ct)
+    public async Task<Result> Handle(Guid employeeId, Guid entryId, CancellationToken ct)
     {
         SalaryEntry? entry = await db.SalaryEntries
-            .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, ct);
+            .FirstOrDefaultAsync(e => e.Id == entryId && e.EmployeeId == employeeId, ct);
         if (entry is null)
             return Result.Failure(SalaryErrors.EntryNotFound);
 
-        string fullName = await db.Users
+        string fullName = await db.Employees
             .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => u.FullName)
+            .Where(e => e.Id == employeeId)
+            .Select(e => e.FullName)
             .FirstOrDefaultAsync(ct) ?? string.Empty;
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);

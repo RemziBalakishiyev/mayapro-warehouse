@@ -453,15 +453,20 @@ public sealed class PhoneNormalizationMigrationTests
         return id;
     }
 
+    /// <summary>
+    /// BE#57 — <c>MonthlySalary</c> is deliberately not listed: the column exists before the split (with a
+    /// DEFAULT of 0) and is gone after it, and this helper is called on both sides of that line — once against
+    /// the pre-phone-migration schema, once against the current one.
+    /// </summary>
     private static async Task<Guid> InsertUserAsync(AuthDbContext db, Guid tenantId, string phone, string name)
     {
         Guid id = Guid.NewGuid();
         await db.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO [identity].[Users]
-                ([Id],[FullName],[Phone],[Email],[PasswordHash],[Role],[IsActive],[MonthlySalary],
+                ([Id],[FullName],[Phone],[Email],[PasswordHash],[Role],[IsActive],
                  [TenantId],[CreatedAt],[UpdatedAt])
-            VALUES ({0}, {1}, {2}, NULL, N'hash', N'Owner', 1, 0, {3}, SYSUTCDATETIME(), SYSUTCDATETIME());
+            VALUES ({0}, {1}, {2}, NULL, N'hash', N'Owner', 1, {3}, SYSUTCDATETIME(), SYSUTCDATETIME());
             """,
             id, name, phone, tenantId);
 

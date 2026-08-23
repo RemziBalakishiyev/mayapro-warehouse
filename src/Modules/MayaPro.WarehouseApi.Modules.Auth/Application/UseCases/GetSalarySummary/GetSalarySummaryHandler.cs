@@ -23,40 +23,44 @@ public sealed class GetSalarySummaryHandler(IAuthDbContext db, IDateProvider dat
         else if (!SalaryMonth.TryParse(month, out filter))
             return Result.Failure<IReadOnlyList<EmployeeSalarySummaryDto>>(SalaryErrors.InvalidMonth);
 
-        // Materialise both sides first — Role.ToCode() is a C# mapping EF cannot translate to SQL, and the
-        // per-employee totals are a trivial in-memory fold over one month's rows.
-        var users = await db.Users
+        // BE#57 — the register being summarised is Employees. Deactivated employees stay in: dropping them
+        // would silently rewrite an earlier month's report every time somebody left the shop.
+        // The ordering (and its Id tiebreaker) is copied from GetEmployeesHandler on purpose — the two
+        // lists are rendered side by side, so a different tiebreaker would shift the table's rows.
+        var employees = await db.Employees
             .AsNoTracking()
-            .OrderByDescending(u => u.CreatedAt)
-            .Select(u => new { u.Id, u.FullName, u.Role, u.MonthlySalary })
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenBy(e => e.Id)
+            .Select(e => new { e.Id, e.FullName, e.Position, e.MonthlySalary })
             .ToListAsync(ct);
 
+        // The per-employee totals are a trivial in-memory fold over one month's rows.
         var entries = await db.SalaryEntries
             .AsNoTracking()
             .Where(e => e.Month == filter)
-            .Select(e => new { e.UserId, e.Type, e.Amount })
+            .Select(e => new { e.EmployeeId, e.Type, e.Amount })
             .ToListAsync(ct);
 
-        var byUser = entries
-            .GroupBy(e => e.UserId)
+        var byEmployee = entries
+            .GroupBy(e => e.EmployeeId)
             .ToDictionary(
                 g => g.Key,
                 g => (
                     Paid: g.Where(e => e.Type == SalaryEntryType.Payment).Sum(e => e.Amount),
                     Deducted: g.Where(e => e.Type == SalaryEntryType.Deduction).Sum(e => e.Amount)));
 
-        List<EmployeeSalarySummaryDto> rows = users
-            .Select(u =>
+        List<EmployeeSalarySummaryDto> rows = employees
+            .Select(e =>
             {
-                (decimal paid, decimal deducted) = byUser.TryGetValue(u.Id, out var totals) ? totals : (0m, 0m);
+                (decimal paid, decimal deducted) = byEmployee.TryGetValue(e.Id, out var totals) ? totals : (0m, 0m);
                 return new EmployeeSalarySummaryDto(
-                    u.Id,
-                    u.FullName,
-                    u.Role.ToCode(),
-                    u.MonthlySalary,
+                    e.Id,
+                    e.FullName,
+                    e.Position,
+                    e.MonthlySalary,
                     paid,
                     deducted,
-                    u.MonthlySalary - paid - deducted);
+                    e.MonthlySalary - paid - deducted);
             })
             .ToList();
 

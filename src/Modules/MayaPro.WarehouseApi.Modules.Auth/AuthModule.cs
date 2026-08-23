@@ -1,6 +1,7 @@
 using FluentValidation;
 using MayaPro.WarehouseApi.Modules.Auth.Application;
 using MayaPro.WarehouseApi.Modules.Auth.Application.Abstractions;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.CreateEmployee;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.CreateSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.DeleteSalaryEntry;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetEmployees;
@@ -8,7 +9,9 @@ using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetMe;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalaryEntries;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetSalarySummary;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.Login;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.SetEmployeeActive;
 using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.SetEmployeeSalary;
+using MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.UpdateEmployee;
 using MayaPro.WarehouseApi.Modules.Auth.Endpoints;
 using MayaPro.WarehouseApi.Modules.Auth.Infrastructure;
 using MayaPro.WarehouseApi.SharedKernel.Application;
@@ -68,10 +71,15 @@ public sealed class AuthModule : IModule
         services.AddScoped<IValidator<LoginCommand>, LoginValidator>();
         services.AddScoped<IValidator<SetEmployeeSalaryCommand>, SetEmployeeSalaryValidator>();
         services.AddScoped<IValidator<CreateSalaryEntryCommand>, CreateSalaryEntryValidator>();
+        services.AddScoped<IValidator<CreateEmployeeCommand>, CreateEmployeeValidator>();
+        services.AddScoped<IValidator<UpdateEmployeeCommand>, UpdateEmployeeValidator>();
 
         services.AddScoped<LoginHandler>();
         services.AddScoped<GetMeHandler>();
         services.AddScoped<GetEmployeesHandler>();
+        services.AddScoped<CreateEmployeeHandler>();
+        services.AddScoped<UpdateEmployeeHandler>();
+        services.AddScoped<SetEmployeeActiveHandler>();
         services.AddScoped<SetEmployeeSalaryHandler>();
         services.AddScoped<CreateSalaryEntryHandler>();
         services.AddScoped<GetSalaryEntriesHandler>();

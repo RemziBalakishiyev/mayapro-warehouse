@@ -24,12 +24,14 @@ Eyni schema daxilində, sahib entity-nin Id-si ilə. Konfiqurasiyalarda navigati
 - `CustomerDebtAdjustment.CustomerId` → Customer (ilkin borc tarixçəsi)
 - `SupplierPayment.SupplierId` → Supplier
 - `SupplierDebtAdjustment.SupplierId` → Supplier (ilkin borc tarixçəsi)
-- `SalaryEntry.UserId` → User (işçinin maaş hesabı; `(UserId, Month)` üzərində index)
+- `SalaryEntry.EmployeeId` → Employee (işçinin maaş hesabı; `(EmployeeId, Month)` üzərində index) — BE#57-dən əvvəl `UserId` idi
+- `SalaryEntry.CreatedByUserId?` → identity.Users (pulu VERƏN giriş hesabı — `EmployeeId` ilə qarışdırılmamalıdır)
 
 ## Entity-lərin qısa xəritəsi
 
-- **User**: FullName, Phone (unique), Email, PasswordHash (BCrypt), Role (string), IsActive, MonthlySalary (default 0)
-- **SalaryEntry**: UserId, Type (enum: Payment/Deduction, string kimi), Amount, Note?, Date (UTC — pulun çıxdığı an), Month (`yyyy-MM` — hesab ayı), CreatedByUserId?
+- **User** (giriş hesabı): FullName, Phone (mağaza daxilində unique — login identifikatoru), Email, PasswordHash (BCrypt), Role (string), IsActive
+- **Employee** (maaş uçotu qeydi, BE#57): FullName, Phone? (**unique deyil** — sadəcə əlaqə nömrəsi), Position (sərbəst mətn), MonthlySalary (default 0), Note?, IsActive, CreatedAt. Login/şifrə/rol sahəsi YOXDUR; silinmir, yalnız deaktiv edilir
+- **SalaryEntry**: EmployeeId, Type (enum: Payment/Deduction, string kimi), Amount, Note?, Date (UTC — pulun çıxdığı an), Month (`yyyy-MM` — hesab ayı), CreatedByUserId?
 - **Product**: ad/kateqoriya(string snapshot)/barcode/qiymətlər/Quantity/InitialQuantity(sabit)/MinStock/yerləşmə sahələri/Attributes(JSON)/Expenses(JSON)/RealCostPerUnit(hesablanan)
 - **Category**: sadə ad siyahısı (məhsul kateqoriyaya FK ilə bağlanmır)
 - **ExpenseType**: sadə ad siyahısı, unique (xərc `Category`-yə FK ilə bağlanmır — Category ilə eyni pattern)
@@ -44,6 +46,8 @@ Eyni schema daxilində, sahib entity-nin Id-si ilə. Konfiqurasiyalarda navigati
 - **StoreSettings**: singleton — StoreName, OwnerName?, Address?, Phone?, WhatsappTemplate, Currency, DefaultMinStock, Language
 
 ## Last Updated
+
+2026-08-23 — BE#57: yeni `Employee` entity-si (maaş uçotu) `User`-dən (giriş hesabı) ayrıldı; `User.MonthlySalary` silindi, `SalaryEntry.UserId` → `EmployeeId`. `Sale.SoldByUserId`, `Closing.ClosedByUserId`, `ActivityLog.UserId` və `SalaryEntry.CreatedByUserId` HƏLƏ DƏ `identity.Users`-ə işarə edir — onlar «kim etdi» sualının cavabıdır.
 
 2026-08-01 — BE#28: `User.MonthlySalary` və yeni `SalaryEntry` entity-si (Auth modulu daxilində, `UserId` FK-sız); `Date` (kassa anı) və `Month` (hesab ayı) ayrımı.
 

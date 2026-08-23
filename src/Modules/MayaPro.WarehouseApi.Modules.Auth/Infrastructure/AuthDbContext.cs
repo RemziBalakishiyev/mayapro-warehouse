@@ -30,6 +30,9 @@ public sealed class AuthDbContext(
 
     public DbSet<User> Users => Set<User>();
 
+    /// <summary>BE#57 — the payroll register; separate from <see cref="Users"/>, which are login accounts.</summary>
+    public DbSet<Employee> Employees => Set<Employee>();
+
     public DbSet<SalaryEntry> SalaryEntries => Set<SalaryEntry>();
 
     public Task EnlistAsync(DbTransaction transaction, CancellationToken cancellationToken = default) =>

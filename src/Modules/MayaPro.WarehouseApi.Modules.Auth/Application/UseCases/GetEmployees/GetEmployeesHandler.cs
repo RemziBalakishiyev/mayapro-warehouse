@@ -5,20 +5,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.GetEmployees;
 
-/// <summary>Returns all users as employee rows, newest first.</summary>
+/// <summary>
+/// The payroll register, newest first. BE#57: this reads <c>Employees</c>, not login accounts.
+/// <para>
+/// Deactivated employees are <b>included</b>, carrying <c>isActive: false</c>. Hiding them would make an
+/// earlier month's salary summary — whose row order is this very list — quietly lose people who worked it.
+/// </para>
+/// </summary>
 public sealed class GetEmployeesHandler(IAuthDbContext db)
 {
     public async Task<IReadOnlyList<EmployeeDto>> Handle(CancellationToken ct)
     {
-        // Materialise first — Role.ToCode() is a C# mapping EF cannot translate to SQL.
-        var users = await db.Users
+        List<Employee> employees = await db.Employees
             .AsNoTracking()
-            .OrderByDescending(u => u.CreatedAt)
-            .Select(u => new { u.Id, u.FullName, u.Phone, u.Role, u.IsActive, u.MonthlySalary })
+            // The Id tiebreaker is not cosmetic: rows seeded (or migrated) in one SaveChanges share a
+            // CreatedAt to the tick, and GET /salary-summary has to hand back the very same order.
+            .OrderByDescending(e => e.CreatedAt)
+            .ThenBy(e => e.Id)
             .ToListAsync(ct);
 
-        return users
-            .Select(u => new EmployeeDto(u.Id, u.FullName, u.Phone, u.Role.ToCode(), u.IsActive, u.MonthlySalary))
-            .ToList();
+        return employees.Select(e => e.ToDto()).ToList();
     }
 }

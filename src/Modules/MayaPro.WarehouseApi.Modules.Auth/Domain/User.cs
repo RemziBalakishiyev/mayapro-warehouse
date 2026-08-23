@@ -3,8 +3,13 @@ using MayaPro.WarehouseApi.SharedKernel.Domain;
 namespace MayaPro.WarehouseApi.Modules.Auth.Domain;
 
 /// <summary>
-/// A system user (employee). Behaviour-rich entity — no public setters; state changes go through methods.
+/// A login account. Behaviour-rich entity — no public setters; state changes go through methods.
 /// Password is only ever stored as a BCrypt hash.
+/// <para>
+/// BE#57 — a user is <b>not</b> a payroll record. The agreed monthly salary moved to <see cref="Employee"/>,
+/// which is what <c>/api/employees</c> and the salary summary now read, because most people a shop pays never
+/// sign in at all. What stays here is only what a login needs: the phone identifier, the hash and the role.
+/// </para>
 /// </summary>
 public sealed class User : TenantEntity
 {
@@ -34,12 +39,6 @@ public sealed class User : TenantEntity
 
     public bool IsActive { get; private set; } = true;
 
-    /// <summary>
-    /// The employee's agreed monthly salary (BE#28). Zero means "not set yet" — never null, so the
-    /// summary maths never has to special-case it. Changed only through <see cref="SetMonthlySalary"/>.
-    /// </summary>
-    public decimal MonthlySalary { get; private set; }
-
     public static User Create(
         string fullName,
         string phone,
@@ -52,7 +51,4 @@ public sealed class User : TenantEntity
     public void Activate() => IsActive = true;
 
     public void Deactivate() => IsActive = false;
-
-    /// <summary>Sets the agreed monthly salary. The caller validates the amount (never negative).</summary>
-    public void SetMonthlySalary(decimal monthlySalary) => MonthlySalary = monthlySalary;
 }

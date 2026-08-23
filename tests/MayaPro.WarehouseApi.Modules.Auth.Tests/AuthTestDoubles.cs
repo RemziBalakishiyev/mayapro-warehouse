@@ -106,16 +106,32 @@ internal static class AuthTestDb
         return new AuthDbContext(options);
     }
 
-    /// <summary>Adds an employee with a known salary and returns it.</summary>
-    public static async Task<User> AddEmployeeAsync(
+    /// <summary>
+    /// BE#57 — adds a <b>payroll record</b> with a known salary and returns it. Note what it does not do:
+    /// no account is created, because an employee does not sign in.
+    /// </summary>
+    public static async Task<Employee> AddEmployeeAsync(
         this AuthDbContext db,
         string fullName = "Günel Quliyeva",
-        string phone = "0554445566",
-        UserRole role = UserRole.Seller,
-        decimal monthlySalary = 0m)
+        string? phone = "0554445566",
+        string position = "Satıcı",
+        decimal monthlySalary = 0m,
+        bool isActive = true)
+    {
+        var employee = Employee.Create(fullName, phone, position, monthlySalary, isActive: isActive);
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
+        return employee;
+    }
+
+    /// <summary>Adds a login account — the other half of the split, for tests that need one.</summary>
+    public static async Task<User> AddUserAsync(
+        this AuthDbContext db,
+        string fullName = "Rəşad Məmmədov",
+        string phone = "0501112233",
+        UserRole role = UserRole.Owner)
     {
         var user = User.Create(fullName, phone, null, Hasher.Hash("demo123"), role);
-        user.SetMonthlySalary(monthlySalary);
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;
@@ -123,14 +139,14 @@ internal static class AuthTestDb
 
     public static async Task AddEntryAsync(
         this AuthDbContext db,
-        Guid userId,
+        Guid employeeId,
         SalaryEntryType type,
         decimal amount,
         string month,
         DateTime? date = null)
     {
         db.SalaryEntries.Add(SalaryEntry.Create(
-            userId, type, amount, null, date ?? new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc), month, null));
+            employeeId, type, amount, null, date ?? new DateTime(2026, 8, 1, 10, 0, 0, DateTimeKind.Utc), month, null));
         await db.SaveChangesAsync();
     }
 }

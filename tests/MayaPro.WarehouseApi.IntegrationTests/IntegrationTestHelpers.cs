@@ -22,6 +22,18 @@ internal static class IntegrationTestHelpers
     /// </summary>
     public const string SecondSellerPhone = "994554445566"; // typed as 0554445566
 
+    /// <summary>
+    /// BE#57 — logins and payroll are two registers now. The seeder fills both, and the three non-Owner demo
+    /// people appear in each under the same name and number (exactly what the data migration produces from an
+    /// existing database), so the constants above still find the right <b>employee</b> row. The Owner has a
+    /// login and no payroll record, which is the normal case for a shop owner.
+    /// </summary>
+    public static async Task<Guid> EmployeeIdByPhoneAsync(this HttpClient client, string phone)
+    {
+        List<EmployeeDto> employees = (await client.GetFromJsonAsync<List<EmployeeDto>>("/api/employees"))!;
+        return employees.Single(e => e.Phone == phone).Id;
+    }
+
     public const string DemoPassword = "demo123";
 
     public static async Task<HttpClient> AuthenticatedClientAsync(
@@ -232,14 +244,27 @@ internal static class IntegrationTestHelpers
 
     internal sealed record ActivityDto(Guid Id, Guid? EmployeeId, string Action, string Detail);
 
-    /// <summary>Wire shape of one row of <c>GET /api/employees</c> — <c>monthlySalary</c> added by BE#28.</summary>
+    /// <summary>
+    /// Wire shape of one row of <c>GET /api/employees</c>. BE#57 replaced <c>role</c> with the free-text
+    /// <c>position</c>, made <c>phone</c> nullable and added <c>note</c>/<c>createdAt</c>.
+    /// </summary>
     internal sealed record EmployeeDto(
-        Guid Id, string FullName, string Phone, string Role, bool IsActive, decimal MonthlySalary);
+        Guid Id,
+        string FullName,
+        string? Phone,
+        string Position,
+        decimal MonthlySalary,
+        bool IsActive,
+        string? Note,
+        DateTime CreatedAt);
 
-    /// <summary>Wire shape of one row of <c>GET /api/employees/{id}/salary-entries</c> (BE#28).</summary>
+    /// <summary>
+    /// Wire shape of one row of <c>GET /api/employees/{id}/salary-entries</c> (BE#28; <c>userId</c> renamed
+    /// to <c>employeeId</c> by BE#57 — <c>createdByUserId</c> still names the login account that recorded it).
+    /// </summary>
     internal sealed record SalaryEntryDto(
         Guid Id,
-        Guid UserId,
+        Guid EmployeeId,
         string Type,
         decimal Amount,
         string? Note,
@@ -248,11 +273,11 @@ internal static class IntegrationTestHelpers
         Guid? CreatedByUserId,
         DateTime CreatedAt);
 
-    /// <summary>Wire shape of one row of <c>GET /api/employees/salary-summary</c> (BE#28).</summary>
+    /// <summary>Wire shape of one row of <c>GET /api/employees/salary-summary</c> (BE#28 / BE#57).</summary>
     internal sealed record SalarySummaryDto(
-        Guid UserId,
+        Guid EmployeeId,
         string FullName,
-        string Role,
+        string Position,
         decimal MonthlySalary,
         decimal PaidTotal,
         decimal DeductionTotal,

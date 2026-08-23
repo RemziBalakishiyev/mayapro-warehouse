@@ -8,7 +8,7 @@ public static class SalaryEntryMapping
     public static SalaryEntryDto ToDto(this SalaryEntry entry) =>
         new(
             entry.Id,
-            entry.UserId,
+            entry.EmployeeId,
             entry.Type.ToCode(),
             entry.Amount,
             entry.Note,

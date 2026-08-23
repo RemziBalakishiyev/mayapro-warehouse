@@ -22,14 +22,14 @@ public sealed class SetEmployeeSalaryHandler(
         if (!validation.IsValid)
             return Result.Failure<EmployeeDto>(Error.Validation(validation.Errors[0].ErrorMessage));
 
-        User? user = await db.Users.FirstOrDefaultAsync(u => u.Id == command.Id, ct);
-        if (user is null)
-            return Result.Failure<EmployeeDto>(AuthErrors.UserNotFound);
+        // BE#57 — the salary belongs to the payroll record, not to a login account.
+        Employee? employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == command.Id, ct);
+        if (employee is null)
+            return Result.Failure<EmployeeDto>(EmployeeErrors.NotFound);
 
-        user.SetMonthlySalary(command.MonthlySalary);
+        employee.SetMonthlySalary(command.MonthlySalary);
         await db.SaveChangesAsync(ct);
 
-        return Result.Success(new EmployeeDto(
-            user.Id, user.FullName, user.Phone, user.Role.ToCode(), user.IsActive, user.MonthlySalary));
+        return Result.Success(employee.ToDto());
     }
 }
