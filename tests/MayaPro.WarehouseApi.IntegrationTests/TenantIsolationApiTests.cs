@@ -441,7 +441,7 @@ public sealed class TenantIsolationApiTests : IAsyncLifetime
         Assert.Equal(theirs, Assert.Single(await EmployeesAsync(_clientB)).Id);
 
         await AssertNotFoundAsync(await _clientA.PutAsJsonAsync(
-            $"/api/employees/{theirs}", new { fullName = "Oğurlanmış", phone = (string?)null, position = "Satıcı", monthlySalary = 0m, note = (string?)null }));
+            $"/api/employees/{theirs}", new { fullName = "Oğurlanmış", phone = (string?)null, position = "Satıcı", note = (string?)null }));
         await AssertNotFoundAsync(await _clientA.PostAsync($"/api/employees/{theirs}/deactivate", null));
         await AssertNotFoundAsync(await _clientA.PostAsync($"/api/employees/{theirs}/activate", null));
         await AssertNotFoundAsync(await _clientA.PostAsJsonAsync(

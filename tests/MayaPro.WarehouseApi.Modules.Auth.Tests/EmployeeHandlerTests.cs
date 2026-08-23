@@ -140,7 +140,7 @@ public sealed class EmployeeHandlerTests
         Assert.Empty(db.Employees);
     }
 
-    /// <summary>The edit rewrites the details and leaves the salary history alone.</summary>
+    /// <summary>The edit rewrites the details and leaves both the agreed salary and the salary history alone.</summary>
     [Fact]
     public async Task Update_Rewrites_The_Details_And_Keeps_The_Salary_History()
     {
@@ -149,20 +149,65 @@ public sealed class EmployeeHandlerTests
         await db.AddEntryAsync(employee.Id, SalaryEntryType.Payment, 100m, "2026-03");
 
         var result = await Updater(db).Handle(
-            new UpdateEmployeeCommand(employee.Id, "Günel Quliyeva-Əliyeva", "0559998877", "Menecer", 750m, "Terfi"),
+            new UpdateEmployeeCommand(employee.Id, "Günel Quliyeva-Əliyeva", "0559998877", "Menecer", "Terfi"),
             default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Günel Quliyeva-Əliyeva", result.Value.FullName);
         Assert.Equal("Menecer", result.Value.Position);
         Assert.Equal("994559998877", result.Value.Phone);
-        Assert.Equal(750m, result.Value.MonthlySalary);
         Assert.Equal("Terfi", result.Value.Note);
+
+        // BE#59: a promotion is a new job title, not a new salary — that is the owner's separate decision.
+        Assert.Equal(600m, result.Value.MonthlySalary);
 
         // The line is untouched — renaming somebody never rewrites what they were already paid.
         SalaryEntry entry = await db.SalaryEntries.SingleAsync();
         Assert.Equal(100m, entry.Amount);
         Assert.Equal(employee.Id, entry.EmployeeId);
+    }
+
+    /// <summary>
+    /// BE#59 regression — the bug in one line. An edit form that sends only the fields it edits used to bind
+    /// the absent <c>monthlySalary</c> to the record default <c>0m</c> and wipe the agreed salary; QA's probe
+    /// read "Expected: 600, Actual: 0". The salary must survive an edit that never mentions it, in the returned
+    /// DTO and in the row that was actually stored.
+    /// </summary>
+    [Fact]
+    public async Task Update_Without_A_Salary_Keeps_The_Agreed_Salary()
+    {
+        await using AuthDbContext db = AuthTestDb.New();
+        Employee employee = await db.AddEmployeeAsync(monthlySalary: 600m);
+
+        // Exactly how ASP.NET Core binds {"fullName": "...", "position": "..."}.
+        var result = await Updater(db).Handle(
+            new UpdateEmployeeCommand(employee.Id, "Günel Quliyeva", null, "Satıcı"), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(600m, result.Value.MonthlySalary);
+        Assert.Equal(600m, (await db.Employees.SingleAsync()).MonthlySalary);
+    }
+
+    /// <summary>
+    /// BE#59 — the structural half of the fix, and the reason it is structural: the edit route is
+    /// <c>OwnerOrManager</c> while setting a salary is <c>OwnerOnly</c>, so as long as the edit contract can
+    /// carry a salary at all, the owner-only rule is only as strong as whoever reviews the next handler. There
+    /// is no such field and no such parameter; re-adding either one turns this test red.
+    /// </summary>
+    [Fact]
+    public void The_Edit_Contract_Cannot_Carry_A_Salary()
+    {
+        Assert.Null(typeof(UpdateEmployeeCommand).GetProperty("MonthlySalary"));
+
+        string[] updateParameters = typeof(Employee).GetMethod(nameof(Employee.Update))!
+            .GetParameters()
+            .Select(p => p.Name!)
+            .ToArray();
+
+        Assert.DoesNotContain("monthlySalary", updateParameters);
+
+        // …while the owner-only route still has the one method that does change it.
+        Assert.NotNull(typeof(Employee).GetMethod(nameof(Employee.SetMonthlySalary)));
     }
 
     /// <summary>TC-11 — an id that is not on the payroll is "İşçi tapılmadı", on every route.</summary>

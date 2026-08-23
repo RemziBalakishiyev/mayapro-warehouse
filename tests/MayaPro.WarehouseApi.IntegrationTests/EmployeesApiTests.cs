@@ -235,15 +235,22 @@ public sealed class EmployeesApiTests : IAsyncLifetime
         await AssertBadRequestAsync(await CreateEmployeeResponseAsync(client, "Aysel", "Satıcı", phone: "abc"));
     }
 
-    /// <summary>TC-9 — maintaining the payroll is owner/manager work; a seller may look but not touch.</summary>
+    /// <summary>
+    /// TC-9 — maintaining the payroll is owner/manager work; a seller may look but not touch. The employee
+    /// carries a real agreed salary throughout (BE#59): on a zero-salary employee an edit that quietly resets
+    /// the figure is indistinguishable from one that leaves it alone, which is precisely how the wipe survived
+    /// this test the first time round.
+    /// </summary>
     [Fact]
     public async Task Payroll_Maintenance_Is_Owner_Or_Manager_Only()
     {
         HttpClient owner = await _factory.AuthenticatedClientAsync();
         HttpClient manager = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.ManagerPhone);
         HttpClient seller = await _factory.AuthenticatedClientAsync(IntegrationTestHelpers.SellerPhone);
+        const string Month = "2027-05";
 
         Guid id = await CreateEmployeeAsync(owner, "Rüfət Nəsirov", "Fəhlə");
+        await SetSalaryAsync(owner, id, 600m);
 
         Assert.Equal(HttpStatusCode.Forbidden, (await CreateEmployeeResponseAsync(seller, "Kim", "Satıcı")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await UpdateEmployeeResponseAsync(seller, id, "Kim", "Satıcı")).StatusCode);
@@ -256,6 +263,13 @@ public sealed class EmployeesApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Created, (await CreateEmployeeResponseAsync(manager, "Səbinə Rəhimli", "Satıcı")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await UpdateEmployeeResponseAsync(manager, id, "Rüfət Nəsirov", "Sürücü")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await manager.PostAsync($"/api/employees/{id}/activate", null)).StatusCode);
+
+        // BE#59: …and the promotion changed the job title only. The agreed salary survived an edit body that
+        // never mentioned it, so the month still owes the full 600 instead of reading −0 against a wiped figure.
+        Assert.Equal(600m, await MonthlySalaryAsync(owner, id));
+        IntegrationTestHelpers.SalarySummaryDto row = await SummaryRowAsync(owner, id, Month);
+        Assert.Equal(600m, row.MonthlySalary);
+        Assert.Equal(600m, row.Remaining);
 
         // TC-25: anonymous is rejected before any role check.
         HttpClient anonymous = _factory.CreateClient();
@@ -466,6 +480,29 @@ public sealed class EmployeesApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await SetSalaryResponseAsync(seller, employeeId, 700m)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await SetSalaryResponseAsync(owner, employeeId, 600m)).StatusCode);
 
+        // BE#59 — the 403 above is only worth something if the wider edit route cannot deliver the same
+        // outcome. PUT /{id} is OwnerOrManager, so a manager may edit the register (200), but the agreed
+        // salary is not part of what an edit reaches: not by sending a figure, not by omitting the field.
+        // Asserted on an employee of this test's own, so renaming it cannot disturb the shared fixtures.
+        Guid paid = await CreateEmployeeAsync(owner, "Nurlan Əliyev", "Fəhlə");
+        await SetSalaryAsync(owner, paid, 600m);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await UpdateEmployeeResponseAsync(manager, paid, "Nurlan Əliyev", "Sürücü", monthlySalary: 5000m)).StatusCode);
+        Assert.Equal(600m, await MonthlySalaryAsync(owner, paid));
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await UpdateEmployeeResponseAsync(manager, paid, "Nurlan Əliyev", "Sürücü")).StatusCode);
+        Assert.Equal(600m, await MonthlySalaryAsync(owner, paid));
+
+        // The owner's own edit is no exception — the route is the rule, not the role using it.
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await UpdateEmployeeResponseAsync(owner, paid, "Nurlan Əliyev", "Fəhlə", monthlySalary: 5000m)).StatusCode);
+        Assert.Equal(600m, await MonthlySalaryAsync(owner, paid));
+
         // POST .../salary-entries — owner or manager.
         Assert.Equal(HttpStatusCode.Created, (await AddEntryResponseAsync(manager, employeeId, "payment", 10m, "2026-09")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await AddEntryResponseAsync(seller, employeeId, "payment", 10m, "2026-09")).StatusCode);
@@ -609,10 +646,20 @@ public sealed class EmployeesApiTests : IAsyncLifetime
         return (await response.Content.ReadFromJsonAsync<IntegrationTestHelpers.EmployeeDto>())!.Id;
     }
 
+    /// <summary>
+    /// The edit body carries a <c>monthlySalary</c> only when a test deliberately sends one (BE#59): the field
+    /// is not part of the contract, and a helper that always attached it would hide the very case that broke —
+    /// the natural "edit the name and the job title" body, which sends nothing else.
+    /// </summary>
     private static Task<HttpResponseMessage> UpdateEmployeeResponseAsync(
         HttpClient client, Guid id, string fullName, string position, string? phone = null,
-        decimal monthlySalary = 0m, string? note = null) =>
-        client.PutAsJsonAsync($"/api/employees/{id}", new { fullName, phone, position, monthlySalary, note });
+        decimal? monthlySalary = null, string? note = null) =>
+        monthlySalary is null
+            ? client.PutAsJsonAsync($"/api/employees/{id}", new { fullName, phone, position, note })
+            : client.PutAsJsonAsync($"/api/employees/{id}", new { fullName, phone, position, note, monthlySalary });
+
+    private static async Task<decimal> MonthlySalaryAsync(HttpClient client, Guid id) =>
+        (await EmployeesAsync(client)).Single(e => e.Id == id).MonthlySalary;
 
     private static Task<HttpResponseMessage> SetSalaryResponseAsync(HttpClient client, Guid id, decimal monthlySalary) =>
         client.PutAsJsonAsync($"/api/employees/{id}/salary", new { monthlySalary });

@@ -9,8 +9,10 @@ using Microsoft.EntityFrameworkCore;
 namespace MayaPro.WarehouseApi.Modules.Auth.Application.UseCases.UpdateEmployee;
 
 /// <summary>
-/// Edits a payroll record and logs the change in one transaction (BE#57). The employee's salary history is
-/// untouched: renaming someone or correcting their job title never rewrites what they were already paid.
+/// Edits a payroll record and logs the change in one transaction (BE#57). The employee's salary is untouched —
+/// both the history and the agreed monthly figure: renaming someone or correcting their job title never
+/// rewrites what they are owed or what they were already paid. Changing the agreed salary is an owner's
+/// decision and has its own route, <c>PUT /api/employees/{id}/salary</c> (BE#59).
 /// <para>
 /// The row is loaded through the tenant-filtered set, so another shop's id is simply not found — a 404, not
 /// a 403, because the caller must not learn that the id exists at all.
@@ -40,11 +42,11 @@ public sealed class UpdateEmployeeHandler(
 
         await using IUnitOfWorkTransaction tx = await unitOfWork.BeginTransactionAsync(ct);
 
+        // The agreed salary is not among the fields on purpose (BE#59) — see UpdateEmployeeCommand.
         employee.Update(
             command.FullName.Trim(),
             phone.Value,
             command.Position.Trim(),
-            command.MonthlySalary,
             command.Note);
 
         await activityLogger.LogAsync(

@@ -64,17 +64,28 @@ public sealed class Employee : TenantEntity
         bool isActive = true) =>
         new(fullName, phone, position, monthlySalary, note, isActive);
 
-    /// <summary>Edits the employee's details. The agreed salary moves through <see cref="SetMonthlySalary"/>.</summary>
-    public void Update(string fullName, string? phone, string position, decimal monthlySalary, string? note)
+    /// <summary>
+    /// Edits the employee's details — name, contact number, job title and note.
+    /// <para>
+    /// The agreed salary is <b>not</b> among them and never was meant to be: it moves only through
+    /// <see cref="SetMonthlySalary"/>, whose route is owner-only. Taking the figure as a parameter here (BE#57)
+    /// made "rename this person" and "rewrite what we owe them" the same operation, so an edit that left the
+    /// field out reset the salary to zero (BE#59). The parameter is gone rather than made optional, because a
+    /// method that cannot express the mistake is a stronger guarantee than one that merely tolerates it.
+    /// </para>
+    /// </summary>
+    public void Update(string fullName, string? phone, string position, string? note)
     {
         FullName = fullName;
         Phone = phone;
         Position = position;
-        MonthlySalary = monthlySalary;
         Note = note;
     }
 
-    /// <summary>Sets the agreed monthly salary. The caller validates the amount (never negative).</summary>
+    /// <summary>
+    /// Sets the agreed monthly salary — the only way the figure ever changes after creation. The caller
+    /// validates the amount (never negative) and the route is owner-only.
+    /// </summary>
     public void SetMonthlySalary(decimal monthlySalary) => MonthlySalary = monthlySalary;
 
     public void Activate() => IsActive = true;

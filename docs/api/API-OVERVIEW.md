@@ -16,7 +16,7 @@ Bütün route-lar `/api/...`, JSON camelCase, tarixlər ISO 8601, pul decimal (J
 | GET | `/api/auth/me` | auth | Cari **giriş hesabı** |
 | GET | `/api/employees` | auth | İşçi (maaş uçotu) siyahısı — deaktivlər də daxil, `isActive` ilə |
 | POST | `/api/employees` | O+M | `{fullName, phone?, position, monthlySalary?, note?}` → 201 |
-| PUT | `/api/employees/{id}` | O+M | Eyni sahələr → 200 |
+| PUT | `/api/employees/{id}` | O+M | `{fullName, phone?, position, note?}` → 200 — **`monthlySalary` YOXDUR** (BE#59) |
 | POST | `/api/employees/{id}/deactivate` · `/activate` | O+M | 200, idempotent (silmə YOXDUR) |
 | PUT | `/api/employees/{id}/salary` | O | `{monthlySalary}` → yenilənmiş işçi sətri |
 | GET | `/api/employees/salary-summary?month=` | O+M | Hər işçi üzrə aylıq maaş hesabı |
@@ -34,6 +34,7 @@ Qeydiyyatdan sonrakı login cavabları: `PendingApproval` → 403 `Auth.TenantPe
 
 - `EmployeeDto` = `{id, fullName, phone (nullable), position, monthlySalary, isActive, note, createdAt}` — **`role` sahəsi SİLİNDİ** (işçinin rolu yoxdur, çünki login-i yoxdur), yerinə sərbəst mətn `position` («Satıcı», «Fəhlə», «Sürücü») gəldi.
 - `EmployeeSalarySummaryDto`: `userId` → **`employeeId`**, `role` → **`position`**. `SalaryEntryDto`: `userId` → **`employeeId`**; `createdByUserId` DƏYİŞMƏYİB — o, pulu VERƏN giriş hesabıdır (`ICurrentUser`), ödəniş ALAN isə `employeeId`-dir.
+- **Razılaşdırılmış maaş yalnız `PUT /api/employees/{id}/salary` (O) ilə dəyişir** (BE#59). `PUT /api/employees/{id}` (O+M) body-si `monthlySalary` sahəsini QƏBUL ETMİR — göndərilsə də nəzərə alınmır (naməlum sahə kimi). İki səbəb: (1) redaktə formasının təbii body-si (`{fullName, position}`) sahəni göndərmir və köhnə davranışda o, `0` kimi bind olunub razılaşdırılmış maaşı səssizcə silirdi (keçmiş ayların `remaining` sütunu mənfiyə düşürdü); (2) sahə O+M route-da qaldıqca menecer OwnerOnly maaş qaydasını sadəcə başqa marşrutdan keçirdi. İşçi YARADILARKƏN `monthlySalary?` hələ də verilə bilər (başlanğıc dəyər, default `0`).
 - `phone` opsionaldır və **unikal DEYİL** (login identifikatoru deyil): eyni nömrə ilə iki işçi yaratmaq 409 deyil, hər ikisi 201 alır. Verilibsə BE#46 qaydası ilə kanonik saxlanılır, boş/omitted → `null`, oxunmayan → 400.
 - Silmə endpoint-i yoxdur — maaş tarixçəsi qorunsun deyə işçi yalnız deaktiv edilir və siyahıda `isActive: false` ilə qalır (maaş xülasəsindən DƏ çıxarılmır, əks halda keçmiş ayların hesabatı dəyişərdi). Deaktiv işçiyə son haqq-hesab yazmaq İCAZƏLİDİR.
 - `Sales.soldByUserId` və activity `employeeId`/`userName` giriş hesabına aiddir — **toxunulmayıb**.
